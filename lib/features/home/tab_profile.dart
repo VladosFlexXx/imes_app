@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_inappwebview/flutter_inappwebview.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
+import 'package:package_info_plus/package_info_plus.dart';
 
 import '../../app.dart';
 import '../../core/widgets/update_banner.dart';
@@ -13,6 +14,12 @@ import '../profile/repository.dart';
 import '../notifications/notification_service.dart';
 
 import 'package:vuz_app/core/network/eios_client.dart';
+
+// ✅ DEBUG/LOG/SHARE
+import '../../core/logging/app_logger.dart';
+import '../../core/logging/log_exporter.dart';
+import '../../core/logging/share_helper.dart';
+import '../debug/debug_report.dart';
 
 class ProfileTab extends StatefulWidget {
   const ProfileTab({super.key});
@@ -41,6 +48,172 @@ class _ProfileTabState extends State<ProfileTab> {
     if (!context.mounted) return;
     Navigator.of(context).pushReplacement(
       MaterialPageRoute(builder: (_) => const LoginWebViewScreen()),
+    );
+  }
+
+  Future<void> _openDiagnostics() async {
+    final t = Theme.of(context).textTheme;
+
+    try {
+      AppLogger.instance.i('[DIAG] build report start');
+      final report = await DebugReport.build();
+      final file = await LogExporter.exportToTempFile(report);
+      AppLogger.instance.i('[DIAG] report ready file=${file.path} bytes=${report.length}');
+
+      if (!mounted) return;
+
+      await showModalBottomSheet(
+        context: context,
+        showDragHandle: true,
+        isScrollControlled: true,
+        builder: (_) {
+          return SafeArea(
+            child: Padding(
+              padding: EdgeInsets.only(
+                left: 16,
+                right: 16,
+                top: 10,
+                bottom: 16 + MediaQuery.of(context).viewInsets.bottom,
+              ),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Диагностика',
+                    style: t.titleLarge?.copyWith(fontWeight: FontWeight.w900),
+                  ),
+                  const SizedBox(height: 6),
+                  Text('Файл: ${file.path}', style: t.bodySmall),
+                  const SizedBox(height: 12),
+
+                  Row(
+                    children: [
+                      Expanded(
+                        child: FilledButton.icon(
+                          onPressed: () async {
+                            await LogExporter.copyToClipboard(report);
+                            if (!context.mounted) return;
+                            Navigator.of(context).pop();
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(content: Text('Отчёт скопирован в буфер')),
+                            );
+                          },
+                          icon: const Icon(Icons.copy),
+                          label: const Text('Копировать'),
+                        ),
+                      ),
+                      const SizedBox(width: 10),
+                      OutlinedButton.icon(
+                        onPressed: () async {
+                          try {
+                            await ShareHelper.shareFile(
+                              file,
+                              text: 'Отчёт ЭИОС (debug). Опиши, что делал перед багом.',
+                            );
+                          } catch (e, st) {
+                            AppLogger.instance.e('[DIAG] share failed', e, st);
+                            if (!context.mounted) return;
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(content: Text('Не удалось поделиться: $e')),
+                            );
+                          }
+                        },
+                        icon: const Icon(Icons.ios_share),
+                        label: const Text('Поделиться'),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 10),
+
+                  Row(
+                    children: [
+                      Expanded(
+                        child: OutlinedButton.icon(
+                          onPressed: () {
+                            AppLogger.instance.clear();
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(content: Text('Логи очищены')),
+                            );
+                          },
+                          icon: const Icon(Icons.delete_outline),
+                          label: const Text('Очистить логи'),
+                        ),
+                      ),
+                    ],
+                  ),
+
+                  const SizedBox(height: 12),
+
+                  ConstrainedBox(
+                    constraints: const BoxConstraints(maxHeight: 360),
+                    child: SingleChildScrollView(
+                      child: Text(
+                        report,
+                        style: const TextStyle(
+                          fontFamily: 'monospace',
+                          fontSize: 12,
+                          height: 1.2,
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          );
+        },
+      );
+    } catch (e, st) {
+      AppLogger.instance.e('[DIAG] failed', e, st);
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Не удалось собрать отчёт: $e')),
+      );
+    }
+  }
+
+  Future<void> _showAbout(BuildContext context) async {
+    const repoUrl = 'https://github.com/VladosFlexXx/vuz_app';
+
+    String versionLine = 'Версия: —';
+    try {
+      final info = await PackageInfo.fromPlatform();
+      final v = info.version.trim();
+      final b = info.buildNumber.trim();
+      versionLine = (v.isNotEmpty && b.isNotEmpty) ? 'Версия: $v+$b' : (v.isNotEmpty ? 'Версия: $v' : 'Версия: —');
+    } catch (_) {}
+
+    if (!context.mounted) return;
+
+    showAboutDialog(
+      context: context,
+      applicationName: 'ЭИОС ИМЭС',
+      applicationVersion: versionLine.replaceFirst('Версия: ', ''),
+      applicationLegalese: 'Бета-версия. Если что-то сломалось — открой “Профиль → Диагностика” и отправь отчёт.',
+      children: [
+        const SizedBox(height: 8),
+        Text(versionLine),
+        const SizedBox(height: 8),
+        const Text('Репозиторий (GitHub):'),
+        const SizedBox(height: 4),
+        SelectableText(repoUrl),
+        const SizedBox(height: 8),
+        Align(
+          alignment: Alignment.centerLeft,
+          child: OutlinedButton.icon(
+            onPressed: () async {
+              await Clipboard.setData(const ClipboardData(text: repoUrl));
+              if (!context.mounted) return;
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(content: Text('Ссылка на GitHub скопирована')),
+              );
+            },
+            icon: const Icon(Icons.copy),
+            label: const Text('Скопировать ссылку'),
+          ),
+        ),
+      ],
     );
   }
 
@@ -78,23 +251,21 @@ class _ProfileTabState extends State<ProfileTab> {
               children: [
                 UpdateBanner(repo: repo),
                 const SizedBox(height: 12),
+
                 _ProfileHeader(profile: p),
                 const SizedBox(height: 14),
 
-                Text('Данные',
-                    style: t.titleMedium?.copyWith(fontWeight: FontWeight.w900)),
+                Text('Данные', style: t.titleMedium?.copyWith(fontWeight: FontWeight.w900)),
                 const SizedBox(height: 10),
                 _ProfileInfoExpandable(profile: p),
 
                 const SizedBox(height: 18),
-                Text('Уведомления',
-                    style: t.titleMedium?.copyWith(fontWeight: FontWeight.w900)),
+                Text('Уведомления', style: t.titleMedium?.copyWith(fontWeight: FontWeight.w900)),
                 const SizedBox(height: 10),
                 const _PushCard(),
 
                 const SizedBox(height: 18),
-                Text('Настройки',
-                    style: t.titleMedium?.copyWith(fontWeight: FontWeight.w900)),
+                Text('Настройки', style: t.titleMedium?.copyWith(fontWeight: FontWeight.w900)),
                 const SizedBox(height: 10),
                 Card(
                   elevation: 0,
@@ -102,9 +273,7 @@ class _ProfileTabState extends State<ProfileTab> {
                     children: [
                       ListTile(
                         leading: const Icon(Icons.palette_outlined),
-                        title: Text('Тема',
-                            style: t.titleMedium
-                                ?.copyWith(fontWeight: FontWeight.w800)),
+                        title: Text('Тема', style: t.titleMedium?.copyWith(fontWeight: FontWeight.w800)),
                         subtitle: Text(_themeLabel(themeController.mode)),
                         trailing: const Icon(Icons.chevron_right),
                         onTap: () => _showThemePicker(context),
@@ -112,16 +281,63 @@ class _ProfileTabState extends State<ProfileTab> {
                       const Divider(height: 1),
                       ListTile(
                         leading: const Icon(Icons.info_outline),
-                        title: Text('О приложении',
-                            style: t.titleMedium
-                                ?.copyWith(fontWeight: FontWeight.w800)),
+                        title: Text('О приложении', style: t.titleMedium?.copyWith(fontWeight: FontWeight.w800)),
+                        subtitle: const Text('Версия, репозиторий, помощь с багами'),
                         trailing: const Icon(Icons.chevron_right),
+                        onTap: () => _showAbout(context),
+                      ),
+                    ],
+                  ),
+                ),
+
+                const SizedBox(height: 18),
+                Text('Аккаунт', style: t.titleMedium?.copyWith(fontWeight: FontWeight.w900)),
+                const SizedBox(height: 10),
+                Card(
+                  elevation: 0,
+                  child: ListTile(
+                    leading: const Icon(Icons.logout),
+                    title: Text('Выйти', style: t.titleMedium?.copyWith(fontWeight: FontWeight.w800)),
+                    subtitle: const Text('Очистить сессию и заново войти'),
+                    onTap: () => _logout(context),
+                  ),
+                ),
+
+                const SizedBox(height: 18),
+                Text('Диагностика', style: t.titleMedium?.copyWith(fontWeight: FontWeight.w900)),
+                const SizedBox(height: 10),
+                Card(
+                  elevation: 0,
+                  child: Column(
+                    children: [
+                      ListTile(
+                        leading: const Icon(Icons.bug_report_outlined),
+                        title: Text('Собрать отчёт', style: t.titleMedium?.copyWith(fontWeight: FontWeight.w800)),
+                        subtitle: const Text('Логи + кеш + репозитории + сеть'),
+                        onTap: _openDiagnostics,
+                      ),
+                      const Divider(height: 1),
+                      ListTile(
+                        leading: const Icon(Icons.copy_all_outlined),
+                        title: Text('Скопировать последние 200 строк', style: t.titleMedium?.copyWith(fontWeight: FontWeight.w800)),
+                        onTap: () async {
+                          final lines = AppLogger.instance.snapshot();
+                          final tail = lines.length <= 200 ? lines : lines.sublist(lines.length - 200);
+                          await LogExporter.copyToClipboard(tail.join('\n'));
+                          if (!context.mounted) return;
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(content: Text('Скопировано')),
+                          );
+                        },
+                      ),
+                      const Divider(height: 1),
+                      ListTile(
+                        leading: const Icon(Icons.delete_outline),
+                        title: Text('Очистить логи', style: t.titleMedium?.copyWith(fontWeight: FontWeight.w800)),
                         onTap: () {
-                          showAboutDialog(
-                            context: context,
-                            applicationName: 'ЭИОС',
-                            applicationVersion: '0.1',
-                            applicationLegalese: 'В разработке',
+                          AppLogger.instance.clear();
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(content: Text('Логи очищены')),
                           );
                         },
                       ),
@@ -130,24 +346,7 @@ class _ProfileTabState extends State<ProfileTab> {
                 ),
 
                 const SizedBox(height: 18),
-                Text('Аккаунт',
-                    style: t.titleMedium?.copyWith(fontWeight: FontWeight.w900)),
-                const SizedBox(height: 10),
-                Card(
-                  elevation: 0,
-                  child: ListTile(
-                    leading: const Icon(Icons.logout),
-                    title: Text('Выйти',
-                        style: t.titleMedium
-                            ?.copyWith(fontWeight: FontWeight.w800)),
-                    subtitle: const Text('Очистить сессию и заново войти'),
-                    onTap: () => _logout(context),
-                  ),
-                ),
-
-                const SizedBox(height: 18),
-                Text('ЭИОС (временно через Web)',
-                    style: t.titleMedium?.copyWith(fontWeight: FontWeight.w900)),
+                Text('ЭИОС (временно через Web)', style: t.titleMedium?.copyWith(fontWeight: FontWeight.w900)),
                 const SizedBox(height: 10),
                 SizedBox(
                   height: 48,
@@ -172,11 +371,15 @@ class _ProfileTabState extends State<ProfileTab> {
   }
 
   static String _themeLabel(ThemeMode mode) {
-    return switch (mode) {
-      ThemeMode.light => 'Светлая',
-      ThemeMode.dark => 'Тёмная',
-      ThemeMode.system => 'Системная',
-    };
+    switch (mode) {
+      case ThemeMode.light:
+        return 'Светлая';
+      case ThemeMode.dark:
+        return 'Тёмная';
+      case ThemeMode.system:
+      default:
+        return 'Системная';
+    }
   }
 
   static void _showThemePicker(BuildContext context) {
@@ -250,8 +453,7 @@ class _PushCard extends StatelessWidget {
               builder: (context, on, _) {
                 return SwitchListTile(
                   secondary: const Icon(Icons.notifications_active_outlined),
-                  title: Text('Включить пуши',
-                      style: t.titleMedium?.copyWith(fontWeight: FontWeight.w800)),
+                  title: Text('Включить пуши', style: t.titleMedium?.copyWith(fontWeight: FontWeight.w800)),
                   subtitle: const Text('Уведомления об изменениях в расписании'),
                   value: on,
                   onChanged: (v) => ns.setEnabled(v),
@@ -265,8 +467,7 @@ class _PushCard extends StatelessWidget {
                 final hasToken = token != null && token.trim().isNotEmpty;
                 return ListTile(
                   leading: const Icon(Icons.vpn_key_outlined),
-                  title: Text('FCM token',
-                      style: t.titleMedium?.copyWith(fontWeight: FontWeight.w800)),
+                  title: Text('FCM token', style: t.titleMedium?.copyWith(fontWeight: FontWeight.w800)),
                   subtitle: Text(
                     hasToken ? token! : 'Токен появится после включения пушей',
                     maxLines: 2,
@@ -302,9 +503,7 @@ class _ProfileHeader extends StatelessWidget {
     final cs = Theme.of(context).colorScheme;
     final t = Theme.of(context).textTheme;
 
-    final name = (profile?.fullName ?? 'Студент').trim().isEmpty
-        ? 'Студент'
-        : profile!.fullName.trim();
+    final name = (profile?.fullName ?? 'Студент').trim().isEmpty ? 'Студент' : profile!.fullName.trim();
     final avatarUrl = profile?.avatarUrl;
 
     return Card(
@@ -326,8 +525,7 @@ class _ProfileHeader extends StatelessWidget {
                   : Image.network(
                       avatarUrl,
                       fit: BoxFit.cover,
-                      errorBuilder: (_, __, ___) =>
-                          Icon(Icons.person, color: cs.onSurface),
+                      errorBuilder: (_, __, ___) => Icon(Icons.person, color: cs.onSurface),
                     ),
             ),
             const SizedBox(width: 14),
@@ -381,8 +579,7 @@ class _ProfileInfoExpandable extends StatelessWidget {
     final parts = <String>[];
     if (prof != null && prof.trim().isNotEmpty) parts.add(prof.trim());
     if (spec != null && spec.trim().isNotEmpty) {
-      if (parts.isEmpty ||
-          parts.first.toLowerCase() != spec.trim().toLowerCase()) {
+      if (parts.isEmpty || parts.first.toLowerCase() != spec.trim().toLowerCase()) {
         parts.add(spec.trim());
       }
     }
@@ -394,14 +591,10 @@ class _ProfileInfoExpandable extends StatelessWidget {
 
     final primaryItems = <({String title, String value, IconData icon})>[
       if (email != null) (title: 'Почта', value: email, icon: Icons.email_outlined),
-      if (profileLine != null)
-        (title: 'Профиль / направление', value: profileLine, icon: Icons.school_outlined),
-      if (level != null)
-        (title: 'Уровень подготовки', value: level, icon: Icons.badge_outlined),
-      if (eduForm != null)
-        (title: 'Форма обучения', value: eduForm, icon: Icons.event_seat_outlined),
-      if (recordBook != null)
-        (title: '№ зачётной книжки', value: recordBook, icon: Icons.confirmation_number_outlined),
+      if (profileLine != null) (title: 'Профиль / направление', value: profileLine, icon: Icons.school_outlined),
+      if (level != null) (title: 'Уровень подготовки', value: level, icon: Icons.badge_outlined),
+      if (eduForm != null) (title: 'Форма обучения', value: eduForm, icon: Icons.event_seat_outlined),
+      if (recordBook != null) (title: '№ зачётной книжки', value: recordBook, icon: Icons.confirmation_number_outlined),
     ];
 
     final shownValues = primaryItems.map((e) => e.value).toSet();
@@ -420,9 +613,7 @@ class _ProfileInfoExpandable extends StatelessWidget {
 
     bool looksLikeHtmlTrash(String v) {
       if (v.length < 40) return false;
-      return v.contains('<') &&
-          v.contains('>') &&
-          (v.contains('div') || v.contains('object') || v.contains('http'));
+      return v.contains('<') && v.contains('>') && (v.contains('div') || v.contains('object') || v.contains('http'));
     }
 
     final allEntries = p.fields.entries

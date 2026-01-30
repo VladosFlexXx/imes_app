@@ -6,8 +6,8 @@ import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:http/http.dart' as http;
 
 import '../auth/session_manager.dart';
+import '../logging/app_logger.dart';
 
-/// Ошибка: сессия истекла или куки невалидны (Moodle вернул страницу логина).
 class SessionExpiredException implements Exception {
   final String message;
   const SessionExpiredException([this.message = 'Session expired']);
@@ -16,7 +16,6 @@ class SessionExpiredException implements Exception {
   String toString() => 'SessionExpiredException: $message';
 }
 
-/// Ошибка: куки отсутствуют (пользователь не вошёл).
 class NoAuthCookiesException implements Exception {
   final String message;
   const NoAuthCookiesException([this.message = 'No auth cookies found']);
@@ -85,6 +84,9 @@ class EiosClient {
           .timeout(timeout);
     }
 
+    final sw = Stopwatch()..start();
+    AppLogger.instance.i('[HTTP] GET $url timeout=${timeout.inSeconds}s retries=$retries');
+
     http.Response? res;
     Exception? lastErr;
 
@@ -94,13 +96,18 @@ class EiosClient {
         break;
       } on TimeoutException catch (e) {
         lastErr = e;
+        AppLogger.instance.w('[HTTP] TIMEOUT attempt=${attempt + 1}/$retries url=$url');
       } on SocketException catch (e) {
         lastErr = e;
+        AppLogger.instance.w('[HTTP] SOCKET attempt=${attempt + 1}/$retries url=$url err=$e');
       } catch (e) {
         lastErr = Exception(e.toString());
+        AppLogger.instance.w('[HTTP] ERROR attempt=${attempt + 1}/$retries url=$url err=$e');
       }
 
       if (attempt == retries) {
+        sw.stop();
+        AppLogger.instance.e('[HTTP] FAIL $url (${sw.elapsedMilliseconds}ms)', lastErr);
         throw lastErr ?? Exception('Unknown network error');
       }
 
@@ -111,27 +118,35 @@ class EiosClient {
 
     final response = res;
     if (response == null) {
+      sw.stop();
+      AppLogger.instance.e('[HTTP] FAIL(no response) $url (${sw.elapsedMilliseconds}ms)', lastErr);
       throw lastErr ?? Exception('Unknown network error');
     }
 
     if (response.statusCode != 200) {
-      throw HttpException('Failed to load page: ${response.statusCode}',
-          uri: Uri.parse(url));
+      sw.stop();
+      AppLogger.instance.e(
+        '[HTTP] ${response.statusCode} $url (${sw.elapsedMilliseconds}ms) bytes=${response.bodyBytes.length}',
+      );
+      throw HttpException('Failed to load page: ${response.statusCode}', uri: Uri.parse(url));
     }
 
     final html = response.body;
     final lower = html.toLowerCase();
 
-    // Сессия могла истечь: Moodle отдаёт страницу логина.
     final finalUrl = response.request?.url.toString() ?? '';
     final redirectedToLogin =
         finalUrl.contains('/login') || finalUrl.contains('login/index.php');
 
     if (redirectedToLogin || _looksLikeLoginPage(lower)) {
-      // вот это главное: сообщаем UI "сессия умерла"
+      sw.stop();
+      AppLogger.instance.w('[HTTP] login page detected url=$url finalUrl=$finalUrl (${sw.elapsedMilliseconds}ms)');
       SessionManager.instance.markExpired();
       throw const SessionExpiredException('Moodle returned login page');
     }
+
+    sw.stop();
+    AppLogger.instance.i('[HTTP] 200 $url (${sw.elapsedMilliseconds}ms) bytes=${response.bodyBytes.length}');
 
     if (kDebugMode) {
       // ignore: avoid_print

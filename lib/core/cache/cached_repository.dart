@@ -1,4 +1,5 @@
 import 'package:flutter/foundation.dart';
+import '../logging/app_logger.dart';
 
 /// Простой базовый класс "кеш + автообновление".
 ///
@@ -20,38 +21,22 @@ abstract class CachedRepository<T> extends ChangeNotifier {
   bool _loading = false;
   Object? _lastError;
 
-  /// Данные (то, что рисует UI)
   T get data => _data;
-
-  /// Когда последний раз обновлялись (из сети или из кеша)
   DateTime? get updatedAt => _updatedAt;
-
-  /// Идёт ли сейчас обновление
   bool get loading => _loading;
-
-  /// Последняя ошибка обновления (если была)
   Object? get lastError => _lastError;
-
-  /// TTL — сколько живут данные, прежде чем их стоит обновить
   Duration get ttl => _ttl;
 
-  /// Читаем кеш (может вернуть null, если кеша нет/битый)
+  String get debugName => runtimeType.toString();
+
   Future<T?> readCache();
-
-  /// Сохраняем кеш
   Future<void> writeCache(T data, DateTime updatedAt);
-
-  /// Загружаем данные из сети
   Future<T> fetchRemote();
 
-  /// Первый запуск: грузим кеш (быстро) и уведомляем UI.
   Future<void> init() async {
     await _loadCacheOnly();
-    // обновление мы не форсим тут, чтобы UI не "подвисал";
-    // дальше вызывай refresh() когда надо (например, при заходе во вкладку)
   }
 
-  /// Удобная старая привычка: кеш + сразу обновить
   Future<void> initAndRefresh({bool force = true}) async {
     await init();
     await refresh(force: force);
@@ -64,42 +49,51 @@ abstract class CachedRepository<T> extends ChangeNotifier {
   }
 
   Future<void> _loadCacheOnly() async {
+    AppLogger.instance.i('[$debugName] cache load start');
     try {
       final cached = await readCache();
-      if (cached == null) return;
+      if (cached == null) {
+        AppLogger.instance.i('[$debugName] cache empty');
+        return;
+      }
 
       _data = cached;
-      // updatedAt обычно внутри readCache восстанавливается отдельно,
-      // поэтому не трогаем тут _updatedAt, если readCache её не выставил
+      AppLogger.instance.i('[$debugName] cache loaded');
       notifyListeners();
-    } catch (_) {
-      // битый кеш — молча игнорируем
+    } catch (e, st) {
+      AppLogger.instance.e('[$debugName] cache load error', e, st);
     }
   }
 
-  /// Основная функция: обновить данные.
-  ///
-  /// - force=false: обновляет только если данные устарели (TTL)
-  /// - force=true: обновляет всегда
   Future<void> refresh({bool force = false}) async {
     if (_loading) return;
 
     if (!force && !_isStale()) {
-      return; // свежо — не трогаем сеть
+      AppLogger.instance.i('[$debugName] refresh skipped (fresh)');
+      return;
     }
 
     _loading = true;
     _lastError = null;
     notifyListeners();
 
+    final sw = Stopwatch()..start();
+    AppLogger.instance.i('[$debugName] refresh start force=$force');
+
     try {
       final fresh = await fetchRemote();
       _data = fresh;
       _updatedAt = DateTime.now();
-
       await writeCache(_data, _updatedAt!);
-    } catch (e) {
+
+      sw.stop();
+      AppLogger.instance.i(
+        '[$debugName] refresh ok (${sw.elapsedMilliseconds}ms) updatedAt=${_updatedAt?.toIso8601String()}',
+      );
+    } catch (e, st) {
+      sw.stop();
       _lastError = e;
+      AppLogger.instance.e('[$debugName] refresh error (${sw.elapsedMilliseconds}ms)', e, st);
     } finally {
       _loading = false;
       notifyListeners();

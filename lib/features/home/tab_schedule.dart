@@ -4,6 +4,11 @@ import '../../core/widgets/update_banner.dart';
 import '../schedule/models.dart';
 import '../schedule/schedule_repository.dart';
 
+// ✅ новое
+import '../schedule/schedule_filter.dart';
+import '../schedule/week_calendar_sheet.dart';
+import '../schedule/week_utils.dart';
+
 enum ScheduleFilter { all, changes, cancelled }
 
 class ScheduleTab extends StatefulWidget {
@@ -17,6 +22,9 @@ class _ScheduleTabState extends State<ScheduleTab> {
   final repo = ScheduleRepository.instance;
 
   ScheduleFilter _filter = ScheduleFilter.all;
+
+  // ✅ выбранная “неделя”, относительно которой применяем правила
+  DateTime _referenceDate = DateTime.now();
 
   final Map<String, GlobalKey> _dayKeys = {};
   bool _didAutoScroll = false;
@@ -82,13 +90,46 @@ class _ScheduleTabState extends State<ScheduleTab> {
     });
   }
 
+  String _weekTitle(DateTime ref) {
+    final s = WeekUtils.weekStart(ref);
+    final e = WeekUtils.weekEnd(ref);
+    String two(int x) => x.toString().padLeft(2, '0');
+    return '${two(s.day)}.${two(s.month)} – ${two(e.day)}.${two(e.month)}';
+  }
+
+  bool get _isCurrentWeek => WeekUtils.sameWeek(_referenceDate, DateTime.now());
+
+  Future<void> _openWeekPicker() async {
+    await WeekCalendarSheet.show(
+      context,
+      selectedDate: _referenceDate,
+      onSelected: (d) => setState(() {
+        _referenceDate = d;
+        _didAutoScroll = false;
+      }),
+    );
+  }
+
+  void _goToCurrentWeek() {
+    setState(() {
+      _referenceDate = DateTime.now();
+      _didAutoScroll = false;
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
     return AnimatedBuilder(
       animation: repo,
       builder: (context, _) {
-        final allLessons = repo.lessons;
-        final filtered = _applyFilter(allLessons);
+        // ✅ 1) фильтруем под выбранную неделю (referenceDate)
+        final weekRelevant = filterLessonsForCurrentWeek(
+          repo.lessons,
+          referenceDate: _referenceDate,
+        );
+
+        // ✅ 2) затем UI-фильтр "Все/Изменения/Отмены"
+        final filtered = _applyFilter(weekRelevant);
         final grouped = _groupByDay(filtered);
 
         for (final d in grouped.keys) {
@@ -100,7 +141,18 @@ class _ScheduleTabState extends State<ScheduleTab> {
 
         return Scaffold(
           appBar: AppBar(
-            title: Text(repo.loading ? 'Расписание (обновление...)' : 'Расписание'),
+            title: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(repo.loading ? 'Расписание (обновление...)' : 'Расписание'),
+                Text(
+                  _weekTitle(_referenceDate),
+                  style: Theme.of(context).textTheme.labelMedium?.copyWith(
+                        fontWeight: FontWeight.w700,
+                      ),
+                ),
+              ],
+            ),
             bottom: repo.loading
                 ? const PreferredSize(
                     preferredSize: Size.fromHeight(3),
@@ -108,6 +160,17 @@ class _ScheduleTabState extends State<ScheduleTab> {
                   )
                 : null,
             actions: [
+              IconButton(
+                tooltip: 'Выбрать неделю',
+                onPressed: _openWeekPicker,
+                icon: const Icon(Icons.calendar_month_outlined),
+              ),
+              if (!_isCurrentWeek)
+                IconButton(
+                  tooltip: 'К текущей неделе',
+                  onPressed: _goToCurrentWeek,
+                  icon: const Icon(Icons.today),
+                ),
               IconButton(
                 tooltip: 'Обновить',
                 onPressed: repo.loading ? null : () => repo.refresh(force: true),

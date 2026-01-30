@@ -60,6 +60,9 @@ List<Lesson> lessonsFromHtml(String htmlText) {
     String type = '';
     String teacher = '';
 
+    // Флаг: строка "укороченная" из-за rowspan (нет subject/time в row)
+    bool inheritedSubject = false;
+
     if (remaining.length >= 4) {
       // Нормальный полный ряд: subject/place/type/teacher
       subject = remaining[0];
@@ -71,12 +74,13 @@ List<Lesson> lessonsFromHtml(String htmlText) {
       if (place.isNotEmpty) currentPlace = place;
     } else if (remaining.length == 3) {
       // Укороченный ряд: place/type/teacher, subject наследуем
-      // (в твоём HTML такое реально встречается)
       place = remaining[0];
       type = remaining[1];
       teacher = remaining[2];
 
       subject = currentSubject;
+      inheritedSubject = true;
+
       if (place.isNotEmpty) currentPlace = place;
       if (place.isEmpty) place = currentPlace;
     } else {
@@ -86,20 +90,58 @@ List<Lesson> lessonsFromHtml(String htmlText) {
     // Иногда subject может быть пустым — пропускаем
     if (subject.trim().isEmpty) continue;
 
-    lessons.add(
-      Lesson(
-        day: currentDay,
-        time: currentTime,
-        subject: subject,
-        place: place,
-        type: type,
-        teacher: teacher,
-        status: LessonStatus.normal,
-      ),
+    final newLesson = Lesson(
+      day: currentDay,
+      time: currentTime,
+      subject: subject,
+      place: place,
+      type: type,
+      teacher: teacher,
+      status: LessonStatus.normal,
     );
+
+    // === FIX ДУБЛЕЙ ИЗ-ЗА ROWSPAN (подгруппы) ===
+    // Если предмет/время унаследованы (remaining == 3),
+    // то чаще всего это "та же пара", но другая подгруппа/препод.
+    // Склеиваем преподавателей в одну карточку вместо дубля.
+    if (inheritedSubject && lessons.isNotEmpty) {
+      final last = lessons.last;
+
+      final sameSlot = last.day == newLesson.day &&
+          last.time == newLesson.time &&
+          last.subject == newLesson.subject &&
+          last.type == newLesson.type &&
+          last.status == newLesson.status;
+
+      if (sameSlot) {
+        final t1 = last.teacher.trim();
+        final t2 = newLesson.teacher.trim();
+
+        // не добавляем одинакового препода дважды
+        if (t2.isNotEmpty && !_teacherAlreadyListed(t1, t2)) {
+          final mergedTeacher = t1.isEmpty ? t2 : '$t1\n$t2';
+          lessons[lessons.length - 1] = last.copyWith(
+            teacher: mergedTeacher,
+            // place оставляем как у последнего/первого — обычно одинаковый (Live Digital)
+          );
+        }
+        continue; // не добавляем новый урок
+      }
+    }
+
+    lessons.add(newLesson);
   }
 
   return lessons;
+}
+
+bool _teacherAlreadyListed(String existing, String candidate) {
+  final ex = existing
+      .split('\n')
+      .map((s) => s.trim())
+      .where((s) => s.isNotEmpty)
+      .toList();
+  return ex.contains(candidate.trim());
 }
 
 bool _looksLikeDay(String text) {
