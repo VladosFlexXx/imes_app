@@ -34,16 +34,37 @@ jobs:
       - name: Build APK (debug beta)
         run: flutter build apk --debug --dart-define=BETA=true
 
+      - name: Debug - list apk outputs
+        run: |
+          echo "=== flutter-apk dir ==="
+          ls -la build/app/outputs/flutter-apk || true
+          echo "=== find *.apk ==="
+          find build -type f -name "*.apk" -maxdepth 6 -print || true
+
       - name: Prepare artifact name
         run: |
           VERSION="${{ github.ref_name }}"
           APK_IN="build/app/outputs/flutter-apk/app-debug.apk"
+
+          if [ ! -f "$APK_IN" ]; then
+            echo "Expected APK not found at $APK_IN"
+            echo "Searching..."
+            APK_IN="$(find build -type f -name "*.apk" | head -n 1)"
+          fi
+
+          if [ ! -f "$APK_IN" ]; then
+            echo "No APK found at all!"
+            exit 1
+          fi
+
           APK_OUT="EIOS-IMES-${VERSION}.apk"
           cp "$APK_IN" "$APK_OUT"
           echo "APK_OUT=$APK_OUT" >> $GITHUB_ENV
+          echo "Using APK: $APK_IN -> $APK_OUT"
 
       - name: Create GitHub Release and upload APK
         uses: softprops/action-gh-release@v2
         with:
+          token: ${{ secrets.GITHUB_TOKEN }}
           files: ${{ env.APK_OUT }}
           generate_release_notes: true
