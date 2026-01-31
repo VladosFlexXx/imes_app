@@ -3,9 +3,11 @@ import 'package:flutter/material.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 
+import 'core/auth/auth_settings.dart';
 import 'features/auth/login_webview.dart';
 import 'features/home/home_screen.dart';
 import 'theme_controller.dart';
+import 'ui/app_theme.dart';
 
 final themeController = ThemeController();
 
@@ -29,6 +31,7 @@ class _VuzAppState extends State<VuzApp> {
   Future<void> _init() async {
     await Future.wait([
       themeController.load(),
+      AuthSettings.instance.load(),
       _loadVersion(),
     ]);
   }
@@ -36,14 +39,11 @@ class _VuzAppState extends State<VuzApp> {
   Future<void> _loadVersion() async {
     try {
       final info = await PackageInfo.fromPlatform();
-      // version = 0.1.0, buildNumber = 3
       final v = info.version.trim();
       final b = info.buildNumber.trim();
       final combined = (v.isNotEmpty && b.isNotEmpty) ? '$v+$b' : (v.isNotEmpty ? v : '');
       if (mounted) setState(() => _appVersion = combined);
-    } catch (_) {
-      // если не смогли получить версию — просто покажем BETA без версии
-    }
+    } catch (_) {}
   }
 
   void _onThemeChanged() {
@@ -56,75 +56,8 @@ class _VuzAppState extends State<VuzApp> {
     super.dispose();
   }
 
-  ThemeData _lightTheme() {
-    final base = ThemeData(
-      useMaterial3: true,
-      brightness: Brightness.light,
-      colorSchemeSeed: Colors.indigo,
-    );
-
-    final cs = base.colorScheme;
-
-    return base.copyWith(
-      scaffoldBackgroundColor: const Color(0xFFF6F7FB),
-
-      // ✅ фикс контрастности нижней навигации
-      bottomNavigationBarTheme: BottomNavigationBarThemeData(
-        type: BottomNavigationBarType.fixed,
-        backgroundColor: cs.surface,
-        selectedItemColor: cs.primary,
-        unselectedItemColor: cs.onSurface.withOpacity(0.65),
-        selectedIconTheme: IconThemeData(color: cs.primary),
-        unselectedIconTheme: IconThemeData(color: cs.onSurface.withOpacity(0.65)),
-        showUnselectedLabels: true,
-      ),
-
-      cardTheme: CardThemeData(
-        elevation: 0,
-        margin: EdgeInsets.zero,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
-      ),
-    );
-  }
-
-  ThemeData _darkTheme() {
-    final base = ThemeData(
-      useMaterial3: true,
-      brightness: Brightness.dark,
-      colorSchemeSeed: Colors.indigo,
-    );
-
-    final cs = base.colorScheme;
-
-    return base.copyWith(
-      scaffoldBackgroundColor: const Color(0xFF0F1115),
-
-      // ✅ фикс контрастности нижней навигации
-      bottomNavigationBarTheme: BottomNavigationBarThemeData(
-        type: BottomNavigationBarType.fixed,
-        backgroundColor: cs.surface,
-        selectedItemColor: cs.primary,
-        unselectedItemColor: cs.onSurface.withOpacity(0.75),
-        selectedIconTheme: IconThemeData(color: cs.primary),
-        unselectedIconTheme: IconThemeData(color: cs.onSurface.withOpacity(0.75)),
-        showUnselectedLabels: true,
-      ),
-
-      cardTheme: CardThemeData(
-        elevation: 0,
-        margin: EdgeInsets.zero,
-        color: const Color(0xFF171A21),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
-      ),
-    );
-  }
-
   Widget _wrapWithBetaBadge(BuildContext context, Widget child) {
-    // В debug: бейдж всегда.
-    // В release: только если --dart-define=BETA=true
-    final bool betaEnabled =
-        !kReleaseMode || const bool.fromEnvironment('BETA', defaultValue: false);
-
+    final bool betaEnabled = !kReleaseMode || const bool.fromEnvironment('BETA', defaultValue: false);
     if (!betaEnabled) return child;
 
     final cs = Theme.of(context).colorScheme;
@@ -138,22 +71,22 @@ class _VuzAppState extends State<VuzApp> {
         Positioned(
           top: 10,
           right: 10,
-          child: IgnorePointer(
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-              decoration: BoxDecoration(
-                color: cs.tertiaryContainer,
-                borderRadius: BorderRadius.circular(999),
-                border: Border.all(color: cs.tertiary.withOpacity(0.35)),
-              ),
-              child: Text(
-                label,
-                style: t.labelSmall?.copyWith(
-                  fontWeight: FontWeight.w900,
-                  letterSpacing: 1.1,
-                  color: cs.onTertiaryContainer,
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+            decoration: BoxDecoration(
+              color: cs.error,
+              borderRadius: BorderRadius.circular(999),
+              boxShadow: [
+                BoxShadow(
+                  color: cs.shadow.withOpacity(0.25),
+                  blurRadius: 10,
+                  offset: const Offset(0, 6),
                 ),
-              ),
+              ],
+            ),
+            child: Text(
+              label,
+              style: t.labelLarge?.copyWith(color: cs.onError, fontWeight: FontWeight.w900),
             ),
           ),
         ),
@@ -163,56 +96,52 @@ class _VuzAppState extends State<VuzApp> {
 
   @override
   Widget build(BuildContext context) {
-    if (!themeController.loaded) {
-      return MaterialApp(
-        debugShowCheckedModeBanner: false,
-        builder: (context, child) =>
-            _wrapWithBetaBadge(context, child ?? const SizedBox.shrink()),
-        home: const Scaffold(body: Center(child: CircularProgressIndicator())),
-      );
-    }
-
     return MaterialApp(
-      debugShowCheckedModeBanner: false,
-      title: 'ЭИОС',
-      theme: _lightTheme(),
-      darkTheme: _darkTheme(),
+      title: 'ЭИОС ИМЭС',
+      theme: AppTheme.light(),
+      darkTheme: AppTheme.dark(),
       themeMode: themeController.mode,
-      builder: (context, child) =>
-          _wrapWithBetaBadge(context, child ?? const SizedBox.shrink()),
-      home: const _AuthGate(),
+      routes: {
+        '/login': (_) => const LoginWebViewScreen(),
+        '/home': (_) => const HomeScreen(),
+      },
+      home: _wrapWithBetaBadge(
+        context,
+        const _BootGate(),
+      ),
     );
   }
 }
 
-class _AuthGate extends StatefulWidget {
-  const _AuthGate();
+class _BootGate extends StatefulWidget {
+  const _BootGate();
 
   @override
-  State<_AuthGate> createState() => _AuthGateState();
+  State<_BootGate> createState() => _BootGateState();
 }
 
-class _AuthGateState extends State<_AuthGate> {
-  static const _storage = FlutterSecureStorage();
-  bool? _hasCookie;
-
+class _BootGateState extends State<_BootGate> {
   @override
   void initState() {
     super.initState();
-    _check();
+    _go();
   }
 
-  Future<void> _check() async {
-    final v = await _storage.read(key: 'cookie_header');
+  Future<void> _go() async {
+    const storage = FlutterSecureStorage();
+    final cookieHeader = await storage.read(key: 'cookie_header');
+
     if (!mounted) return;
-    setState(() => _hasCookie = (v != null && v.trim().isNotEmpty));
+
+    if (cookieHeader != null && cookieHeader.trim().isNotEmpty) {
+      Navigator.of(context).pushReplacementNamed('/home');
+    } else {
+      Navigator.of(context).pushReplacementNamed('/login');
+    }
   }
 
   @override
   Widget build(BuildContext context) {
-    if (_hasCookie == null) {
-      return const Scaffold(body: Center(child: CircularProgressIndicator()));
-    }
-    return _hasCookie! ? const HomeScreen() : const LoginWebViewScreen();
+    return const Scaffold(body: Center(child: CircularProgressIndicator()));
   }
 }

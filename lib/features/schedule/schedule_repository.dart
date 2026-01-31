@@ -7,28 +7,20 @@ import '../../core/cache/cached_repository.dart';
 import 'convert.dart';
 import 'merge.dart';
 import 'models.dart';
+import 'schedule_rule.dart';
 import 'schedule_service.dart';
+import 'week_parity.dart';
+import 'week_parity_service.dart';
 
 const _kCacheKey = 'schedule_cache_v3';
 const _kCacheUpdatedKey = 'schedule_cache_updated_v3';
 
 const _baseUrl = 'https://eos.imes.su/mod/page/view.php?id=41428';
-
-// ВАЖНО: эта ссылка может “умирать” (как у тебя сейчас)
 const _changesUrl = 'https://eos.imes.su/mod/page/view.php?id=56446';
 
-// compute требует top-level функцию
 List<Lesson> _parseLessons(String html) => lessonsFromHtml(html);
 
 String _normDay(String s) => s.toUpperCase().trim();
-
-String _normTime(String s) {
-  var t = s.trim();
-  t = t.replaceAll('–', '-').replaceAll('—', '-');
-  t = t.replaceAll(':', '.');
-  t = t.replaceAll(RegExp(r'\s+'), '');
-  return t;
-}
 
 class ScheduleRepository extends CachedRepository<List<Lesson>> {
   ScheduleRepository._()
@@ -40,6 +32,44 @@ class ScheduleRepository extends CachedRepository<List<Lesson>> {
   static final ScheduleRepository instance = ScheduleRepository._();
 
   List<Lesson> get lessons => data;
+
+  /// ✅ ЕДИНЫЙ ИСТОЧНИК ИСТИНЫ:
+  /// реальные пары на конкретную дату с учётом:
+  /// - чёт/нечет
+  /// - конкретных дат
+  /// - дня недели
+  List<Lesson> lessonsForDate(DateTime date) {
+    final dayName = _weekdayRuUpper(date);
+    final parity = WeekParityService.parityFor(date);
+
+    return lessons
+        .where((l) {
+          if (_normDay(l.day) != dayName) return false;
+
+          final rule = ScheduleRule.parseFromSubject(l.subject);
+
+          switch (rule.type) {
+            case ScheduleRuleType.always:
+              return true;
+
+            case ScheduleRuleType.evenWeeks:
+              return parity == WeekParity.even;
+
+            case ScheduleRuleType.oddWeeks:
+              return parity == WeekParity.odd;
+
+            case ScheduleRuleType.specificDates:
+              return rule.dates.any((dm) {
+                final resolved = dm.resolveNear(date);
+                return resolved.year == date.year &&
+                    resolved.month == date.month &&
+                    resolved.day == date.day;
+              });
+          }
+        })
+        .toList()
+      ..sort((a, b) => _timeRank(a.time).compareTo(_timeRank(b.time)));
+  }
 
   @override
   Future<List<Lesson>?> readCache() async {
@@ -73,53 +103,16 @@ class ScheduleRepository extends CachedRepository<List<Lesson>> {
   Future<List<Lesson>> fetchRemote() async {
     final service = ScheduleService();
 
-    // 1) БАЗУ грузим обязательно. Если база не загрузилась — это реально фейл.
     final baseHtml = await service.loadPage(_baseUrl);
     final baseLessons = await compute(_parseLessons, baseHtml);
 
-    // 2) ИЗМЕНЕНИЯ — best effort: если не получилось, просто считаем, что изменений нет.
     List<Lesson> changeLessons = const [];
     try {
       final changesHtml = await service.loadPage(_changesUrl);
       changeLessons = await compute(_parseLessons, changesHtml);
-    } catch (e) {
-      // ВАЖНО: не валим весь fetchRemote
-      // Можно оставить print для дебага:
-      // ignore: avoid_print
-      print('[ScheduleRepository] changes page failed, using base only: $e');
-      changeLessons = const [];
-    }
+    } catch (_) {}
 
-    final merged = mergeSchedule(base: baseLessons, changes: changeLessons);
-
-    merged.sort((a, b) {
-      final d = _dayRank(a.day).compareTo(_dayRank(b.day));
-      if (d != 0) return d;
-      return _timeRank(a.time).compareTo(_timeRank(b.time));
-    });
-
-    return merged;
-  }
-
-  static const _dayOrder = <String, int>{
-    'ПОНЕДЕЛЬНИК': 1,
-    'ВТОРНИК': 2,
-    'СРЕДА': 3,
-    'ЧЕТВЕРГ': 4,
-    'ПЯТНИЦА': 5,
-    'СУББОТА': 6,
-    'ВОСКРЕСЕНЬЕ': 7,
-  };
-
-  int _dayRank(String day) => _dayOrder[_normDay(day)] ?? 999;
-
-  int _timeRank(String time) {
-    final t = _normTime(time);
-    final start = t.split('-').first;
-    final parts = start.split('.');
-    final h = parts.isNotEmpty ? int.tryParse(parts[0]) ?? 99 : 99;
-    final m = parts.length > 1 ? int.tryParse(parts[1]) ?? 99 : 99;
-    return h * 100 + m;
+    return mergeSchedule(base: baseLessons, changes: changeLessons);
   }
 
   Map<String, dynamic> _lessonToJson(Lesson l) => {
@@ -132,24 +125,37 @@ class ScheduleRepository extends CachedRepository<List<Lesson>> {
         'status': l.status.name,
       };
 
-  Lesson _lessonFromJson(Map<String, dynamic> j) {
-    LessonStatus status = LessonStatus.normal;
-    final s = (j['status'] ?? '').toString();
-    for (final v in LessonStatus.values) {
-      if (v.name == s) {
-        status = v;
-        break;
-      }
-    }
+  Lesson _lessonFromJson(Map<String, dynamic> j) => Lesson(
+        day: j['day'],
+        time: j['time'],
+        subject: j['subject'],
+        place: j['place'],
+        type: j['type'],
+        teacher: j['teacher'],
+        status: LessonStatus.values.firstWhere(
+          (e) => e.name == j['status'],
+          orElse: () => LessonStatus.normal,
+        ),
+      );
+}
 
-    return Lesson(
-      day: (j['day'] ?? '').toString(),
-      time: (j['time'] ?? '').toString(),
-      subject: (j['subject'] ?? '').toString(),
-      place: (j['place'] ?? '').toString(),
-      type: (j['type'] ?? '').toString(),
-      teacher: (j['teacher'] ?? '').toString(),
-      status: status,
-    );
-  }
+String _weekdayRuUpper(DateTime d) {
+  const map = {
+    1: 'ПОНЕДЕЛЬНИК',
+    2: 'ВТОРНИК',
+    3: 'СРЕДА',
+    4: 'ЧЕТВЕРГ',
+    5: 'ПЯТНИЦА',
+    6: 'СУББОТА',
+    7: 'ВОСКРЕСЕНЬЕ',
+  };
+  return map[d.weekday]!;
+}
+
+int _timeRank(String time) {
+  final start = time.split('-').first.trim().replaceAll(':', '.');
+  final parts = start.split('.');
+  final h = int.tryParse(parts[0]) ?? 99;
+  final m = parts.length > 1 ? int.tryParse(parts[1]) ?? 0 : 0;
+  return h * 100 + m;
 }
