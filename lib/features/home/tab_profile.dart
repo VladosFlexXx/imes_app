@@ -216,9 +216,30 @@ class _ProfileHeader extends StatelessWidget {
     if (p == null) {
       return Card(
         elevation: 0,
-        child: const Padding(
-          padding: EdgeInsets.all(14),
-          child: Text('Загрузка...'),
+        child: Padding(
+          padding: const EdgeInsets.all(14),
+          child: Column(
+            children: const [
+              Row(
+                children: [
+                  _SkeletonCircle(size: 52),
+                  SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        _SkeletonLine(width: 220, height: 18),
+                        SizedBox(height: 8),
+                        _SkeletonLine(width: 160, height: 13),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+              SizedBox(height: 12),
+              _SkeletonLine(width: double.infinity, height: 10),
+            ],
+          ),
         ),
       );
     }
@@ -256,7 +277,7 @@ class _ProfileHeader extends StatelessWidget {
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                         style: t.bodySmall?.copyWith(
-                          color: cs.onSurface.withOpacity(0.78),
+                          color: cs.onSurface.withValues(alpha: 0.78),
                           fontWeight: FontWeight.w600,
                         ),
                       ),
@@ -275,8 +296,8 @@ class _ProfileHeader extends StatelessWidget {
                     hasError ? Icons.warning_amber_rounded : Icons.sync,
                     size: 18,
                     color: hasError
-                        ? cs.error.withOpacity(0.85)
-                        : cs.onSurface.withOpacity(0.75),
+                        ? cs.error.withValues(alpha: 0.85)
+                        : cs.onSurface.withValues(alpha: 0.75),
                   ),
                   const SizedBox(width: 8),
                   Expanded(
@@ -286,7 +307,7 @@ class _ProfileHeader extends StatelessWidget {
                           : 'Обновлено: $updateText',
                       style: t.bodySmall?.copyWith(
                         fontWeight: FontWeight.w700,
-                        color: cs.onSurface.withOpacity(0.78),
+                        color: cs.onSurface.withValues(alpha: 0.78),
                       ),
                     ),
                   ),
@@ -319,14 +340,21 @@ class _ProfileInfoCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final p = profile;
     final cs = Theme.of(context).colorScheme;
-    final t = Theme.of(context).textTheme;
 
     if (p == null) {
       return Card(
         elevation: 0,
-        child: const Padding(
-          padding: EdgeInsets.all(14),
-          child: Text('Загрузка...'),
+        child: Padding(
+          padding: const EdgeInsets.all(14),
+          child: Column(
+            children: const [
+              _SkeletonTile(),
+              SizedBox(height: 8),
+              _SkeletonTile(),
+              SizedBox(height: 8),
+              _SkeletonTile(),
+            ],
+          ),
         ),
       );
     }
@@ -388,7 +416,7 @@ class _ProfileInfoCard extends StatelessWidget {
         padding: const EdgeInsets.symmetric(vertical: 6),
         child: Column(
           children: [
-            ..._withDividers(items, Divider(color: cs.outlineVariant.withOpacity(0.35), height: 1)),
+            ..._withDividers(items, Divider(color: cs.outlineVariant.withValues(alpha: 0.35), height: 1)),
           ],
         ),
       ),
@@ -430,7 +458,7 @@ class _InfoTile extends StatelessWidget {
       subtitle: Text(
         show ? v : '—',
         style: t.bodyMedium?.copyWith(
-          color: cs.onSurface.withOpacity(show ? 0.85 : 0.55),
+          color: cs.onSurface.withValues(alpha: show ? 0.85 : 0.55),
           fontWeight: FontWeight.w600,
         ),
       ),
@@ -472,15 +500,82 @@ class _CopyTile extends StatelessWidget {
               ),
             ),
             if (show)
-              Icon(Icons.copy_rounded, size: 18, color: cs.onSurface.withOpacity(0.65)),
+              Icon(Icons.copy_rounded, size: 18, color: cs.onSurface.withValues(alpha: 0.65)),
           ],
         ),
         subtitle: Text(
           (v.isNotEmpty) ? v : '—',
           style: t.bodyMedium?.copyWith(
-            color: cs.onSurface.withOpacity(v.isNotEmpty ? 0.85 : 0.55),
+            color: cs.onSurface.withValues(alpha: v.isNotEmpty ? 0.85 : 0.55),
             fontWeight: FontWeight.w600,
           ),
+        ),
+      ),
+    );
+  }
+}
+
+class _SkeletonTile extends StatelessWidget {
+  const _SkeletonTile();
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: const [
+        _SkeletonCircle(size: 22),
+        SizedBox(width: 12),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              _SkeletonLine(width: 140, height: 14),
+              SizedBox(height: 8),
+              _SkeletonLine(width: double.infinity, height: 12),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _SkeletonCircle extends StatelessWidget {
+  final double size;
+  const _SkeletonCircle({required this.size});
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    return Container(
+      width: size,
+      height: size,
+      decoration: BoxDecoration(
+        shape: BoxShape.circle,
+        color: cs.surfaceContainerHighest.withValues(alpha: 0.45),
+      ),
+    );
+  }
+}
+
+class _SkeletonLine extends StatelessWidget {
+  final double width;
+  final double height;
+  const _SkeletonLine({
+    required this.width,
+    this.height = 12,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    return Align(
+      alignment: Alignment.centerLeft,
+      child: Container(
+        width: width,
+        height: height,
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(8),
+          color: cs.surfaceContainerHighest.withValues(alpha: 0.45),
         ),
       ),
     );

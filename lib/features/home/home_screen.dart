@@ -39,6 +39,7 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   int _index = 0;
+  DateTime? _lastBackPress;
 
   void _navigateTo(int i) => setState(() => _index = i);
 
@@ -86,55 +87,90 @@ class _HomeScreenState extends State<HomeScreen> {
     super.dispose();
   }
 
+  Future<bool> _onWillPop() async {
+    // Назад на любой вкладке -> возвращаем на Главную.
+    if (_index != 0) {
+      setState(() => _index = 0);
+      return false;
+    }
+
+    // На главной: двойное "назад" для выхода.
+    final now = DateTime.now();
+    final last = _lastBackPress;
+    _lastBackPress = now;
+
+    if (last != null && now.difference(last) <= const Duration(seconds: 2)) {
+      return true; // закрыть приложение
+    }
+
+    // Показываем подсказку.
+    final messenger = ScaffoldMessenger.of(context);
+    messenger.clearSnackBars();
+    messenger.showSnackBar(
+      const SnackBar(
+        content: Text('Ещё раз назад, чтобы выйти'),
+        duration: Duration(seconds: 2),
+        behavior: SnackBarBehavior.floating,
+      ),
+    );
+
+    return false;
+  }
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final bnt = theme.bottomNavigationBarTheme;
     final cs = theme.colorScheme;
 
-    return Scaffold(
-      body: SafeArea(
-        child: IndexedStack(
-          index: _index,
-          children: _pages,
+    return WillPopScope(
+      onWillPop: _onWillPop,
+      child: Scaffold(
+        body: SafeArea(
+          child: IndexedStack(
+            index: _index,
+            children: _pages,
+          ),
         ),
-      ),
-      bottomNavigationBar: BottomNavigationBar(
-        type: BottomNavigationBarType.fixed,
-        currentIndex: _index,
-        onTap: _navigateTo,
+        bottomNavigationBar: BottomNavigationBar(
+          type: BottomNavigationBarType.fixed,
+          currentIndex: _index,
+          onTap: _navigateTo,
 
-        // ✅ ЯВНО: фон/цвета берём из темы
-        backgroundColor: bnt.backgroundColor ?? cs.surface,
-        selectedItemColor: bnt.selectedItemColor ?? cs.primary,
-        unselectedItemColor: bnt.unselectedItemColor ?? cs.onSurface.withOpacity(0.7),
-        selectedIconTheme: bnt.selectedIconTheme ?? IconThemeData(color: cs.primary),
-        unselectedIconTheme:
-            bnt.unselectedIconTheme ?? IconThemeData(color: cs.onSurface.withOpacity(0.7)),
-        showUnselectedLabels: bnt.showUnselectedLabels ?? true,
+          // ✅ ЯВНО: фон/цвета берём из темы
+          backgroundColor: bnt.backgroundColor ?? cs.surface,
+          selectedItemColor: bnt.selectedItemColor ?? cs.primary,
+          unselectedItemColor:
+              bnt.unselectedItemColor ?? cs.onSurface.withOpacity(0.7),
+          selectedIconTheme:
+              bnt.selectedIconTheme ?? IconThemeData(color: cs.primary),
+          unselectedIconTheme: bnt.unselectedIconTheme ??
+              IconThemeData(color: cs.onSurface.withOpacity(0.7)),
+          showUnselectedLabels: bnt.showUnselectedLabels ?? true,
 
-        items: const [
-          BottomNavigationBarItem(
-            icon: Icon(Icons.home_outlined),
-            activeIcon: Icon(Icons.home),
-            label: 'Главная',
-          ),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.calendar_today_outlined),
-            activeIcon: Icon(Icons.calendar_today),
-            label: 'Расписание',
-          ),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.school_outlined),
-            activeIcon: Icon(Icons.school),
-            label: 'Оценки',
-          ),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.person_outline),
-            activeIcon: Icon(Icons.person),
-            label: 'Профиль',
-          ),
-        ],
+          items: const [
+            BottomNavigationBarItem(
+              icon: Icon(Icons.home_outlined),
+              activeIcon: Icon(Icons.home),
+              label: 'Главная',
+            ),
+            BottomNavigationBarItem(
+              icon: Icon(Icons.calendar_today_outlined),
+              activeIcon: Icon(Icons.calendar_today),
+              label: 'Расписание',
+            ),
+            BottomNavigationBarItem(
+              icon: Icon(Icons.school_outlined),
+              activeIcon: Icon(Icons.school),
+              label: 'Оценки',
+            ),
+            BottomNavigationBarItem(
+              icon: Icon(Icons.person_outline),
+              activeIcon: Icon(Icons.person),
+              label: 'Профиль',
+            ),
+          ],
+        ),
       ),
     );
   }

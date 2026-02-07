@@ -17,107 +17,71 @@ class ScheduleTab extends StatefulWidget {
   State<ScheduleTab> createState() => _ScheduleTabState();
 }
 
-class _ScheduleTabState extends State<ScheduleTab> {
+class _ScheduleTabState extends State<ScheduleTab>
+    with TickerProviderStateMixin {
   final repo = ScheduleRepository.instance;
 
   ScheduleUiFilter _filter = ScheduleUiFilter.all;
 
-  /// Якорь для бесконечного PageView (старт понедельника текущей недели).
-  late final DateTime _anchorWeekStart;
+  /// Неделя ряда кружков (UI) — её можно свайпать отдельно, не меняя расписание.
+  late DateTime _uiWeekStart;
 
-  /// Большая стартовая страница, чтобы можно было бесконечно ходить в обе стороны.
-  static const int _pageBase = 10000;
+  /// Неделя, из которой реально показывается расписание.
+  late DateTime _contentWeekStart;
 
-  /// Текущая страница PageView.
-  late int _currentPage;
-
-  /// Любая дата внутри выбранной недели (якорь недели).
-  DateTime _weekRef = DateTime.now();
-
-  /// 0..6 (Пн..Вс)
+  /// 0..6 (Пн..Вс) выбранный день (и в расписании, и как "выбор").
   int _selectedIndex = DateTime.now().weekday - 1;
 
-  late final PageController _pageController;
+  /// Для анимации смены дня (один слайд).
+  int _lastSelectedIndex = DateTime.now().weekday - 1;
+
+  /// Для анимации ряда кружков при смене недели.
+  int _weekSlideDir = 0; // -1 пред., +1 след.
+
+  static const _kAnim = Duration(milliseconds: 260);
+  static const _kCurveIn = Curves.easeOutCubic;
+  static const _kCurveOut = Curves.easeInCubic;
+
+  /// Плавная анимация изменения высоты контента дня.
+  static const _kSizeAnim = Duration(milliseconds: 220);
+  static const _kSizeCurve = Curves.easeInOutCubic;
 
   @override
   void initState() {
     super.initState();
+    final now = DateTime.now();
+    final start = WeekUtils.weekStart(now);
 
-    _anchorWeekStart = WeekUtils.weekStart(DateTime.now());
-    _selectedIndex = DateTime.now().weekday - 1;
+    _uiWeekStart = start;
+    _contentWeekStart = start;
 
-    _currentPage = _pageBase + _selectedIndex;
-    _pageController = PageController(initialPage: _currentPage);
-
-    // weekRef держим как "любая дата недели" — пусть будет понедельник выбранной недели
-    _weekRef = _anchorWeekStart;
-  }
-
-  @override
-  void dispose() {
-    _pageController.dispose();
-    super.dispose();
+    _selectedIndex = now.weekday - 1;
+    _lastSelectedIndex = _selectedIndex;
   }
 
   Future<void> _refresh() => repo.refresh(force: true);
 
   // =========================
-  // helpers: математика индексов (важно для отрицательных)
-  // =========================
-
-  int _floorDiv(int a, int b) {
-    // floor(a / b) для int, корректно работает с отрицательными
-    var q = a ~/ b; // trunc toward zero
-    final r = a % b;
-    if (r != 0 && ((a < 0) != (b < 0))) q -= 1;
-    return q;
-  }
-
-  int _mod(int a, int b) {
-    var m = a % b;
-    if (m < 0) m += b;
-    return m;
-  }
-
-  int _weekOffsetForPage(int page) {
-    final delta = page - _pageBase;
-    return _floorDiv(delta, 7);
-  }
-
-  int _dayIndexForPage(int page) {
-    final delta = page - _pageBase;
-    return _mod(delta, 7); // 0..6
-  }
-
-  DateTime _weekStartForOffset(int weekOffset) {
-    return _anchorWeekStart.add(Duration(days: weekOffset * 7));
-  }
-
-  void _syncFromPage(int page) {
-    final weekOffset = _weekOffsetForPage(page);
-    final dayIndex = _dayIndexForPage(page);
-
-    final weekStart = _weekStartForOffset(weekOffset);
-
-    setState(() {
-      _currentPage = page;
-      _selectedIndex = dayIndex;
-      _weekRef = weekStart; // якорь недели
-    });
-  }
-
-  // =========================
   // Helpers: даты/форматы
   // =========================
 
+  static const List<String> _dots = ['Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Вс'];
+
+  static const List<String> _full = [
+    'Понедельник',
+    'Вторник',
+    'Среда',
+    'Четверг',
+    'Пятница',
+    'Суббота',
+    'Воскресенье',
+  ];
+
   String _two(int x) => x.toString().padLeft(2, '0');
 
-  DateTime _weekStart() => WeekUtils.weekStart(_weekRef);
-  DateTime _weekEnd() => WeekUtils.weekEnd(_weekRef);
-
-  String _weekTitle() {
-    final s = _weekStart();
-    final e = _weekEnd();
+  String _weekTitle(DateTime weekStart) {
+    final s = weekStart;
+    final e = weekStart.add(const Duration(days: 6));
     return '${_two(s.day)}.${_two(s.month)} – ${_two(e.day)}.${_two(e.month)}';
   }
 
@@ -126,12 +90,13 @@ class _ScheduleTabState extends State<ScheduleTab> {
     return '${_two(dt.hour)}:${_two(dt.minute)}';
   }
 
-  DateTime _dateForSelectedIndex() => _weekStart().add(Duration(days: _selectedIndex));
+  DateTime _dateForSelected() =>
+      _contentWeekStart.add(Duration(days: _selectedIndex));
 
-  bool get _isCurrentWeek => WeekUtils.sameWeek(_weekRef, DateTime.now());
+  bool get _isCurrentWeekUi => WeekUtils.sameWeek(_uiWeekStart, DateTime.now());
 
   // =========================
-  // Нормализация дня недели из lesson.day -> 1..7
+  // Нормализация дня недели
   // =========================
 
   static final Map<String, int> _ruDayToWeekday = {
@@ -142,13 +107,6 @@ class _ScheduleTabState extends State<ScheduleTab> {
     'пятница': 5,
     'суббота': 6,
     'воскресенье': 7,
-    'ПОНЕДЕЛЬНИК': 1,
-    'ВТОРНИК': 2,
-    'СРЕДА': 3,
-    'ЧЕТВЕРГ': 4,
-    'ПЯТНИЦА': 5,
-    'СУББОТА': 6,
-    'ВОСКРЕСЕНЬЕ': 7,
     'пн': 1,
     'вт': 2,
     'ср': 3,
@@ -159,43 +117,26 @@ class _ScheduleTabState extends State<ScheduleTab> {
   };
 
   int? _weekdayIndexFromLessonDay(String raw) {
-    final s = raw.trim();
-    if (s.isEmpty) return null;
+    final low = raw.trim().toLowerCase();
+    if (low.isEmpty) return null;
 
-    final direct = _ruDayToWeekday[s];
+    final direct = _ruDayToWeekday[low];
     if (direct != null) return direct;
-
-    final low = s.toLowerCase();
-    final lowHit = _ruDayToWeekday[low];
-    if (lowHit != null) return lowHit;
 
     final short2 = low.length >= 2 ? low.substring(0, 2) : low;
     return _ruDayToWeekday[short2];
   }
 
   // =========================
-  // Фильтры
+  // Данные/фильтры
   // =========================
 
-  List<Lesson> _applyUiFilter(List<Lesson> lessons) {
-    switch (_filter) {
-      case ScheduleUiFilter.changes:
-        return lessons
-            .where((l) =>
-                l.status == LessonStatus.changed ||
-                l.status == LessonStatus.cancelled)
-            .toList();
-      case ScheduleUiFilter.all:
-      default:
-        return lessons;
-    }
-  }
-
-  /// Уроки для выбранной недели с учётом правил/чётности.
-  List<Lesson> _weekRelevantLessons() {
+  List<Lesson> _weekRelevantLessonsFor(DateTime anyDateInsideWeek) {
+    // референс на середину недели
+    final ref = anyDateInsideWeek.add(const Duration(days: 2));
     return rules_filter.filterLessonsForCurrentWeek(
       repo.lessons,
-      referenceDate: _weekRef,
+      referenceDate: ref,
     );
   }
 
@@ -209,8 +150,19 @@ class _ScheduleTabState extends State<ScheduleTab> {
     return map;
   }
 
+  List<Lesson> _applyUiFilter(List<Lesson> lessons) {
+    if (_filter == ScheduleUiFilter.changes) {
+      return lessons
+          .where((l) =>
+              l.status == LessonStatus.changed ||
+              l.status == LessonStatus.cancelled)
+          .toList();
+    }
+    return lessons;
+  }
+
   // =========================
-  // “Сейчас/следующая/прошла”
+  // Время/статусы (идёт/прошло/следующая)
   // =========================
 
   DateTime? _parseStartForDay(String time, DateTime day) {
@@ -298,6 +250,105 @@ class _ScheduleTabState extends State<ScheduleTab> {
   }
 
   // =========================
+  // UX действия
+  // =========================
+
+  void _toggleChangesOnly() {
+    setState(() {
+      _filter = _filter == ScheduleUiFilter.all
+          ? ScheduleUiFilter.changes
+          : ScheduleUiFilter.all;
+    });
+  }
+
+  void _goToToday() {
+    final now = DateTime.now();
+    final week = WeekUtils.weekStart(now);
+    final idx = now.weekday - 1;
+
+    setState(() {
+      _weekSlideDir =
+          week.isAfter(_uiWeekStart) ? 1 : (week.isBefore(_uiWeekStart) ? -1 : 0);
+
+      _uiWeekStart = week;
+      _contentWeekStart = week;
+
+      _lastSelectedIndex = _selectedIndex;
+      _selectedIndex = idx;
+    });
+  }
+
+  /// Свайп недели (только UI-неделя). НЕ трогаем выбор и НЕ трогаем расписание.
+  void _uiSwipeWeek(int dir) {
+    setState(() {
+      _weekSlideDir = dir;
+      _uiWeekStart = _uiWeekStart.add(Duration(days: dir * 7));
+    });
+  }
+
+  /// Тап по дню в UI-неделе = явный выбор.
+  /// Тут мы синхронизируем и расписание, и выбор.
+  void _selectDayInUiWeek(int index) {
+    setState(() {
+      _lastSelectedIndex = _selectedIndex;
+      _selectedIndex = index;
+      _contentWeekStart = _uiWeekStart;
+    });
+  }
+
+  /// SYNC свайп дня по расписанию: меняем день и неделю расписания.
+  /// Важно: UI-неделю тоже переключаем, чтобы кружки соответствовали расписанию.
+  void _swipeDay(int dir) {
+    if (dir == 0) return;
+
+    setState(() {
+      _lastSelectedIndex = _selectedIndex;
+
+      var newIndex = _selectedIndex + dir;
+      var newWeek = _contentWeekStart;
+
+      if (newIndex < 0) {
+        newIndex = 6;
+        newWeek = newWeek.subtract(const Duration(days: 7));
+      } else if (newIndex > 6) {
+        newIndex = 0;
+        newWeek = newWeek.add(const Duration(days: 7));
+      }
+
+      _selectedIndex = newIndex;
+      _contentWeekStart = newWeek;
+
+      _weekSlideDir = newWeek.isAfter(_uiWeekStart)
+          ? 1
+          : (newWeek.isBefore(_uiWeekStart) ? -1 : 0);
+      _uiWeekStart = newWeek;
+    });
+  }
+
+  Future<void> _openWeekPicker() async {
+    await WeekCalendarSheet.show(
+      context,
+      selectedDate: _uiWeekStart,
+      onSelected: (d) {
+        final week = WeekUtils.weekStart(d);
+        final idx = d.weekday - 1;
+
+        setState(() {
+          _weekSlideDir = week.isAfter(_uiWeekStart)
+              ? 1
+              : (week.isBefore(_uiWeekStart) ? -1 : 0);
+
+          _uiWeekStart = week;
+          _contentWeekStart = week;
+
+          _lastSelectedIndex = _selectedIndex;
+          _selectedIndex = idx;
+        });
+      },
+    );
+  }
+
+  // =========================
   // Детали пары
   // =========================
 
@@ -313,7 +364,7 @@ class _ScheduleTabState extends State<ScheduleTab> {
       case LessonStatus.changed:
         statusText = 'Изменение';
         statusIcon = Icons.edit_calendar_outlined;
-        statusColor = Colors.orange;
+        statusColor = cs.primary;
         break;
       case LessonStatus.cancelled:
         statusText = 'Отмена';
@@ -321,7 +372,6 @@ class _ScheduleTabState extends State<ScheduleTab> {
         statusColor = cs.error;
         break;
       case LessonStatus.normal:
-      default:
         statusText = 'Обычная пара';
         statusIcon = Icons.check_circle_outline;
         statusColor = cs.primary;
@@ -351,7 +401,8 @@ class _ScheduleTabState extends State<ScheduleTab> {
                   Expanded(
                     child: Text(
                       statusText,
-                      style: t.titleMedium?.copyWith(fontWeight: FontWeight.w900),
+                      style:
+                          t.titleMedium?.copyWith(fontWeight: FontWeight.w900),
                     ),
                   ),
                 ],
@@ -376,11 +427,6 @@ class _ScheduleTabState extends State<ScheduleTab> {
                     _InfoChip(icon: Icons.info_outline, text: l.type),
                 ],
               ),
-              const SizedBox(height: 12),
-              Text(
-                'Если это изменение/отмена — детали зависят от того, как ЭИОС отдаёт расписание.',
-                style: t.bodySmall?.copyWith(color: cs.onSurface.withOpacity(0.72)),
-              ),
               const SizedBox(height: 10),
             ],
           ),
@@ -390,55 +436,8 @@ class _ScheduleTabState extends State<ScheduleTab> {
   }
 
   // =========================
-  // Week picker / navigation
+  // Build
   // =========================
-
-  int _weekOffsetBetween(DateTime fromWeekStart, DateTime toWeekStart) {
-    final diffDays = toWeekStart.difference(fromWeekStart).inDays;
-    return _floorDiv(diffDays, 7);
-  }
-
-  Future<void> _openWeekPicker() async {
-    await WeekCalendarSheet.show(
-      context,
-      selectedDate: _weekRef,
-      onSelected: (d) {
-        final selectedWeekStart = WeekUtils.weekStart(d);
-        final offset = _weekOffsetBetween(_anchorWeekStart, selectedWeekStart);
-
-        final targetDayIndex = WeekUtils.sameWeek(d, DateTime.now())
-            ? (DateTime.now().weekday - 1)
-            : 0;
-
-        final targetPage = _pageBase + offset * 7 + targetDayIndex;
-
-        _pageController.jumpToPage(targetPage);
-        _syncFromPage(targetPage);
-      },
-    );
-  }
-
-  void _goToCurrentWeek() {
-    final todayIndex = DateTime.now().weekday - 1;
-    final targetPage = _pageBase + todayIndex;
-    _pageController.jumpToPage(targetPage);
-    _syncFromPage(targetPage);
-  }
-
-  // =========================
-  // UI
-  // =========================
-
-  static const List<String> _dots = ['П', 'В', 'С', 'Ч', 'П', 'С', 'В'];
-  static const List<String> _full = [
-    'Понедельник',
-    'Вторник',
-    'Среда',
-    'Четверг',
-    'Пятница',
-    'Суббота',
-    'Воскресенье',
-  ];
 
   @override
   Widget build(BuildContext context) {
@@ -447,34 +446,58 @@ class _ScheduleTabState extends State<ScheduleTab> {
     return AnimatedBuilder(
       animation: repo,
       builder: (context, _) {
-        final weekRelevant = _weekRelevantLessons();
-        final grouped = _groupWeekByWeekday(weekRelevant);
-
-        final parity = WeekParityService.parityFor(_weekRef);
-        final parityText =
-            parity == WeekParity.even ? 'чётная неделя' : 'нечётная неделя';
+        final uiParity = WeekParityService.parityFor(_uiWeekStart);
+        final uiParityText =
+            uiParity == WeekParity.even ? 'чётная неделя' : 'нечётная неделя';
 
         final updatedAt = repo.updatedAt;
 
-        final dayDate = _dateForSelectedIndex();
-        final isToday = WeekUtils.isSameDay(dayDate, DateTime.now());
+        final contentWeekLessons = _weekRelevantLessonsFor(_contentWeekStart);
+        final contentGrouped = _groupWeekByWeekday(contentWeekLessons);
+
+        final contentDate = _dateForSelected();
+        final isToday = WeekUtils.isSameDay(contentDate, DateTime.now());
 
         final weekday = _selectedIndex + 1;
-        final dayLessonsAll = grouped[weekday] ?? const <Lesson>[];
+        final dayLessonsAll = contentGrouped[weekday] ?? const <Lesson>[];
         final dayLessons = _applyUiFilter(dayLessonsAll);
 
-        final next = _nextLesson(dayLessons, dayDate);
+        final next = _nextLesson(dayLessons, contentDate);
 
-        final weekChanged =
-            weekRelevant.where((l) => l.status == LessonStatus.changed).length;
-        final weekCancelled =
-            weekRelevant.where((l) => l.status == LessonStatus.cancelled).length;
+        final weekChangesTotal = contentWeekLessons
+            .where((l) =>
+                l.status == LessonStatus.changed ||
+                l.status == LessonStatus.cancelled)
+            .length;
 
         final dayChanges = dayLessonsAll
             .where((l) =>
                 l.status == LessonStatus.changed ||
                 l.status == LessonStatus.cancelled)
             .length;
+
+        final dayTitle =
+            '${_full[_selectedIndex]} • ${_two(contentDate.day)}.${_two(contentDate.month)}';
+
+        final daySlideDir = (_selectedIndex == _lastSelectedIndex)
+            ? 0
+            : (_selectedIndex > _lastSelectedIndex ? 1 : -1);
+
+        final screenH = MediaQuery.of(context).size.height;
+        final swipeAreaMinHeight = (screenH * 0.52).clamp(260.0, 520.0);
+
+        // Сегодня индекс (0..6) ТОЛЬКО если UI-неделя = текущая неделя.
+        int? todayIndexInUiWeek;
+        if (WeekUtils.sameWeek(_uiWeekStart, DateTime.now())) {
+          todayIndexInUiWeek = DateTime.now().weekday - 1;
+        }
+
+        // ВАЖНО: заливку выбранного показываем только если UI-неделя совпадает с неделей расписания.
+        // Иначе — пользователь "листает неделю", но расписание остаётся прежним => не нужно вводить в заблуждение.
+        final int? filledSelectedIndex =
+            WeekUtils.sameWeek(_uiWeekStart, _contentWeekStart)
+                ? _selectedIndex
+                : null;
 
         return Scaffold(
           appBar: AppBar(
@@ -483,7 +506,7 @@ class _ScheduleTabState extends State<ScheduleTab> {
               children: [
                 Text(repo.loading ? 'Расписание (обновление...)' : 'Расписание'),
                 Text(
-                  _weekTitle(),
+                  _weekTitle(_uiWeekStart),
                   style: t.labelMedium?.copyWith(fontWeight: FontWeight.w700),
                 ),
               ],
@@ -500,10 +523,10 @@ class _ScheduleTabState extends State<ScheduleTab> {
                 onPressed: _openWeekPicker,
                 icon: const Icon(Icons.calendar_month_outlined),
               ),
-              if (!_isCurrentWeek)
+              if (!_isCurrentWeekUi)
                 IconButton(
                   tooltip: 'К текущей неделе',
-                  onPressed: _goToCurrentWeek,
+                  onPressed: _goToToday,
                   icon: const Icon(Icons.today),
                 ),
               IconButton(
@@ -519,77 +542,101 @@ class _ScheduleTabState extends State<ScheduleTab> {
               physics: const AlwaysScrollableScrollPhysics(),
               padding: const EdgeInsets.fromLTRB(16, 12, 16, 18),
               children: [
-                _UnifiedHeaderCard(
-                  parityText: parityText,
-                  rangeText: _weekTitle(),
-                  updatedText: _updatedAtText(updatedAt),
-                  weekChanged: weekChanged,
-                  weekCancelled: weekCancelled,
-                  dayChanges: dayChanges,
-                  dayTitle:
-                      '${_full[_selectedIndex]} • ${_two(dayDate.day)}.${_two(dayDate.month)}',
-                  showTodayPill: isToday,
-                  filter: _filter,
-                  onFilterChanged: (f) => setState(() => _filter = f),
+                GestureDetector(
+                  behavior: HitTestBehavior.opaque,
+                  onHorizontalDragStart: (_) {},
+                  onHorizontalDragUpdate: (_) {},
+                  onHorizontalDragEnd: (_) {},
+                  child: _UnifiedHeaderCard(
+                    parityText: uiParityText,
+                    rangeText: _weekTitle(_uiWeekStart),
+                    updatedText: _updatedAtText(updatedAt),
+                    weekChangesTotal: weekChangesTotal,
+                    dayChanges: dayChanges,
+                    dayTitle: dayTitle,
+                    todayLabel: isToday ? 'Сегодня' : 'Вернуться',
+                    onTodayTap: _goToToday,
+                    changesOnly: _filter == ScheduleUiFilter.changes,
+                    onToggleChangesOnly: _toggleChangesOnly,
+                  ),
                 ),
                 const SizedBox(height: 12),
 
-                _WeekDotsRow(
-                  selectedIndex: _selectedIndex,
+                _WeekDotsRowAnimated(
+                  weekStart: _uiWeekStart,
+                  slideDir: _weekSlideDir,
+                  filledSelectedIndex: filledSelectedIndex, // заливка
+                  todayIndex: todayIndexInUiWeek, // обводка (если не выбран)
                   labels: _dots,
-                  onTap: (i) {
-                    // остаёмся в той же неделе, меняем только день
-                    final currentDayIndex = _dayIndexForPage(_currentPage);
-                    final baseWeekPage = _currentPage - currentDayIndex;
-                    final target = baseWeekPage + i;
-
-                    _pageController.animateToPage(
-                      target,
-                      duration: const Duration(milliseconds: 220),
-                      curve: Curves.easeOut,
-                    );
-                    _syncFromPage(target);
-                  },
+                  onTap: _selectDayInUiWeek,
+                  onSwipeWeek: _uiSwipeWeek,
                 ),
                 const SizedBox(height: 12),
 
-                SizedBox(
-                  height: 520,
-                  child: PageView.builder(
-                    controller: _pageController,
-                    // itemCount = null => бесконечно
-                    onPageChanged: (page) => _syncFromPage(page),
-                    itemBuilder: (context, page) {
-                      final weekOffset = _weekOffsetForPage(page);
-                      final dayIndex = _dayIndexForPage(page);
-
-                      final weekStart = _weekStartForOffset(weekOffset);
-                      final date = weekStart.add(Duration(days: dayIndex));
-
-                      final weekRefForThisPage = weekStart;
-
-                      final weekRelevantForThisPage =
-                          rules_filter.filterLessonsForCurrentWeek(
-                        repo.lessons,
-                        referenceDate: weekRefForThisPage,
-                      );
-                      final groupedForThisPage =
-                          _groupWeekByWeekday(weekRelevantForThisPage);
-
-                      final wd = dayIndex + 1;
-                      final all = groupedForThisPage[wd] ?? const <Lesson>[];
-                      final filtered = _applyUiFilter(all);
-                      final n = _nextLesson(filtered, date);
-
-                      return _DayPage(
-                        date: date,
-                        lessons: filtered,
-                        nextLesson: n,
-                        isOngoing: (l) => _isOngoing(l, date),
-                        isPast: (l) => _isPast(l, date),
-                        onLessonTap: _openLessonDetails,
-                      );
+                ConstrainedBox(
+                  constraints: BoxConstraints(minHeight: swipeAreaMinHeight),
+                  child: GestureDetector(
+                    behavior: HitTestBehavior.opaque,
+                    onHorizontalDragEnd: (details) {
+                      final v = details.primaryVelocity ?? 0;
+                      if (v.abs() < 250) return;
+                      if (v < 0) {
+                        _swipeDay(1);
+                      } else {
+                        _swipeDay(-1);
+                      }
                     },
+                    child: AnimatedSize(
+                      duration: _kSizeAnim,
+                      curve: _kSizeCurve,
+                      alignment: Alignment.topCenter,
+                      child: AnimatedSwitcher(
+                        duration: _kAnim,
+                        switchInCurve: _kCurveIn,
+                        switchOutCurve: _kCurveOut,
+                        layoutBuilder: (currentChild, previousChildren) {
+                          return Stack(
+                            alignment: Alignment.topCenter,
+                            children: <Widget>[
+                              ...previousChildren,
+                              if (currentChild != null) currentChild,
+                            ],
+                          );
+                        },
+                        transitionBuilder: (child, anim) {
+                          final beginX = daySlideDir == 0
+                              ? 0.0
+                              : (daySlideDir > 0 ? 0.10 : -0.10);
+
+                          return ClipRect(
+                            child: SlideTransition(
+                              position: Tween<Offset>(
+                                begin: Offset(beginX, 0),
+                                end: Offset.zero,
+                              ).animate(anim),
+                              child:
+                                  FadeTransition(opacity: anim, child: child),
+                            ),
+                          );
+                        },
+                        child: Card(
+                          key: ValueKey(
+                            '${_contentWeekStart.year}-${_contentWeekStart.month}-${_contentWeekStart.day}-$_selectedIndex-${_filter.name}',
+                          ),
+                          child: Padding(
+                            padding: const EdgeInsets.fromLTRB(14, 14, 14, 12),
+                            child: _DayPage(
+                              date: contentDate,
+                              lessons: dayLessons,
+                              nextLesson: next,
+                              isOngoing: (l) => _isOngoing(l, contentDate),
+                              isPast: (l) => _isPast(l, contentDate),
+                              onLessonTap: _openLessonDetails,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
                   ),
                 ),
               ],
@@ -606,27 +653,28 @@ class _UnifiedHeaderCard extends StatelessWidget {
   final String rangeText;
   final String updatedText;
 
-  final int weekChanged;
-  final int weekCancelled;
+  final int weekChangesTotal;
   final int dayChanges;
 
   final String dayTitle;
-  final bool showTodayPill;
 
-  final ScheduleUiFilter filter;
-  final ValueChanged<ScheduleUiFilter> onFilterChanged;
+  final String todayLabel;
+  final VoidCallback onTodayTap;
+
+  final bool changesOnly;
+  final VoidCallback onToggleChangesOnly;
 
   const _UnifiedHeaderCard({
     required this.parityText,
     required this.rangeText,
     required this.updatedText,
-    required this.weekChanged,
-    required this.weekCancelled,
+    required this.weekChangesTotal,
     required this.dayChanges,
     required this.dayTitle,
-    required this.showTodayPill,
-    required this.filter,
-    required this.onFilterChanged,
+    required this.todayLabel,
+    required this.onTodayTap,
+    required this.changesOnly,
+    required this.onToggleChangesOnly,
   });
 
   @override
@@ -634,95 +682,80 @@ class _UnifiedHeaderCard extends StatelessWidget {
     final cs = Theme.of(context).colorScheme;
     final t = Theme.of(context).textTheme;
 
+    final titleStyle = t.titleMedium?.copyWith(fontWeight: FontWeight.w900);
+    final subStyle = t.bodySmall?.copyWith(
+      fontWeight: FontWeight.w800,
+      color: cs.onSurface.withValues(alpha: 0.78),
+    );
+
     return Card(
       child: Padding(
         padding: const EdgeInsets.all(14),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Row(
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
               children: [
                 _Pill(icon: Icons.swap_vert_circle_outlined, text: parityText),
-                const SizedBox(width: 8),
                 _Pill(icon: Icons.date_range_outlined, text: rangeText),
+                if (weekChangesTotal > 0)
+                  _Pill(
+                    icon: Icons.edit_calendar_outlined,
+                    text: 'Изм.: $weekChangesTotal',
+                    tone: _PillTone.warn,
+                  ),
               ],
             ),
             const SizedBox(height: 10),
-
             Row(
               children: [
-                Icon(Icons.sync, size: 18, color: cs.onSurface.withOpacity(0.75)),
+                Icon(Icons.sync, size: 18, color: cs.onSurface.withValues(alpha: 0.75)),
                 const SizedBox(width: 8),
-                Text(
-                  'Обновлено: $updatedText',
-                  style: t.bodyMedium?.copyWith(
-                    fontWeight: FontWeight.w800,
-                    color: cs.onSurface.withOpacity(0.78),
+                Expanded(
+                  child: Text(
+                    'Обновлено: $updatedText',
+                    style: subStyle,
+                    overflow: TextOverflow.ellipsis,
                   ),
                 ),
-                const Spacer(),
-                if (weekChanged > 0)
-                  _CountBadge(
-                    icon: Icons.edit_calendar_outlined,
-                    text: '$weekChanged',
-                    tone: _BadgeTone.warn,
-                  ),
-                if (weekChanged > 0) const SizedBox(width: 8),
-                if (weekCancelled > 0)
-                  _CountBadge(
-                    icon: Icons.cancel_outlined,
-                    text: '$weekCancelled',
-                    tone: _BadgeTone.danger,
-                  ),
               ],
             ),
-
-            if (dayChanges > 0) ...[
-              const SizedBox(height: 10),
-              Text(
-                'В выбранный день изменений: $dayChanges',
-                style: t.bodySmall?.copyWith(color: cs.onSurface.withOpacity(0.72)),
-              ),
-            ],
-
+            const SizedBox(height: 10),
+            Text(
+              dayChanges > 0
+                  ? 'В выбранный день изменений: $dayChanges'
+                  : 'Сегодня изменений нет',
+              style: t.bodySmall?.copyWith(color: cs.onSurface.withValues(alpha: 0.72)),
+            ),
             const SizedBox(height: 12),
-            Divider(color: cs.outlineVariant.withOpacity(0.35), height: 1),
+            Divider(color: cs.outlineVariant.withValues(alpha: 0.35), height: 1),
             const SizedBox(height: 12),
-
             Row(
               children: [
                 Expanded(
                   child: Text(
                     dayTitle,
-                    style: t.titleMedium?.copyWith(fontWeight: FontWeight.w900),
+                    style: titleStyle,
+                    overflow: TextOverflow.ellipsis,
                   ),
                 ),
-                Visibility(
-                  visible: showTodayPill,
-                  maintainSize: true,
-                  maintainAnimation: true,
-                  maintainState: true,
-                  child: _Pill(icon: Icons.today, text: 'сегодня'),
+                const SizedBox(width: 10),
+                _TapPill(
+                  icon: Icons.today,
+                  text: todayLabel,
+                  active: true,
+                  onTap: onTodayTap,
+                ),
+                const SizedBox(width: 8),
+                _TapPill(
+                  icon: Icons.edit_calendar_outlined,
+                  text: 'Изм.',
+                  active: changesOnly,
+                  onTap: onToggleChangesOnly,
                 ),
               ],
-            ),
-            const SizedBox(height: 10),
-
-            SegmentedButton<ScheduleUiFilter>(
-              segments: const [
-                ButtonSegment(
-                  value: ScheduleUiFilter.all,
-                  label: Text('Все'),
-                  icon: Icon(Icons.view_agenda_outlined),
-                ),
-                ButtonSegment(
-                  value: ScheduleUiFilter.changes,
-                  label: Text('Изменения'),
-                  icon: Icon(Icons.edit_calendar_outlined),
-                ),
-              ],
-              selected: {filter},
-              onSelectionChanged: (set) => onFilterChanged(set.first),
             ),
           ],
         ),
@@ -731,13 +764,93 @@ class _UnifiedHeaderCard extends StatelessWidget {
   }
 }
 
+class _WeekDotsRowAnimated extends StatelessWidget {
+  final DateTime weekStart;
+  final int slideDir; // -1 / 0 / +1
+
+  /// Заполненный (выбранный) день, или null если UI-неделя != неделя расписания.
+  final int? filledSelectedIndex;
+
+  /// Сегодня (обводка), если UI-неделя = текущая.
+  final int? todayIndex;
+
+  final List<String> labels;
+
+  final ValueChanged<int> onTap;
+  final ValueChanged<int> onSwipeWeek; // -1 / +1
+
+  const _WeekDotsRowAnimated({
+    required this.weekStart,
+    required this.slideDir,
+    required this.filledSelectedIndex,
+    required this.todayIndex,
+    required this.labels,
+    required this.onTap,
+    required this.onSwipeWeek,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final key = ValueKey('${weekStart.year}-${weekStart.month}-${weekStart.day}');
+
+    return GestureDetector(
+      behavior: HitTestBehavior.opaque,
+      onHorizontalDragEnd: (details) {
+        final v = details.primaryVelocity ?? 0;
+        if (v.abs() < 250) return;
+        if (v < 0) {
+          onSwipeWeek(1);
+        } else {
+          onSwipeWeek(-1);
+        }
+      },
+      child: AnimatedSwitcher(
+        duration: const Duration(milliseconds: 260),
+        switchInCurve: Curves.easeOutCubic,
+        switchOutCurve: Curves.easeInCubic,
+        transitionBuilder: (child, anim) {
+          final beginX =
+              slideDir == 0 ? 0.0 : (slideDir > 0 ? 0.18 : -0.18);
+
+          return ClipRect(
+            child: SlideTransition(
+              position: Tween<Offset>(
+                begin: Offset(beginX, 0),
+                end: Offset.zero,
+              ).animate(anim),
+              child: FadeTransition(opacity: anim, child: child),
+            ),
+          );
+        },
+        child: _WeekDotsRow(
+          key: key,
+          weekStart: weekStart,
+          filledSelectedIndex: filledSelectedIndex,
+          todayIndex: todayIndex,
+          labels: labels,
+          onTap: onTap,
+        ),
+      ),
+    );
+  }
+}
+
+/// КРУЖКИ:
+/// - выбранный: ЗАЛИВКА (filled)
+/// - сегодня: ОБВОДКА (outline), но только если сегодня НЕ выбран (иначе и так видно)
+/// - никаких точек
 class _WeekDotsRow extends StatelessWidget {
-  final int selectedIndex;
+  final DateTime weekStart;
+  final int? filledSelectedIndex;
+  final int? todayIndex;
   final List<String> labels;
   final ValueChanged<int> onTap;
 
   const _WeekDotsRow({
-    required this.selectedIndex,
+    super.key,
+    required this.weekStart,
+    required this.filledSelectedIndex,
+    required this.todayIndex,
     required this.labels,
     required this.onTap,
   });
@@ -746,44 +859,91 @@ class _WeekDotsRow extends StatelessWidget {
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
 
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-      children: List.generate(labels.length, (i) {
-        final selected = i == selectedIndex;
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        const gap = 8.0;
+        final raw = (constraints.maxWidth - gap * 6) / 7;
+        final size = raw.clamp(40.0, 54.0);
 
-        return Expanded(
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 4),
-            child: InkWell(
+        return Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: List.generate(labels.length, (i) {
+            final isSelected =
+                filledSelectedIndex != null && i == filledSelectedIndex;
+            final isToday = todayIndex != null && i == todayIndex;
+
+            final date = weekStart.add(Duration(days: i));
+            final dayNum = date.day;
+
+            final bg = isSelected
+                ? cs.primary.withValues(alpha: 0.95)
+                : cs.surfaceContainerHighest.withValues(alpha: 0.30);
+
+            // сегодня обводим только если НЕ выбран (иначе будет “обводка + заливка”)
+            final showTodayOutline = isToday && !isSelected;
+
+            final borderColor = isSelected
+                ? cs.primary
+                : (showTodayOutline
+                    ? cs.primary.withValues(alpha: 0.75)
+                    : cs.outlineVariant.withValues(alpha: 0.35));
+
+            final borderWidth = showTodayOutline ? 1.6 : (isSelected ? 0.0 : 1.0);
+
+            final fgMain = isSelected ? cs.onPrimary : cs.onSurface.withValues(alpha: 0.82);
+            final fgSub = isSelected
+                ? cs.onPrimary.withValues(alpha: 0.85)
+                : cs.onSurface.withValues(alpha: 0.45);
+
+            return InkWell(
               borderRadius: BorderRadius.circular(999),
               onTap: () => onTap(i),
               child: Container(
-                height: 36,
-                alignment: Alignment.center,
+                width: size,
+                height: size,
                 decoration: BoxDecoration(
-                  color: selected
-                      ? cs.primary.withOpacity(0.12)
-                      : cs.surfaceVariant.withOpacity(0.30),
-                  borderRadius: BorderRadius.circular(999),
-                  border: Border.all(
-                    color: selected
-                        ? cs.primary.withOpacity(0.70)
-                        : cs.outlineVariant.withOpacity(0.35),
-                    width: selected ? 1.6 : 1.0,
-                  ),
+                  shape: BoxShape.circle,
+                  color: bg,
+                  border: borderWidth == 0.0
+                      ? null
+                      : Border.all(color: borderColor, width: borderWidth),
                 ),
-                child: Text(
-                  labels[i],
-                  style: TextStyle(
-                    fontWeight: FontWeight.w900,
-                    color: selected ? cs.primary : cs.onSurface.withOpacity(0.78),
-                  ),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    FittedBox(
+                      fit: BoxFit.scaleDown,
+                      child: Text(
+                        labels[i],
+                        style: TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w900,
+                          height: 1.0,
+                          color: fgMain,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    FittedBox(
+                      fit: BoxFit.scaleDown,
+                      child: Text(
+                        '$dayNum',
+                        style: TextStyle(
+                          fontSize: 12.5,
+                          fontWeight: FontWeight.w900,
+                          height: 1.0,
+                          color: fgSub,
+                        ),
+                      ),
+                    ),
+                  ],
                 ),
               ),
-            ),
-          ),
+            );
+          }),
         );
-      }),
+      },
     );
   }
 }
@@ -814,53 +974,36 @@ class _DayPage extends StatelessWidget {
     final t = Theme.of(context).textTheme;
 
     if (lessons.isEmpty) {
-      return Card(
-        child: Padding(
-          padding: const EdgeInsets.all(16),
-          child: Row(
-            children: [
-              Icon(Icons.inbox_outlined, color: cs.primary),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Text(
-                  'Нет занятий',
-                  style: t.titleMedium?.copyWith(fontWeight: FontWeight.w900),
-                ),
-              ),
-            ],
+      return Row(
+        children: [
+          Icon(Icons.event_busy_outlined, color: cs.primary),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Text(
+              'Нет занятий',
+              style: t.titleMedium?.copyWith(fontWeight: FontWeight.w900),
+            ),
           ),
-        ),
+        ],
       );
     }
 
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.fromLTRB(14, 14, 14, 10),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Expanded(
-              child: ListView(
-                physics: const BouncingScrollPhysics(),
-                children: [
-                  for (final l in lessons)
-                    _LessonCard(
-                      lesson: l,
-                      isToday: WeekUtils.isSameDay(date, DateTime.now()),
-                      isOngoing: isOngoing(l),
-                      isNext: nextLesson != null &&
-                          nextLesson!.day == l.day &&
-                          nextLesson!.time == l.time &&
-                          nextLesson!.subject == l.subject,
-                      isPast: isPast(l),
-                      onTap: () => onLessonTap(l),
-                    ),
-                ],
-              ),
-            ),
-          ],
-        ),
-      ),
+    return Column(
+      children: [
+        for (int i = 0; i < lessons.length; i++) ...[
+          _LessonCard(
+            lesson: lessons[i],
+            isToday: WeekUtils.isSameDay(date, DateTime.now()),
+            isOngoing: isOngoing(lessons[i]),
+            isNext: nextLesson != null &&
+                nextLesson!.day == lessons[i].day &&
+                nextLesson!.time == lessons[i].time &&
+                nextLesson!.subject == lessons[i].subject,
+            isPast: isPast(lessons[i]),
+            onTap: () => onLessonTap(lessons[i]),
+          ),
+        ],
+      ],
     );
   }
 }
@@ -897,28 +1040,28 @@ class _LessonCard extends StatelessWidget {
     String? badgeText;
 
     if (isOngoing) {
-      bg = cs.tertiaryContainer.withOpacity(0.75);
-      border = cs.tertiary.withOpacity(0.55);
+      bg = cs.tertiaryContainer.withValues(alpha: 0.75);
+      border = cs.tertiary.withValues(alpha: 0.55);
       badgeIcon = Icons.play_circle_outline;
       badgeText = 'идёт';
     } else if (isNext) {
-      bg = cs.primaryContainer.withOpacity(0.55);
-      border = cs.primary.withOpacity(0.45);
+      bg = cs.primaryContainer.withValues(alpha: 0.55);
+      border = cs.primary.withValues(alpha: 0.45);
       badgeIcon = Icons.skip_next_outlined;
       badgeText = 'следующая';
     } else if (lesson.status == LessonStatus.changed) {
-      bg = Colors.orange.withOpacity(0.10);
-      border = Colors.orange.withOpacity(0.35);
+      bg = cs.primaryContainer.withValues(alpha: 0.42);
+      border = cs.primary.withValues(alpha: 0.40);
       badgeIcon = Icons.edit_calendar_outlined;
       badgeText = 'изменение';
     } else if (lesson.status == LessonStatus.cancelled) {
-      bg = cs.errorContainer.withOpacity(0.55);
-      border = cs.error.withOpacity(0.45);
+      bg = cs.errorContainer.withValues(alpha: 0.55);
+      border = cs.error.withValues(alpha: 0.45);
       badgeIcon = Icons.cancel_outlined;
       badgeText = 'отмена';
     } else {
-      bg = cs.surfaceVariant.withOpacity(0.22);
-      border = cs.outlineVariant.withOpacity(0.35);
+      bg = cs.surfaceContainerHighest.withValues(alpha: 0.22);
+      border = cs.outlineVariant.withValues(alpha: 0.35);
       badgeIcon = null;
       badgeText = null;
     }
@@ -926,14 +1069,14 @@ class _LessonCard extends StatelessWidget {
     final faded = isPast && isToday;
     final opacity = faded ? 0.72 : 1.0;
 
-    final titleStyle = t.titleSmall?.copyWith(
+    final titleStyle = t.bodyLarge?.copyWith(
       fontWeight: FontWeight.w900,
       decoration: isCancelled ? TextDecoration.lineThrough : null,
     );
 
-    final timeStyle = t.bodyMedium?.copyWith(
-      fontWeight: FontWeight.w800,
-      color: cs.onSurface.withOpacity(0.80),
+    final timeStyle = t.bodySmall?.copyWith(
+      fontWeight: FontWeight.w900,
+      color: cs.onSurface.withValues(alpha: 0.80),
       decoration: isCancelled ? TextDecoration.lineThrough : null,
     );
 
@@ -959,22 +1102,27 @@ class _LessonCard extends StatelessWidget {
                   const Spacer(),
                   if (badgeText != null)
                     Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 10, vertical: 6),
                       decoration: BoxDecoration(
-                        color: cs.surface.withOpacity(0.70),
+                        color: cs.surface.withValues(alpha: 0.70),
                         borderRadius: BorderRadius.circular(999),
-                        border: Border.all(color: cs.outlineVariant.withOpacity(0.35)),
+                        border: Border.all(
+                            color: cs.outlineVariant.withValues(alpha: 0.35)),
                       ),
                       child: Row(
                         mainAxisSize: MainAxisSize.min,
                         children: [
                           if (badgeIcon != null) ...[
-                            Icon(badgeIcon, size: 16, color: cs.onSurface.withOpacity(0.80)),
+                            Icon(badgeIcon,
+                                size: 16,
+                                color: cs.onSurface.withValues(alpha: 0.80)),
                             const SizedBox(width: 6),
                           ],
                           Text(
-                            badgeText!,
-                            style: t.labelSmall?.copyWith(fontWeight: FontWeight.w900),
+                            badgeText,
+                            style: t.labelSmall
+                                ?.copyWith(fontWeight: FontWeight.w900),
                           ),
                         ],
                       ),
@@ -1021,14 +1169,14 @@ class _InfoChip extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
       decoration: BoxDecoration(
-        color: cs.surface.withOpacity(0.70),
+        color: cs.surface.withValues(alpha: 0.70),
         borderRadius: BorderRadius.circular(999),
-        border: Border.all(color: cs.outlineVariant.withOpacity(0.35)),
+        border: Border.all(color: cs.outlineVariant.withValues(alpha: 0.35)),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(icon, size: 16, color: cs.onSurface.withOpacity(0.80)),
+          Icon(icon, size: 16, color: cs.onSurface.withValues(alpha: 0.80)),
           const SizedBox(width: 6),
           Text(
             text,
@@ -1040,13 +1188,17 @@ class _InfoChip extends StatelessWidget {
   }
 }
 
+enum _PillTone { normal, warn }
+
 class _Pill extends StatelessWidget {
   final IconData icon;
   final String text;
+  final _PillTone tone;
 
   const _Pill({
     required this.icon,
     required this.text,
+    this.tone = _PillTone.normal,
   });
 
   @override
@@ -1054,65 +1206,18 @@ class _Pill extends StatelessWidget {
     final cs = Theme.of(context).colorScheme;
     final t = Theme.of(context).textTheme;
 
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
-      decoration: BoxDecoration(
-        color: cs.surfaceVariant.withOpacity(0.35),
-        borderRadius: BorderRadius.circular(999),
-        border: Border.all(color: cs.outlineVariant.withOpacity(0.35)),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(icon, size: 16, color: cs.onSurface.withOpacity(0.80)),
-          const SizedBox(width: 6),
-          Text(
-            text,
-            style: t.labelSmall?.copyWith(fontWeight: FontWeight.w900),
-          ),
-        ],
-      ),
-    );
-  }
-}
+    Color border = cs.outlineVariant.withValues(alpha: 0.35);
+    Color bg = cs.surfaceContainerHighest.withValues(alpha: 0.35);
+    Color fg = cs.onSurface.withValues(alpha: 0.80);
 
-enum _BadgeTone { warn, danger }
-
-class _CountBadge extends StatelessWidget {
-  final IconData icon;
-  final String text;
-  final _BadgeTone tone;
-
-  const _CountBadge({
-    required this.icon,
-    required this.text,
-    required this.tone,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final t = Theme.of(context).textTheme;
-
-    Color fg;
-    Color bg;
-    Color border;
-
-    switch (tone) {
-      case _BadgeTone.danger:
-        fg = Colors.red;
-        bg = Colors.red.withOpacity(0.10);
-        border = Colors.red.withOpacity(0.25);
-        break;
-      case _BadgeTone.warn:
-      default:
-        fg = Colors.orange;
-        bg = Colors.orange.withOpacity(0.10);
-        border = Colors.orange.withOpacity(0.25);
-        break;
+    if (tone == _PillTone.warn) {
+      border = cs.primary.withValues(alpha: 0.40);
+      bg = cs.primaryContainer.withValues(alpha: 0.35);
+      fg = cs.primary;
     }
 
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
       decoration: BoxDecoration(
         color: bg,
         borderRadius: BorderRadius.circular(999),
@@ -1125,12 +1230,64 @@ class _CountBadge extends StatelessWidget {
           const SizedBox(width: 6),
           Text(
             text,
-            style: t.labelSmall?.copyWith(
-              fontWeight: FontWeight.w900,
-              color: fg,
-            ),
+            style:
+                t.labelSmall?.copyWith(fontWeight: FontWeight.w900, color: fg),
           ),
         ],
+      ),
+    );
+  }
+}
+
+class _TapPill extends StatelessWidget {
+  final IconData icon;
+  final String text;
+  final bool active;
+  final VoidCallback onTap;
+
+  const _TapPill({
+    required this.icon,
+    required this.text,
+    required this.active,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    final t = Theme.of(context).textTheme;
+
+    final bg = active
+        ? cs.primary.withValues(alpha: 0.18)
+        : cs.surfaceContainerHighest.withValues(alpha: 0.28);
+    final border = active
+        ? cs.primary.withValues(alpha: 0.45)
+        : cs.outlineVariant.withValues(alpha: 0.35);
+    final fg = active ? cs.primary : cs.onSurface.withValues(alpha: 0.78);
+
+    return InkWell(
+      borderRadius: BorderRadius.circular(999),
+      onTap: onTap,
+      child: Container(
+        height: 36,
+        padding: const EdgeInsets.symmetric(horizontal: 12),
+        decoration: BoxDecoration(
+          color: bg,
+          borderRadius: BorderRadius.circular(999),
+          border: Border.all(color: border),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(icon, size: 16, color: fg),
+            const SizedBox(width: 6),
+            Text(
+              text,
+              style:
+                  t.labelSmall?.copyWith(fontWeight: FontWeight.w900, color: fg),
+            ),
+          ],
+        ),
       ),
     );
   }
