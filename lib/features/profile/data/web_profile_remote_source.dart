@@ -24,13 +24,41 @@ class WebProfileRemoteSource implements ProfileRemoteSource {
     return '${EiosEndpoints.base}/$url';
   }
 
+  String _upgradeAvatarQualityUrl(String url) {
+    final uri = Uri.tryParse(url);
+    if (uri == null) return url;
+
+    var changed = false;
+    final segs = List<String>.from(uri.pathSegments);
+    for (var i = 0; i < segs.length; i++) {
+      final s = segs[i].toLowerCase();
+      if (s == 'f1' || s == 'f2') {
+        segs[i] = 'f3';
+        changed = true;
+      }
+    }
+
+    final qp = Map<String, String>.from(uri.queryParameters);
+    final sizeRaw = qp['size'];
+    if (sizeRaw != null) {
+      final size = int.tryParse(sizeRaw);
+      if (size != null && size < 200) {
+        qp['size'] = '200';
+        changed = true;
+      }
+    }
+
+    if (!changed) return url;
+    return uri.replace(pathSegments: segs, queryParameters: qp).toString();
+  }
+
   String? _normalizeAvatarUrl(String? url) {
     if (url == null) return null;
     final u = url.trim();
     if (u.isEmpty) return null;
     // Локальные ссылки из сохранённого браузером HTML не годятся для сети.
     if (u.startsWith('./') || u.startsWith('../')) return null;
-    return _absUrl(u);
+    return _upgradeAvatarQualityUrl(_absUrl(u));
   }
 
   @override
@@ -41,18 +69,18 @@ class WebProfileRemoteSource implements ProfileRemoteSource {
     final fullName = myParsed.fullName;
     var avatarUrl = _normalizeAvatarUrl(myParsed.avatarUrl);
 
-    // В /my/ часто только инициалы без img.userpicture.
-    // Тогда добираем аватар со страницы профиля.
-    if (avatarUrl == null || avatarUrl.trim().isEmpty) {
-      final profileUrl = _absUrl(myParsed.profileUrl ?? '/user/profile.php');
-      try {
-        final profileHtml = await _service.loadPage(profileUrl);
-        avatarUrl = _normalizeAvatarUrl(
-          await compute(_parseAvatarFromProfile, profileHtml),
-        );
-      } catch (_) {
-        // Не блокируем загрузку профиля, если страница профиля недоступна.
+    // На /my/ аватар часто маленький, поэтому всегда пытаемся взять с profile.php.
+    final profileUrl = _absUrl(myParsed.profileUrl ?? '/user/profile.php');
+    try {
+      final profileHtml = await _service.loadPage(profileUrl);
+      final profileAvatar = _normalizeAvatarUrl(
+        await compute(_parseAvatarFromProfile, profileHtml),
+      );
+      if (profileAvatar != null && profileAvatar.trim().isNotEmpty) {
+        avatarUrl = profileAvatar;
       }
+    } catch (_) {
+      // Не блокируем загрузку профиля, если страница профиля недоступна.
     }
 
     final editUrl = _absUrl(myParsed.editUrl ?? EiosEndpoints.userEdit);

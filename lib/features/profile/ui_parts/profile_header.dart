@@ -1,4 +1,4 @@
-﻿part of '../../home/tab_profile.dart';
+part of '../../home/tab_profile.dart';
 
 class _AuthAvatar extends StatefulWidget {
   final String? avatarUrl;
@@ -90,7 +90,10 @@ class _AuthAvatarState extends State<_AuthAvatar> {
     try {
       final prefs = await SharedPreferences.getInstance();
       await prefs.setString(_cacheDataKey(url), base64Encode(bytes));
-      await prefs.setInt(_cacheTsKey(url), DateTime.now().millisecondsSinceEpoch);
+      await prefs.setInt(
+        _cacheTsKey(url),
+        DateTime.now().millisecondsSinceEpoch,
+      );
     } catch (_) {}
   }
 
@@ -101,9 +104,18 @@ class _AuthAvatarState extends State<_AuthAvatar> {
       builder: (context, snap) {
         final bytes = snap.data;
         if (bytes != null && bytes.isNotEmpty) {
-          return CircleAvatar(
-            radius: widget.radius,
-            backgroundImage: MemoryImage(bytes),
+          final size = widget.radius * 2;
+          return SizedBox(
+            width: size,
+            height: size,
+            child: ClipOval(
+              child: Image.memory(
+                bytes,
+                fit: BoxFit.cover,
+                filterQuality: FilterQuality.high,
+                gaplessPlayback: true,
+              ),
+            ),
           );
         }
         return CircleAvatar(
@@ -118,9 +130,7 @@ class _AuthAvatarState extends State<_AuthAvatar> {
 class _ProfileHeader extends StatelessWidget {
   final UserProfile? profile;
 
-  const _ProfileHeader({
-    required this.profile,
-  });
+  const _ProfileHeader({required this.profile});
 
   String _subtitleLine(UserProfile p) {
     final parts = <String>[];
