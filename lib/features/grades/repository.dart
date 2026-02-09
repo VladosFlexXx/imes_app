@@ -63,6 +63,13 @@ class GradesRepository extends CachedRepository<List<GradeCourse>> {
     return _remoteSource.fetchCourses();
   }
 
+  Future<CourseGradeReport> fetchCourseReport(GradeCourse course) async {
+    if (DemoMode.instance.enabled) {
+      return DemoData.courseReport(course);
+    }
+    return _remoteSource.fetchCourseReport(course);
+  }
+
   Map<String, dynamic> _toJson(GradeCourse c) => {
     'courseName': c.courseName,
     'courseUrl': c.courseUrl,

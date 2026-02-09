@@ -1,4 +1,4 @@
-﻿import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
 
 import '../grades/repository.dart';
 import '../profile/repository.dart';
@@ -23,28 +23,14 @@ class DashboardTab extends StatelessWidget {
     ]);
   }
 
-  DateTime? _parseStartToday(String time) {
-    final start = time.split('-').first.trim();
+  DateTime? _parseStartForDate(String time, DateTime day) {
+    final start = time.split('-').first.trim().replaceAll(':', '.');
     final parts = start.split('.');
     if (parts.length != 2) return null;
     final h = int.tryParse(parts[0]);
     final m = int.tryParse(parts[1]);
     if (h == null || m == null) return null;
-    final now = DateTime.now();
-    return DateTime(now.year, now.month, now.day, h, m);
-  }
-
-  DateTime? _parseEndToday(String time) {
-    final pieces = time.split('-');
-    if (pieces.length < 2) return null;
-    final end = pieces[1].trim();
-    final parts = end.split('.');
-    if (parts.length != 2) return null;
-    final h = int.tryParse(parts[0]);
-    final m = int.tryParse(parts[1]);
-    if (h == null || m == null) return null;
-    final now = DateTime.now();
-    return DateTime(now.year, now.month, now.day, h, m);
+    return DateTime(day.year, day.month, day.day, h, m);
   }
 
   DateTime? _parseEndForDate(String time, DateTime day) {
@@ -59,66 +45,75 @@ class DashboardTab extends StatelessWidget {
     return DateTime(day.year, day.month, day.day, h, m);
   }
 
-  Lesson? _nextLessonToday(List<Lesson> todayLessons) {
+  _UpcomingLesson? _nextLessonUpcoming(ScheduleRepository repo) {
     final now = DateTime.now();
-    Lesson? best;
-    DateTime? bestStart;
+    _UpcomingLesson? best;
 
-    for (final l in todayLessons) {
-      final start = _parseStartToday(l.time);
-      if (start == null) continue;
+    for (var i = 0; i <= 7; i++) {
+      final day = DateTime(now.year, now.month, now.day).add(Duration(days: i));
+      final lessons = repo.lessonsForDate(day);
+      for (final l in lessons) {
+        final start = _parseStartForDate(l.time, day);
+        if (start == null) continue;
 
-      final end = _parseEndToday(l.time);
-      final isOngoing = end != null && start.isBefore(now) && end.isAfter(now);
-      final isFuture = start.isAfter(now);
+        final end = _parseEndForDate(l.time, day);
+        final isOngoing =
+            end != null && start.isBefore(now) && end.isAfter(now);
+        final isFuture = start.isAfter(now);
+        if (!isOngoing && !isFuture) continue;
 
-      if (!isOngoing && !isFuture) continue;
+        final candidate = _UpcomingLesson(lesson: l, start: start, day: day);
+        if (best == null) {
+          best = candidate;
+          continue;
+        }
 
-      if (best == null) {
-        best = l;
-        bestStart = start;
-        continue;
-      }
+        final bestEnd = _parseEndForDate(best.lesson.time, best.day);
+        final bestOngoing =
+            bestEnd != null && best.start.isBefore(now) && bestEnd.isAfter(now);
 
-      final bestEnd = _parseEndToday(best.time);
-      final bestOngoing =
-          bestEnd != null && bestStart!.isBefore(now) && bestEnd.isAfter(now);
-
-      if (bestOngoing) continue;
-      if (isOngoing) {
-        best = l;
-        bestStart = start;
-        continue;
-      }
-
-      if (start.isBefore(bestStart!)) {
-        best = l;
-        bestStart = start;
+        if (bestOngoing) continue;
+        if (isOngoing) {
+          best = candidate;
+          continue;
+        }
+        if (start.isBefore(best.start)) {
+          best = candidate;
+        }
       }
     }
-
     return best;
   }
 
-  String _timeToText(Lesson lesson) {
+  String _timeToText(_UpcomingLesson next) {
     final now = DateTime.now();
-    final start = _parseStartToday(lesson.time);
-    if (start == null) return '';
+    final start = next.start;
+    final lesson = next.lesson;
 
-    final end = _parseEndToday(lesson.time);
+    final end = _parseEndForDate(lesson.time, next.day);
     final isOngoing = end != null && start.isBefore(now) && end.isAfter(now);
     if (isOngoing) return 'уже идёт';
 
-    final diff = start.difference(now);
-    final mins = diff.inMinutes;
+    final startOfToday = DateTime(now.year, now.month, now.day);
+    final startOfNextDay = startOfToday.add(const Duration(days: 1));
+    if (next.day == startOfToday) {
+      final diff = start.difference(now);
+      final mins = diff.inMinutes;
+      if (mins <= 0) return 'скоро';
+      if (mins < 60) return 'через $mins мин';
 
-    if (mins <= 0) return 'скоро';
-    if (mins < 60) return 'через $mins мин';
+      final hours = diff.inHours;
+      final rem = mins - hours * 60;
+      if (rem == 0) return 'через $hours ч';
+      return 'через $hours ч $rem мин';
+    }
 
-    final hours = diff.inHours;
-    final rem = mins - hours * 60;
-    if (rem == 0) return 'через $hours ч';
-    return 'через $hours ч $rem мин';
+    if (next.day == startOfNextDay) {
+      return 'завтра в ${lesson.time.split('-').first.trim()}';
+    }
+
+    String two(int x) => x.toString().padLeft(2, '0');
+    return '${two(next.day.day)}.${two(next.day.month)} в ${lesson.time.split('-').first.trim()}';
   }
 
   DateTime _weekStart(DateTime date) {
@@ -141,7 +136,7 @@ class DashboardTab extends StatelessWidget {
       animation: Listenable.merge([scheduleRepo, gradesRepo, profileRepo]),
       builder: (context, _) {
         final todayLessons = scheduleRepo.lessonsForDate(DateTime.now());
-        final next = _nextLessonToday(todayLessons);
+        final next = _nextLessonUpcoming(scheduleRepo);
         final now = DateTime.now();
         final weekDays = _weekDays(now);
         final lessonsByDay = <int, int>{
@@ -193,10 +188,12 @@ class DashboardTab extends StatelessWidget {
                   switchOutCurve: Curves.easeInCubic,
                   child: KeyedSubtree(
                     key: ValueKey(
-                      next == null ? 'no-next' : '${next.subject}-${next.time}',
+                      next == null
+                          ? 'no-next'
+                          : '${next.lesson.subject}-${next.lesson.time}-${next.day.toIso8601String()}',
                     ),
                     child: _NextLessonCard(
-                      lesson: next,
+                      lesson: next?.lesson,
                       subtitle: next == null ? null : _timeToText(next),
                       onOpenSchedule: () => onNavigate(1),
                     ),
@@ -212,4 +209,16 @@ class DashboardTab extends StatelessWidget {
       },
     );
   }
+}
+
+class _UpcomingLesson {
+  final Lesson lesson;
+  final DateTime start;
+  final DateTime day;
+
+  const _UpcomingLesson({
+    required this.lesson,
+    required this.start,
+    required this.day,
+  });
 }

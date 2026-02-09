@@ -136,6 +136,124 @@ class DemoData {
     ];
   }
 
+  static CourseGradeReport courseReport(GradeCourse course) {
+    String gradeByName(String name) {
+      for (final c in grades()) {
+        if (c.courseName == name) {
+          return (c.grade ?? '-').trim();
+        }
+      }
+      return '-';
+    }
+
+    final courseGrade = gradeByName(course.courseName);
+    final rows = <GradeReportRow>[
+      GradeReportRow(
+        id: 'course',
+        level: 1,
+        type: GradeReportRowType.course,
+        title: course.courseName,
+        grade: '-',
+      ),
+      GradeReportRow(
+        id: 'total',
+        level: 1,
+        type: GradeReportRowType.aggregate,
+        title: 'Итоговая оценка за курс',
+        subtitle: 'Вычисляемая оценка',
+        grade: courseGrade,
+      ),
+      const GradeReportRow(
+        id: 'cat_current',
+        level: 2,
+        type: GradeReportRowType.category,
+        title: 'Текущий контроль',
+        grade: '-',
+      ),
+      const GradeReportRow(
+        id: 'att',
+        level: 3,
+        type: GradeReportRowType.aggregate,
+        title: 'Баллы за посещаемость',
+        subtitle: 'Вычисляемая оценка',
+        grade: '22,40',
+      ),
+      const GradeReportRow(
+        id: 'att_1',
+        level: 4,
+        type: GradeReportRowType.item,
+        title: 'Посещаемость. Лекция №1',
+        subtitle: 'Посещаемость',
+        grade: '2,80',
+      ),
+      const GradeReportRow(
+        id: 'att_2',
+        level: 4,
+        type: GradeReportRowType.item,
+        title: 'Посещаемость. Лекция №2',
+        subtitle: 'Посещаемость',
+        grade: '2,80',
+      ),
+      const GradeReportRow(
+        id: 'att_3',
+        level: 4,
+        type: GradeReportRowType.item,
+        title: 'Посещаемость. Лекция №3',
+        subtitle: 'Посещаемость',
+        grade: '2,80',
+      ),
+      const GradeReportRow(
+        id: 'cat_active',
+        level: 3,
+        type: GradeReportRowType.aggregate,
+        title: 'Баллы за активность',
+        subtitle: 'Вычисляемая оценка',
+        grade: '15,00',
+      ),
+      const GradeReportRow(
+        id: 'task_1',
+        level: 4,
+        type: GradeReportRowType.item,
+        title: 'Мини-кейс №1',
+        subtitle: 'Задание',
+        grade: '7,50',
+      ),
+      const GradeReportRow(
+        id: 'task_2',
+        level: 4,
+        type: GradeReportRowType.item,
+        title: 'Мини-кейс №2',
+        subtitle: 'Задание',
+        grade: '7,50',
+      ),
+      const GradeReportRow(
+        id: 'cat_exam',
+        level: 2,
+        type: GradeReportRowType.category,
+        title: 'Промежуточная аттестация',
+        grade: '-',
+      ),
+      const GradeReportRow(
+        id: 'exam_sum',
+        level: 3,
+        type: GradeReportRowType.aggregate,
+        title: 'Итого в категории «Промежуточная аттестация»',
+        subtitle: 'Вычисляемая оценка',
+        grade: '50,00',
+      ),
+      const GradeReportRow(
+        id: 'exam_item',
+        level: 3,
+        type: GradeReportRowType.item,
+        title: 'Экзамен / зачет',
+        subtitle: 'Задание',
+        grade: '50,00',
+      ),
+    ];
+
+    return CourseGradeReport(courseName: course.courseName, rows: rows);
+  }
+
   static UserProfile profile() {
     return UserProfile(
       fullName: 'TEST',

@@ -199,6 +199,81 @@ class NotificationInboxRepository extends ChangeNotifier {
     _syncCounters();
   }
 
+  Future<void> seedDemoItems({bool replace = false}) async {
+    await init();
+    if (!replace && _items.isNotEmpty) return;
+
+    final now = DateTime.now().millisecondsSinceEpoch;
+    final samples = <NotificationInboxItem>[
+      NotificationInboxItem(
+        id: 'demo_1',
+        dedupeKey: 'demo_1',
+        source: 'push',
+        title: 'Изменения в расписании',
+        body: 'На завтра обновились 2 пары по макроэкономике.',
+        data: const {'target': 'schedule'},
+        createdAtMs: now - const Duration(minutes: 8).inMilliseconds,
+        isRead: false,
+      ),
+      NotificationInboxItem(
+        id: 'demo_2',
+        dedupeKey: 'demo_2',
+        source: 'push',
+        title: 'Добавлена оценка',
+        body: 'Финансовая аналитика и BI: новая оценка 5,10.',
+        data: const {'target': 'grades'},
+        createdAtMs: now - const Duration(hours: 1, minutes: 15).inMilliseconds,
+        isRead: false,
+      ),
+      NotificationInboxItem(
+        id: 'demo_3',
+        dedupeKey: 'demo_3',
+        source: 'push',
+        title: 'Напоминание',
+        body: 'Сегодня дедлайн по мини-кейсу №2 до 23:59.',
+        data: const {'target': 'grades'},
+        createdAtMs: now - const Duration(hours: 3).inMilliseconds,
+        isRead: true,
+      ),
+      NotificationInboxItem(
+        id: 'demo_4',
+        dedupeKey: 'demo_4',
+        source: 'system',
+        title: 'Сервер уведомлений обновлён',
+        body: 'Новый адрес push-сервера применён автоматически.',
+        data: const {'cmd': 'push_server_update', 'target': 'profile'},
+        createdAtMs: now - const Duration(hours: 6).inMilliseconds,
+        isRead: true,
+      ),
+      NotificationInboxItem(
+        id: 'demo_5',
+        dedupeKey: 'demo_5',
+        source: 'push',
+        title: 'Расписание на следующую неделю',
+        body: 'Появилась дополнительная практика в четверг.',
+        data: const {'target': 'schedule'},
+        createdAtMs: now - const Duration(hours: 20).inMilliseconds,
+        isRead: false,
+      ),
+      NotificationInboxItem(
+        id: 'demo_6',
+        dedupeKey: 'demo_6',
+        source: 'push',
+        title: 'Учебный план обновлён',
+        body: 'Добавлена дисциплина: Командная коммуникация и переговоры.',
+        data: const {'target': 'grades'},
+        createdAtMs: now - const Duration(days: 1, hours: 4).inMilliseconds,
+        isRead: true,
+      ),
+    ];
+
+    _items
+      ..clear()
+      ..addAll(samples);
+    await _persist();
+    _syncCounters();
+  }
+
   String _sourceFromData(Map<String, String> data) {
     final cmd = (data['cmd'] ?? '').toLowerCase().trim();
     if (cmd == 'push_server_update') return 'system';

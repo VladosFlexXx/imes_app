@@ -1,4 +1,5 @@
 import 'dart:ui';
+import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
@@ -64,6 +65,9 @@ class _HomeScreenState extends State<HomeScreen> {
 
     ScheduleRepository.instance.initAndRefresh();
     NotificationInboxRepository.instance.init();
+    if (DemoMode.instance.enabled) {
+      unawaited(NotificationInboxRepository.instance.seedDemoItems());
+    }
 
     _notif.action.addListener(_onNotificationAction);
 

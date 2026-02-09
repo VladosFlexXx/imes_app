@@ -3,6 +3,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import '../grades/models.dart';
 import '../grades/repository.dart';
+import '../grades/course_report_screen.dart';
 import '../schedule/schedule_repository.dart';
 
 import '../recordbook/repository.dart';
@@ -111,7 +112,10 @@ class _GradesTabState extends State<GradesTab>
       unselectedLabelStyle: t.titleSmall?.copyWith(fontWeight: FontWeight.w700),
       onTap: (idx) {
         if (idx == _tabController.index) return;
-        _tabController.animateTo(idx, duration: const Duration(milliseconds: 220));
+        _tabController.animateTo(
+          idx,
+          duration: const Duration(milliseconds: 220),
+        );
       },
       tabs: const [
         Tab(text: 'Дисциплины'),
@@ -418,7 +422,17 @@ class _GradesTabState extends State<GradesTab>
               style: t.titleSmall?.copyWith(fontWeight: FontWeight.w900),
             ),
             const SizedBox(height: 8),
-            for (final c in currentQ) _CourseCard(course: c, onTap: () {}),
+            for (final c in currentQ)
+              _CourseCard(
+                course: c,
+                onTap: () {
+                  Navigator.of(context).push(
+                    MaterialPageRoute(
+                      builder: (_) => CourseGradeReportScreen(course: c),
+                    ),
+                  );
+                },
+              ),
             const SizedBox(height: 12),
           ],
           if (othersQ.isNotEmpty) ...[
@@ -427,7 +441,17 @@ class _GradesTabState extends State<GradesTab>
               style: t.titleSmall?.copyWith(fontWeight: FontWeight.w900),
             ),
             const SizedBox(height: 8),
-            for (final c in othersQ) _CourseCard(course: c, onTap: () {}),
+            for (final c in othersQ)
+              _CourseCard(
+                course: c,
+                onTap: () {
+                  Navigator.of(context).push(
+                    MaterialPageRoute(
+                      builder: (_) => CourseGradeReportScreen(course: c),
+                    ),
+                  );
+                },
+              ),
           ],
         ],
 

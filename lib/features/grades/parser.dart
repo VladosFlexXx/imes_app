@@ -1,4 +1,5 @@
 import 'package:html/parser.dart' as html_parser;
+import 'package:html/dom.dart' as dom;
 import 'models.dart';
 
 class GradesParser {
@@ -14,7 +15,9 @@ class GradesParser {
 
     bool looksLikeGradesTable(List<String> headers) {
       final hs = normHeaders(headers);
-      final hasCourse = hs.any((h) => h.contains('курс') || h.contains('course'));
+      final hasCourse = hs.any(
+        (h) => h.contains('курс') || h.contains('course'),
+      );
       final hasGrade = hs.any((h) => h.contains('оцен') || h.contains('grade'));
       // иногда в overview есть только курс+оценка, иногда больше
       return hasCourse && (hasGrade || hs.length >= 2);
@@ -83,7 +86,13 @@ class GradesParser {
         cols[key] = val;
       }
 
-      out.add(GradeCourse(courseName: courseName, columns: cols, courseUrl: courseUrl));
+      out.add(
+        GradeCourse(
+          courseName: courseName,
+          columns: cols,
+          courseUrl: courseUrl,
+        ),
+      );
     }
 
     return out;
@@ -91,4 +100,87 @@ class GradesParser {
 
   static String _norm(String s) =>
       s.toLowerCase().replaceAll(RegExp(r'\s+'), ' ').trim();
+
+  static CourseGradeReport parseUserReport(
+    String html, {
+    required String fallbackCourseName,
+  }) {
+    final doc = html_parser.parse(html);
+    final table = doc.querySelector('table.user-grade');
+
+    if (table == null) {
+      return CourseGradeReport(courseName: fallbackCourseName, rows: const []);
+    }
+
+    final topCourse = _clean(
+      table.querySelector('th.level1.category span')?.text ?? '',
+    );
+    final courseName = topCourse.isNotEmpty ? topCourse : fallbackCourseName;
+
+    final rows = <GradeReportRow>[];
+
+    for (final tr in table.querySelectorAll('tbody tr')) {
+      final th = tr.querySelector('th.column-itemname');
+      final td = tr.querySelector('td.column-grade');
+      if (th == null) continue;
+
+      final title = _extractTitle(th);
+      if (title.isEmpty) continue;
+
+      final level = _extractLevel(th.classes);
+      final type = _extractRowType(th.classes);
+      final grade = _clean(td?.text ?? '');
+      final subtitle = _clean(th.querySelector('.dimmed_text')?.text ?? '');
+      final link = th.querySelector('.rowtitle a')?.attributes['href'];
+      final id = th.id.trim().isNotEmpty
+          ? th.id.trim()
+          : '${type.name}_${level}_${rows.length}';
+
+      rows.add(
+        GradeReportRow(
+          id: id,
+          level: level,
+          type: type,
+          title: title,
+          subtitle: subtitle.isEmpty ? null : subtitle,
+          grade: grade.isEmpty ? '-' : grade,
+          link: link,
+        ),
+      );
+    }
+
+    return CourseGradeReport(courseName: courseName, rows: rows);
+  }
+
+  static String _extractTitle(dom.Element th) {
+    final direct = _clean(
+      th.querySelector('.rowtitle .gradeitemheader')?.text ?? '',
+    );
+    if (direct.isNotEmpty) return direct;
+    final span = _clean(
+      th.querySelector('.category-content > span')?.text ?? '',
+    );
+    if (span.isNotEmpty) return span;
+    return _clean(th.text);
+  }
+
+  static int _extractLevel(Set<String> classes) {
+    for (final c in classes) {
+      if (c.startsWith('level')) {
+        final v = int.tryParse(c.substring('level'.length));
+        if (v != null) return v;
+      }
+    }
+    return 1;
+  }
+
+  static GradeReportRowType _extractRowType(Set<String> classes) {
+    if (classes.contains('category')) return GradeReportRowType.category;
+    if (classes.contains('baggb')) return GradeReportRowType.aggregate;
+    if (classes.contains('item')) return GradeReportRowType.item;
+    return GradeReportRowType.course;
+  }
+
+  static String _clean(String s) =>
+      s.replaceAll(RegExp(r'\s+'), ' ').replaceAll('\u00A0', ' ').trim();
 }

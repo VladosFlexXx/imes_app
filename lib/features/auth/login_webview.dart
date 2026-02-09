@@ -7,6 +7,7 @@ import 'package:vuz_app/core/demo/demo_mode.dart';
 import 'package:vuz_app/core/network/eios_client.dart';
 
 import '../home/home_screen.dart';
+import '../notifications/inbox_repository.dart';
 
 class LoginWebViewScreen extends StatefulWidget {
   const LoginWebViewScreen({super.key});
@@ -39,6 +40,7 @@ class _LoginWebViewScreenState extends State<LoginWebViewScreen> {
     await _storage.delete(key: 'cookie_header');
     EiosClient.instance.invalidateCookieCache();
     await DemoMode.instance.setEnabled(true);
+    await NotificationInboxRepository.instance.seedDemoItems(replace: true);
     await _goToApp();
   }
 
