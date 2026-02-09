@@ -1,4 +1,4 @@
-part of '../tab_dashboard.dart';
+﻿part of '../tab_dashboard.dart';
 
 class _GreetingHero extends StatelessWidget {
   final String? fullName;
@@ -21,12 +21,15 @@ class _GreetingHero extends StatelessWidget {
   ({String greeting, _DayPhase phase}) _greetingForNow() {
     final h = DateTime.now().hour;
 
-    if (h >= 5 && h < 12)
+    if (h >= 5 && h < 12) {
       return (greeting: 'Доброе утро', phase: _DayPhase.morning);
-    if (h >= 12 && h < 18)
+    }
+    if (h >= 12 && h < 18) {
       return (greeting: 'Добрый день', phase: _DayPhase.day);
-    if (h >= 18 && h < 23)
+    }
+    if (h >= 18 && h < 23) {
       return (greeting: 'Добрый вечер', phase: _DayPhase.evening);
+    }
     return (greeting: 'Доброй ночи', phase: _DayPhase.night);
   }
 

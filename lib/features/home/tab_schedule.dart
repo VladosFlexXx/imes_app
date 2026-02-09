@@ -102,8 +102,6 @@ class _ScheduleTabState extends State<ScheduleTab>
   DateTime _dateForSelected() =>
       _contentWeekStart.add(Duration(days: _selectedIndex));
 
-  bool get _isCurrentWeekUi => WeekUtils.sameWeek(_uiWeekStart, DateTime.now());
-
   // =========================
   // Нормализация дня недели
   // =========================
@@ -454,8 +452,6 @@ class _ScheduleTabState extends State<ScheduleTab>
 
   @override
   Widget build(BuildContext context) {
-    final t = Theme.of(context).textTheme;
-
     return AnimatedBuilder(
       animation: repo,
       builder: (context, _) {
@@ -477,14 +473,6 @@ class _ScheduleTabState extends State<ScheduleTab>
         final dayLessons = _applyUiFilter(dayLessonsAll);
 
         final next = _nextLesson(dayLessons, contentDate);
-
-        final weekChangesTotal = contentWeekLessons
-            .where(
-              (l) =>
-                  l.status == LessonStatus.changed ||
-                  l.status == LessonStatus.cancelled,
-            )
-            .length;
 
         final dayChanges = dayLessonsAll
             .where(
@@ -518,52 +506,16 @@ class _ScheduleTabState extends State<ScheduleTab>
             : null;
 
         return Scaffold(
-          appBar: AppBar(
-            title: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  repo.loading ? 'Расписание (обновление...)' : 'Расписание',
-                ),
-                Text(
-                  _weekTitle(_uiWeekStart),
-                  style: t.labelMedium?.copyWith(fontWeight: FontWeight.w700),
-                ),
-              ],
-            ),
-            bottom: repo.loading
-                ? const PreferredSize(
-                    preferredSize: Size.fromHeight(3),
-                    child: LinearProgressIndicator(minHeight: 3),
-                  )
-                : null,
-            actions: [
-              IconButton(
-                tooltip: 'Выбрать неделю',
-                onPressed: _openWeekPicker,
-                icon: const Icon(Icons.calendar_month_outlined),
-              ),
-              if (!_isCurrentWeekUi)
-                IconButton(
-                  tooltip: 'К текущей неделе',
-                  onPressed: _goToToday,
-                  icon: const Icon(Icons.today),
-                ),
-              IconButton(
-                tooltip: 'Обновить',
-                onPressed: repo.loading
-                    ? null
-                    : () => repo.refresh(force: true),
-                icon: const Icon(Icons.refresh),
-              ),
-            ],
-          ),
           body: RefreshIndicator(
             onRefresh: _refresh,
             child: ListView(
               physics: const AlwaysScrollableScrollPhysics(),
-              padding: const EdgeInsets.fromLTRB(16, 12, 16, 18),
+              padding: const EdgeInsets.fromLTRB(16, 12, 16, 106),
               children: [
+                if (repo.loading) ...[
+                  const LinearProgressIndicator(minHeight: 3),
+                  const SizedBox(height: 12),
+                ],
                 GestureDetector(
                   behavior: HitTestBehavior.opaque,
                   onHorizontalDragStart: (_) {},
@@ -573,13 +525,13 @@ class _ScheduleTabState extends State<ScheduleTab>
                     parityText: uiParityText,
                     rangeText: _weekTitle(_uiWeekStart),
                     updatedText: _updatedAtText(updatedAt),
-                    weekChangesTotal: weekChangesTotal,
                     dayChanges: dayChanges,
                     dayTitle: dayTitle,
                     todayLabel: isToday ? 'Сегодня' : 'Вернуться',
                     onTodayTap: _goToToday,
                     changesOnly: _filter == ScheduleUiFilter.changes,
                     onToggleChangesOnly: _toggleChangesOnly,
+                    onOpenWeekPicker: _openWeekPicker,
                   ),
                 ),
                 const SizedBox(height: 12),

@@ -5,7 +5,6 @@ class _UnifiedHeaderCard extends StatelessWidget {
   final String rangeText;
   final String updatedText;
 
-  final int weekChangesTotal;
   final int dayChanges;
 
   final String dayTitle;
@@ -15,18 +14,19 @@ class _UnifiedHeaderCard extends StatelessWidget {
 
   final bool changesOnly;
   final VoidCallback onToggleChangesOnly;
+  final VoidCallback onOpenWeekPicker;
 
   const _UnifiedHeaderCard({
     required this.parityText,
     required this.rangeText,
     required this.updatedText,
-    required this.weekChangesTotal,
     required this.dayChanges,
     required this.dayTitle,
     required this.todayLabel,
     required this.onTodayTap,
     required this.changesOnly,
     required this.onToggleChangesOnly,
+    required this.onOpenWeekPicker,
   });
 
   @override
@@ -46,46 +46,40 @@ class _UnifiedHeaderCard extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Wrap(
-              spacing: 8,
-              runSpacing: 8,
-              children: [
-                _Pill(icon: Icons.swap_vert_circle_outlined, text: parityText),
-                _Pill(icon: Icons.date_range_outlined, text: rangeText),
-                if (weekChangesTotal > 0)
-                  _Pill(
-                    icon: Icons.edit_calendar_outlined,
-                    text: 'Изм.: $weekChangesTotal',
-                    tone: _PillTone.warn,
-                  ),
-              ],
-            ),
-            const SizedBox(height: 10),
             Row(
               children: [
-                Icon(
-                  Icons.sync,
-                  size: 18,
-                  color: cs.onSurface.withValues(alpha: 0.75),
-                ),
-                const SizedBox(width: 8),
                 Expanded(
-                  child: Text(
-                    'Обновлено: $updatedText',
-                    style: subStyle,
-                    overflow: TextOverflow.ellipsis,
+                  child: Row(
+                    children: [
+                      Text(
+                        'Расписание',
+                        style: t.titleLarge?.copyWith(
+                          fontWeight: FontWeight.w900,
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Flexible(
+                        child: Text(
+                          rangeText,
+                          overflow: TextOverflow.ellipsis,
+                          style: t.bodyMedium?.copyWith(
+                            fontWeight: FontWeight.w800,
+                            color: cs.onSurface.withValues(alpha: 0.82),
+                          ),
+                        ),
+                      ),
+                    ],
                   ),
                 ),
+                const SizedBox(width: 10),
+                Icon(
+                  Icons.sync,
+                  size: 16,
+                  color: cs.onSurface.withValues(alpha: 0.75),
+                ),
+                const SizedBox(width: 6),
+                Text(updatedText, style: subStyle),
               ],
-            ),
-            const SizedBox(height: 10),
-            Text(
-              dayChanges > 0
-                  ? 'В выбранный день изменений: $dayChanges'
-                  : 'Сегодня изменений нет',
-              style: t.bodySmall?.copyWith(
-                color: cs.onSurface.withValues(alpha: 0.72),
-              ),
             ),
             const SizedBox(height: 12),
             Divider(
@@ -103,16 +97,44 @@ class _UnifiedHeaderCard extends StatelessWidget {
                   ),
                 ),
                 const SizedBox(width: 10),
+                Icon(
+                  Icons.swap_vert_circle_outlined,
+                  size: 17,
+                  color: cs.onSurface.withValues(alpha: 0.78),
+                ),
+                const SizedBox(width: 6),
+                Flexible(
+                  child: Text(
+                    parityText,
+                    style: t.bodyMedium?.copyWith(
+                      fontWeight: FontWeight.w800,
+                      color: cs.onSurface.withValues(alpha: 0.82),
+                    ),
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 10),
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: [
+                _TapPill(
+                  icon: Icons.calendar_month_outlined,
+                  text: 'Неделя',
+                  active: true,
+                  onTap: onOpenWeekPicker,
+                ),
                 _TapPill(
                   icon: Icons.today,
                   text: todayLabel,
                   active: true,
                   onTap: onTodayTap,
                 ),
-                const SizedBox(width: 8),
                 _TapPill(
                   icon: Icons.edit_calendar_outlined,
-                  text: 'Изм.',
+                  text: 'Изм. $dayChanges',
                   active: changesOnly,
                   onTap: onToggleChangesOnly,
                 ),

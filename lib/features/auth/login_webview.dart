@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_inappwebview/flutter_inappwebview.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
+import 'package:vuz_app/core/demo/demo_mode.dart';
 import 'package:vuz_app/core/network/eios_client.dart';
 
 import '../home/home_screen.dart';
@@ -29,9 +30,16 @@ class _LoginWebViewScreenState extends State<LoginWebViewScreen> {
 
   Future<void> _goToApp() async {
     if (!mounted) return;
-    Navigator.of(context).pushReplacement(
-      MaterialPageRoute(builder: (_) => const HomeScreen()),
-    );
+    Navigator.of(
+      context,
+    ).pushReplacement(MaterialPageRoute(builder: (_) => const HomeScreen()));
+  }
+
+  Future<void> _enterDemo() async {
+    await _storage.delete(key: 'cookie_header');
+    EiosClient.instance.invalidateCookieCache();
+    await DemoMode.instance.setEnabled(true);
+    await _goToApp();
   }
 
   Future<String> _buildCookieHeader() async {
@@ -117,26 +125,34 @@ class _LoginWebViewScreenState extends State<LoginWebViewScreen> {
       // 2) прочитаем cookie_header и проверим MoodleSession
       final header = (await _storage.read(key: 'cookie_header')) ?? '';
       if (header.trim().isEmpty || !_hasMoodleSessionCookie(header)) {
-        debugPrint('LOGIN VERIFY: missing MoodleSession in cookie_header, stay in WebView');
+        debugPrint(
+          'LOGIN VERIFY: missing MoodleSession in cookie_header, stay in WebView',
+        );
         // даём время CookieManager’у синхронизироваться и попробуем ещё раз
         await Future.delayed(const Duration(milliseconds: 500));
         await _saveCookiesForDomain();
         final header2 = (await _storage.read(key: 'cookie_header')) ?? '';
         if (header2.trim().isEmpty || !_hasMoodleSessionCookie(header2)) {
-          debugPrint('LOGIN VERIFY: still no MoodleSession, not leaving WebView');
+          debugPrint(
+            'LOGIN VERIFY: still no MoodleSession, not leaving WebView',
+          );
           return;
         }
       }
 
       // 3) контрольный запрос через EiosClient: если вернёт login page — НЕ выходим
       try {
-        await EiosClient.instance.getHtml('https://eos.imes.su/my/', retries: 0);
+        await EiosClient.instance.getHtml(
+          'https://eos.imes.su/my/',
+          retries: 0,
+        );
       } catch (e) {
         debugPrint('LOGIN VERIFY: /my/ via http still not authed: $e');
         return;
       }
 
       // Всё ок — уходим
+      await DemoMode.instance.setEnabled(false);
       await _goToApp();
     } finally {
       _verifying = false;
@@ -163,6 +179,14 @@ class _LoginWebViewScreenState extends State<LoginWebViewScreen> {
     return Scaffold(
       appBar: AppBar(
         title: const Text('Вход в ЭИОС'),
+        actions: [
+          TextButton.icon(
+            onPressed: _enterDemo,
+            icon: const Icon(Icons.slideshow_outlined),
+            label: const Text('Демо-вход'),
+          ),
+          const SizedBox(width: 8),
+        ],
         bottom: PreferredSize(
           preferredSize: const Size.fromHeight(3),
           child: _progress < 1

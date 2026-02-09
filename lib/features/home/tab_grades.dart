@@ -26,14 +26,15 @@ class GradesTab extends StatefulWidget {
   State<GradesTab> createState() => _GradesTabState();
 }
 
-class _GradesTabState extends State<GradesTab> {
+class _GradesTabState extends State<GradesTab>
+    with SingleTickerProviderStateMixin {
   final gradesRepo = GradesRepository.instance;
   final scheduleRepo = ScheduleRepository.instance;
 
   final planRepo = StudyPlanRepository.instance;
   final recordRepo = RecordbookRepository.instance;
 
-  StudySection _section = StudySection.disciplines;
+  late final TabController _tabController;
 
   String _query = '';
 
@@ -59,7 +60,19 @@ class _GradesTabState extends State<GradesTab> {
     planRepo.initAndRefresh();
     recordRepo.initAndRefresh();
 
+    _tabController = TabController(
+      length: 3,
+      vsync: this,
+      animationDuration: const Duration(milliseconds: 220),
+    );
+
     _loadCap();
+  }
+
+  @override
+  void dispose() {
+    _tabController.dispose();
+    super.dispose();
   }
 
   Future<void> _loadCap() async {
@@ -80,44 +93,31 @@ class _GradesTabState extends State<GradesTab> {
       '${dt.hour.toString().padLeft(2, '0')}:${dt.minute.toString().padLeft(2, '0')}';
 
   // =========================
-  // Switch chips
+  // Tabs
   // =========================
 
-  Widget _sectionSwitch() {
-    Widget chip(StudySection s, String label, IconData icon) {
-      final selected = _section == s;
-      return ChoiceChip(
-        label: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(icon, size: 16),
-            const SizedBox(width: 6),
-            Text(label),
-          ],
-        ),
-        selected: selected,
-        onSelected: (_) => setState(() => _section = s),
-      );
-    }
+  Widget _sectionTabs() {
+    final t = Theme.of(context).textTheme;
+    final cs = Theme.of(context).colorScheme;
 
-    return SingleChildScrollView(
-      scrollDirection: Axis.horizontal,
-      child: Wrap(
-        spacing: 8,
-        children: [
-          chip(
-            StudySection.disciplines,
-            'Дисциплины',
-            Icons.menu_book_outlined,
-          ),
-          chip(
-            StudySection.studyPlan,
-            'Учебный план',
-            Icons.view_list_outlined,
-          ),
-          chip(StudySection.recordbook, 'Зачётка', Icons.fact_check_outlined),
-        ],
-      ),
+    return TabBar(
+      controller: _tabController,
+      isScrollable: false,
+      indicatorSize: TabBarIndicatorSize.label,
+      dividerColor: Colors.transparent,
+      indicatorColor: cs.primary,
+      indicatorWeight: 2.2,
+      labelStyle: t.titleSmall?.copyWith(fontWeight: FontWeight.w900),
+      unselectedLabelStyle: t.titleSmall?.copyWith(fontWeight: FontWeight.w700),
+      onTap: (idx) {
+        if (idx == _tabController.index) return;
+        _tabController.animateTo(idx, duration: const Duration(milliseconds: 220));
+      },
+      tabs: const [
+        Tab(text: 'Дисциплины'),
+        Tab(text: 'План'),
+        Tab(text: 'Зачётка'),
+      ],
     );
   }
 
@@ -716,8 +716,8 @@ class _GradesTabState extends State<GradesTab> {
   // refresh
   // =========================
 
-  Future<void> _refreshCurrent() async {
-    switch (_section) {
+  Future<void> _refreshSection(StudySection section) async {
+    switch (section) {
       case StudySection.disciplines:
         await gradesRepo.refresh(force: true);
         await scheduleRepo.refresh(force: true);
@@ -731,8 +731,8 @@ class _GradesTabState extends State<GradesTab> {
     }
   }
 
-  bool _isLoadingCurrent() {
-    switch (_section) {
+  bool _isLoadingSection(StudySection section) {
+    switch (section) {
       case StudySection.disciplines:
         return gradesRepo.loading || scheduleRepo.loading;
       case StudySection.studyPlan:
@@ -740,6 +740,31 @@ class _GradesTabState extends State<GradesTab> {
       case StudySection.recordbook:
         return recordRepo.loading;
     }
+  }
+
+  Widget _sectionPage(StudySection section, Widget child) {
+    final isLoading = _isLoadingSection(section);
+    return RefreshIndicator(
+      onRefresh: () => _refreshSection(section),
+      child: ListView(
+        physics: const AlwaysScrollableScrollPhysics(),
+        padding: const EdgeInsets.fromLTRB(16, 12, 16, 106),
+        children: [
+          if (isLoading) ...[
+            const LinearProgressIndicator(minHeight: 3),
+            const SizedBox(height: 12),
+          ],
+          child,
+        ],
+      ),
+    );
+  }
+
+  void _swipeSection(int dir) {
+    if (dir == 0) return;
+    final next = (_tabController.index + dir).clamp(0, 2);
+    if (next == _tabController.index) return;
+    _tabController.animateTo(next, duration: const Duration(milliseconds: 220));
   }
 
   @override
@@ -752,64 +777,60 @@ class _GradesTabState extends State<GradesTab> {
         recordRepo,
       ]),
       builder: (context, _) {
-        final title = switch (_section) {
-          StudySection.disciplines => 'Дисциплины',
-          StudySection.studyPlan => 'Учебный план',
-          StudySection.recordbook => 'Зачётная книжка',
-        };
-
         return Scaffold(
-          appBar: AppBar(
-            title: Text(title),
-            bottom: _isLoadingCurrent()
-                ? const PreferredSize(
-                    preferredSize: Size.fromHeight(3),
-                    child: LinearProgressIndicator(minHeight: 3),
-                  )
-                : null,
-            actions: [
-              IconButton(
-                tooltip: 'Обновить',
-                onPressed: _isLoadingCurrent() ? null : () => _refreshCurrent(),
-                icon: const Icon(Icons.refresh),
+          body: Column(
+            children: [
+              const SizedBox(height: 6),
+              _sectionTabs(),
+              const SizedBox(height: 6),
+              Expanded(
+                child: GestureDetector(
+                  behavior: HitTestBehavior.opaque,
+                  onHorizontalDragEnd: (details) {
+                    final v = details.primaryVelocity ?? 0;
+                    if (v.abs() < 250) return;
+                    if (v < 0) {
+                      _swipeSection(1);
+                    } else {
+                      _swipeSection(-1);
+                    }
+                  },
+                  child: TabBarView(
+                    controller: _tabController,
+                    physics: const NeverScrollableScrollPhysics(),
+                    children: [
+                      RepaintBoundary(
+                        child: _sectionPage(
+                          StudySection.disciplines,
+                          KeyedSubtree(
+                            key: const ValueKey('disciplines'),
+                            child: _pageDisciplines(),
+                          ),
+                        ),
+                      ),
+                      RepaintBoundary(
+                        child: _sectionPage(
+                          StudySection.studyPlan,
+                          KeyedSubtree(
+                            key: const ValueKey('study_plan'),
+                            child: _pageStudyPlan(),
+                          ),
+                        ),
+                      ),
+                      RepaintBoundary(
+                        child: _sectionPage(
+                          StudySection.recordbook,
+                          KeyedSubtree(
+                            key: const ValueKey('recordbook'),
+                            child: _pageRecordbook(),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
               ),
             ],
-          ),
-          body: RefreshIndicator(
-            onRefresh: _refreshCurrent,
-            child: ListView(
-              physics: const AlwaysScrollableScrollPhysics(),
-              padding: const EdgeInsets.fromLTRB(16, 12, 16, 18),
-              children: [
-                _sectionSwitch(),
-                const SizedBox(height: 12),
-
-                AnimatedSwitcher(
-                  duration: const Duration(milliseconds: 180),
-                  switchInCurve: Curves.easeOutCubic,
-                  switchOutCurve: Curves.easeInCubic,
-                  child: () {
-                    switch (_section) {
-                      case StudySection.disciplines:
-                        return KeyedSubtree(
-                          key: const ValueKey('disciplines'),
-                          child: _pageDisciplines(),
-                        );
-                      case StudySection.studyPlan:
-                        return KeyedSubtree(
-                          key: const ValueKey('study_plan'),
-                          child: _pageStudyPlan(),
-                        );
-                      case StudySection.recordbook:
-                        return KeyedSubtree(
-                          key: const ValueKey('recordbook'),
-                          child: _pageRecordbook(),
-                        );
-                    }
-                  }(),
-                ),
-              ],
-            ),
           ),
         );
       },

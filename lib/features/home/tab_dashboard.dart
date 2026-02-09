@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+﻿import 'package:flutter/material.dart';
 
 import '../grades/repository.dart';
 import '../profile/repository.dart';
@@ -167,28 +167,16 @@ class DashboardTab extends StatelessWidget {
         final fullName = profileRepo.profile?.fullName;
 
         return Scaffold(
-          appBar: AppBar(
-            title: Text(isLoading ? 'Главная (обновление...)' : 'Главная'),
-            bottom: isLoading
-                ? const PreferredSize(
-                    preferredSize: Size.fromHeight(3),
-                    child: LinearProgressIndicator(minHeight: 3),
-                  )
-                : null,
-            actions: [
-              IconButton(
-                tooltip: 'Обновить всё',
-                onPressed: isLoading ? null : _refreshAll,
-                icon: const Icon(Icons.refresh),
-              ),
-            ],
-          ),
           body: RefreshIndicator(
             onRefresh: _refreshAll,
             child: ListView(
               physics: const AlwaysScrollableScrollPhysics(),
-              padding: const EdgeInsets.all(16),
+              padding: const EdgeInsets.fromLTRB(16, 16, 16, 106),
               children: [
+                if (isLoading) ...[
+                  const LinearProgressIndicator(minHeight: 3),
+                  const SizedBox(height: 12),
+                ],
                 _GreetingHero(
                   fullName: fullName,
                   lessonsToday: todayLessons.length,

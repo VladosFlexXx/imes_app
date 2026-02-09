@@ -3,6 +3,8 @@ import 'dart:convert';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../core/cache/cached_repository.dart';
+import '../../core/demo/demo_data.dart';
+import '../../core/demo/demo_mode.dart';
 import 'data/grades_remote_source.dart';
 import 'data/web_grades_remote_source.dart';
 import 'models.dart';
@@ -55,6 +57,9 @@ class GradesRepository extends CachedRepository<List<GradeCourse>> {
 
   @override
   Future<List<GradeCourse>> fetchRemote() async {
+    if (DemoMode.instance.enabled) {
+      return DemoData.grades();
+    }
     return _remoteSource.fetchCourses();
   }
 

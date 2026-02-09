@@ -3,6 +3,8 @@ import 'dart:convert';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../core/cache/cached_repository.dart';
+import '../../core/demo/demo_data.dart';
+import '../../core/demo/demo_mode.dart';
 import 'data/schedule_remote_source.dart';
 import 'data/web_schedule_remote_source.dart';
 import 'models.dart';
@@ -91,6 +93,9 @@ class ScheduleRepository extends CachedRepository<List<Lesson>> {
 
   @override
   Future<List<Lesson>> fetchRemote() async {
+    if (DemoMode.instance.enabled) {
+      return DemoData.schedule();
+    }
     return _remoteSource.fetchLessons();
   }
 

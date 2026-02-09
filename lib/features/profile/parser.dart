@@ -1,4 +1,5 @@
 import 'package:html/parser.dart' as html_parser;
+import 'package:html/dom.dart' as dom;
 import 'models.dart';
 
 class ProfileParser {
@@ -46,9 +47,7 @@ class ProfileParser {
     if (name.trim().isEmpty) name = 'Студент';
 
     // аватар
-    final avatar = doc.querySelector('.usermenu img.userpicture')?.attributes['src'] ??
-        doc.querySelector('img.userpicture')?.attributes['src'] ??
-        doc.querySelector('.usermenu img')?.attributes['src'];
+    final avatar = _extractAvatarFromDoc(doc);
 
     // ссылки
     String? profileUrl;
@@ -71,6 +70,11 @@ class ProfileParser {
     return (fullName: name, avatarUrl: avatar, profileUrl: profileUrl, editUrl: editUrl);
   }
 
+  static String? parseAvatarFromProfilePage(String html) {
+    final doc = html_parser.parse(html);
+    return _extractAvatarFromDoc(doc);
+  }
+
   /// Парсит ВСЕ поля со страницы редактирования профиля.
   static UserProfile parseEditPage(
     String html, {
@@ -87,7 +91,7 @@ class ProfileParser {
     }
 
     // аватар
-    final pageAvatar = doc.querySelector('img.userpicture')?.attributes['src'];
+    final pageAvatar = _extractAvatarFromDoc(doc);
     final avatarUrl = (pageAvatar != null && pageAvatar.trim().isNotEmpty)
         ? pageAvatar
         : fallbackAvatarUrl;
@@ -214,6 +218,67 @@ class ProfileParser {
     if (RegExp(r'\d').hasMatch(s)) return false;
 
     return true;
+  }
+
+  static String? _extractAvatarFromDoc(dom.Document doc) {
+    final candidates = <dom.Element?>[
+      doc.querySelector('.usermenu img.userpicture'),
+      doc.querySelector('.userpicture img'),
+      doc.querySelector('.avatar.current img'),
+      doc.querySelector('.userprofile img.userpicture'),
+      doc.querySelector('.page-context-header img.userpicture'),
+      doc.querySelector('img.userpicture'),
+      doc.querySelector('.usermenu img'),
+    ];
+
+    for (final el in candidates.whereType<dom.Element>()) {
+      final direct = _extractImageUrlFromElement(el);
+      if (direct != null) return direct;
+    }
+
+    // Иногда аватар задается как background-image на span/div.
+    final bgCandidates = doc.querySelectorAll(
+      '.avatar.current, .usermenu .avatar, .userpicture, [style*="background-image"]',
+    );
+    for (final el in bgCandidates) {
+      final bg = _extractBackgroundImage(el.attributes['style']);
+      if (bg != null) return bg;
+    }
+
+    return null;
+  }
+
+  static String? _extractImageUrlFromElement(dom.Element el) {
+    final src = _clean(el.attributes['src'] ?? '');
+    if (src.isNotEmpty) return src;
+
+    final dataSrc = _clean(el.attributes['data-src'] ?? '');
+    if (dataSrc.isNotEmpty) return dataSrc;
+
+    final srcset = _clean(el.attributes['srcset'] ?? '');
+    if (srcset.isNotEmpty) {
+      final first = srcset.split(',').first.trim().split(' ').first.trim();
+      if (first.isNotEmpty) return first;
+    }
+
+    return _extractBackgroundImage(el.attributes['style']);
+  }
+
+  static String? _extractBackgroundImage(String? style) {
+    final s = style ?? '';
+    if (s.isEmpty) return null;
+    final m = RegExp(
+      r'background-image\s*:\s*url\(([^)]+)\)',
+      caseSensitive: false,
+    ).firstMatch(s);
+    if (m == null) return null;
+    var url = _clean(m.group(1) ?? '');
+    if (url.startsWith('"') && url.endsWith('"') && url.length > 1) {
+      url = url.substring(1, url.length - 1);
+    } else if (url.startsWith("'") && url.endsWith("'") && url.length > 1) {
+      url = url.substring(1, url.length - 1);
+    }
+    return url.isEmpty ? null : url;
   }
 
   static String _clean(String s) => s.replaceAll(RegExp(r'\s+'), ' ').trim();

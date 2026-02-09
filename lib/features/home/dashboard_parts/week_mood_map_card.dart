@@ -42,41 +42,32 @@ class _WeekMoodMapCard extends StatelessWidget {
 
     if (weekMax <= 0) {
       return (
-        bg: const Color(0xFF302D46),
-        border: const Color(0xFF595685),
-        fg: const Color(0xFFC2BDEA),
+        bg: const Color(0xFF213C39),
+        border: const Color(0xFF3C8B82),
+        fg: const Color(0xFFB6F2E5),
       );
     }
 
     final ratio = count / weekMax;
-    final peakIsRare = peakDaysCount <= 2;
-
-    if (ratio >= 0.85 && peakIsRare) {
+    if (ratio >= 0.80) {
+      final isRarePeak = peakDaysCount <= 2 && count == weekMax;
       return (
-        bg: const Color(0xFF5F4DFF),
-        border: const Color(0xFFD1CAFF),
-        fg: const Color(0xFFFFFFFF),
-      );
-    }
-    if (ratio >= 0.70) {
-      final isPeak = count == weekMax;
-      return (
-        bg: isPeak ? const Color(0xFF4E40D6) : const Color(0xFF4438BE),
-        border: isPeak ? const Color(0xFFB0A6FF) : const Color(0xFF978EED),
-        fg: const Color(0xFFF1EEFF),
+        bg: isRarePeak ? const Color(0xFF5E3615) : const Color(0xFF4C3117),
+        border: isRarePeak ? const Color(0xFFFFC987) : const Color(0xFFE3A563),
+        fg: isRarePeak ? const Color(0xFFFFF1DE) : const Color(0xFFFFE7C8),
       );
     }
     if (ratio >= 0.45) {
       return (
-        bg: const Color(0xFF393162),
-        border: const Color(0xFF7067B8),
-        fg: const Color(0xFFD8D2FF),
+        bg: const Color(0xFF1E3253),
+        border: const Color(0xFF4B8EDF),
+        fg: const Color(0xFFD6EBFF),
       );
     }
     return (
-      bg: const Color(0xFF2F2C46),
-      border: const Color(0xFF5B5688),
-      fg: const Color(0xFFC1BBEE),
+      bg: const Color(0xFF1B3A36),
+      border: const Color(0xFF41A28E),
+      fg: const Color(0xFFC2F4E7),
     );
   }
 
@@ -162,13 +153,11 @@ class _WeekMoodMapCard extends StatelessWidget {
                   children: const [
                     _MoodLegend(text: 'Нет пар', color: Color(0xFF747787)),
                     SizedBox(width: 8),
-                    _MoodLegend(text: 'Легкая', color: Color(0xFF7067B8)),
+                    _MoodLegend(text: 'Мало пар', color: Color(0xFF41A28E)),
                     SizedBox(width: 8),
-                    _MoodLegend(text: 'Средняя', color: Color(0xFF978EED)),
+                    _MoodLegend(text: 'Средне', color: Color(0xFF4B8EDF)),
                     SizedBox(width: 8),
-                    _MoodLegend(text: 'Высокая', color: Color(0xFFB0A6FF)),
-                    SizedBox(width: 8),
-                    _MoodLegend(text: 'Пик недели', color: Color(0xFFD1CAFF)),
+                    _MoodLegend(text: 'Много', color: Color(0xFFE3A563)),
                   ],
                 ),
               ),

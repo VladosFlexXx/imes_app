@@ -4,6 +4,8 @@ import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../core/cache/cached_repository.dart';
+import '../../core/demo/demo_data.dart';
+import '../../core/demo/demo_mode.dart';
 import '../schedule/schedule_service.dart';
 import 'models.dart';
 import 'parser.dart';
@@ -11,16 +13,15 @@ import 'parser.dart';
 const _kRecordbookCacheKey = 'recordbook_cache_v1';
 const _kRecordbookUpdatedKey = 'recordbook_cache_updated_v1';
 
-const _recordbookUrl = 'https://eos.imes.su/local/cdo_academic_progress/academic_progress.php';
+const _recordbookUrl =
+    'https://eos.imes.su/local/cdo_academic_progress/academic_progress.php';
 
-List<RecordbookGradebook> _parseRecordbook(String html) => RecordbookParser.parse(html);
+List<RecordbookGradebook> _parseRecordbook(String html) =>
+    RecordbookParser.parse(html);
 
 class RecordbookRepository extends CachedRepository<List<RecordbookGradebook>> {
   RecordbookRepository._()
-      : super(
-          initialData: const [],
-          ttl: const Duration(hours: 12),
-        );
+    : super(initialData: const [], ttl: const Duration(hours: 12));
 
   static final RecordbookRepository instance = RecordbookRepository._();
 
@@ -47,7 +48,10 @@ class RecordbookRepository extends CachedRepository<List<RecordbookGradebook>> {
   }
 
   @override
-  Future<void> writeCache(List<RecordbookGradebook> data, DateTime updatedAt) async {
+  Future<void> writeCache(
+    List<RecordbookGradebook> data,
+    DateTime updatedAt,
+  ) async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString(
       _kRecordbookCacheKey,
@@ -58,6 +62,10 @@ class RecordbookRepository extends CachedRepository<List<RecordbookGradebook>> {
 
   @override
   Future<List<RecordbookGradebook>> fetchRemote() async {
+    if (DemoMode.instance.enabled) {
+      return DemoData.recordbook();
+    }
+
     final service = ScheduleService();
     final html = await service.loadPage(_recordbookUrl);
     final parsed = await compute(_parseRecordbook, html);
@@ -71,35 +79,37 @@ class RecordbookRepository extends CachedRepository<List<RecordbookGradebook>> {
   }
 
   Map<String, dynamic> _toJsonGradebook(RecordbookGradebook g) => {
-        'number': g.number,
-        'semesters': g.semesters
-            .map(
-              (s) => {
-                'semester': s.semester,
-                'rows': s.rows
-                    .map(
-                      (r) => {
-                        'discipline': r.discipline,
-                        'date': r.date,
-                        'controlType': r.controlType,
-                        'mark': r.mark,
-                        'retake': r.retake,
-                        'teacher': r.teacher,
-                      },
-                    )
-                    .toList(),
-              },
-            )
-            .toList(),
-      };
+    'number': g.number,
+    'semesters': g.semesters
+        .map(
+          (s) => {
+            'semester': s.semester,
+            'rows': s.rows
+                .map(
+                  (r) => {
+                    'discipline': r.discipline,
+                    'date': r.date,
+                    'controlType': r.controlType,
+                    'mark': r.mark,
+                    'retake': r.retake,
+                    'teacher': r.teacher,
+                  },
+                )
+                .toList(),
+          },
+        )
+        .toList(),
+  };
 
   RecordbookGradebook _fromJsonGradebook(Map<String, dynamic> j) {
-    final semestersRaw = (j['semesters'] as List?)?.cast<Map<String, dynamic>>() ?? const [];
+    final semestersRaw =
+        (j['semesters'] as List?)?.cast<Map<String, dynamic>>() ?? const [];
     final semesters = <RecordbookSemester>[];
 
     for (final s in semestersRaw) {
       final sem = int.tryParse((s['semester'] ?? '0').toString()) ?? 0;
-      final rowsRaw = (s['rows'] as List?)?.cast<Map<String, dynamic>>() ?? const [];
+      final rowsRaw =
+          (s['rows'] as List?)?.cast<Map<String, dynamic>>() ?? const [];
       final rows = rowsRaw
           .map(
             (r) => RecordbookRow(

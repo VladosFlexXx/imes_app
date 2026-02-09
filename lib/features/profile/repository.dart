@@ -3,6 +3,8 @@ import 'dart:convert';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../core/cache/cached_repository.dart';
+import '../../core/demo/demo_data.dart';
+import '../../core/demo/demo_mode.dart';
 import 'data/profile_remote_source.dart';
 import 'data/web_profile_remote_source.dart';
 import 'models.dart';
@@ -69,6 +71,9 @@ class ProfileRepository extends CachedRepository<UserProfile?> {
 
   @override
   Future<UserProfile?> fetchRemote() async {
+    if (DemoMode.instance.enabled) {
+      return DemoData.profile();
+    }
     return _remoteSource.fetchProfile();
   }
 }

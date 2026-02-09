@@ -6,6 +6,7 @@ import 'package:package_info_plus/package_info_plus.dart';
 
 import '../../app.dart';
 import '../../core/auth/auth_settings.dart';
+import '../../core/demo/demo_mode.dart';
 import '../../core/network/eios_client.dart';
 import '../../core/network/eios_endpoints.dart';
 
@@ -74,6 +75,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
   Future<void> _logout(BuildContext context) async {
     await _storage.delete(key: 'cookie_header');
+    await DemoMode.instance.setEnabled(false);
     EiosClient.instance.invalidateCookieCache();
     try {
       await CookieManager.instance().deleteAllCookies();

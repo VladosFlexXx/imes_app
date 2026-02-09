@@ -1,11 +1,15 @@
+import 'dart:ui';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 
 import 'package:vuz_app/core/auth/session_manager.dart';
+import 'package:vuz_app/core/demo/demo_mode.dart';
 import 'package:vuz_app/core/network/eios_client.dart';
 import 'package:vuz_app/features/auth/login_webview.dart';
 
 import '../notifications/notification_service.dart';
+import '../notifications/inbox_repository.dart';
 import '../schedule/schedule_repository.dart';
 import 'tab_dashboard.dart';
 import 'tab_grades.dart';
@@ -25,6 +29,8 @@ class _HomeScreenState extends State<HomeScreen> {
   late final VoidCallback _sessionListener;
 
   Future<void> _handleSessionExpired() async {
+    if (DemoMode.instance.enabled) return;
+
     await _storage.delete(key: 'cookie_header');
     EiosClient.instance.invalidateCookieCache();
 
@@ -57,10 +63,12 @@ class _HomeScreenState extends State<HomeScreen> {
     super.initState();
 
     ScheduleRepository.instance.initAndRefresh();
+    NotificationInboxRepository.instance.init();
 
     _notif.action.addListener(_onNotificationAction);
 
     _sessionListener = () {
+      if (DemoMode.instance.enabled) return;
       if (SessionManager.instance.expired.value) {
         _handleSessionExpired();
       }
@@ -131,57 +139,164 @@ class _HomeScreenState extends State<HomeScreen> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final bnt = theme.bottomNavigationBarTheme;
-    final cs = theme.colorScheme;
 
     return WillPopScope(
       onWillPop: _onWillPop,
       child: Scaffold(
         body: SafeArea(
-          child: IndexedStack(
-            index: _index,
-            children: _pages,
+          child: Stack(
+            children: [
+              IndexedStack(index: _index, children: _pages),
+              Positioned(
+                left: 28,
+                right: 28,
+                bottom: 14,
+                child: _GlassBottomNav(
+                  index: _index,
+                  onTap: _navigateTo,
+                  theme: theme,
+                ),
+              ),
+            ],
           ),
         ),
-        bottomNavigationBar: BottomNavigationBar(
-          type: BottomNavigationBarType.fixed,
-          currentIndex: _index,
-          onTap: _navigateTo,
+      ),
+    );
+  }
+}
 
-          // ✅ ЯВНО: фон/цвета берём из темы
-          backgroundColor: bnt.backgroundColor ?? cs.surface,
-          selectedItemColor: bnt.selectedItemColor ?? cs.primary,
-          unselectedItemColor:
-              bnt.unselectedItemColor ?? cs.onSurface.withOpacity(0.7),
-          selectedIconTheme:
-              bnt.selectedIconTheme ?? IconThemeData(color: cs.primary),
-          unselectedIconTheme: bnt.unselectedIconTheme ??
-              IconThemeData(color: cs.onSurface.withOpacity(0.7)),
-          showUnselectedLabels: bnt.showUnselectedLabels ?? true,
+class _GlassBottomNav extends StatelessWidget {
+  final int index;
+  final ValueChanged<int> onTap;
+  final ThemeData theme;
 
-          items: const [
-            BottomNavigationBarItem(
-              icon: Icon(Icons.home_outlined),
-              activeIcon: Icon(Icons.home),
-              label: 'Главная',
+  const _GlassBottomNav({
+    required this.index,
+    required this.onTap,
+    required this.theme,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = theme.colorScheme;
+    final items = const <({String label, IconData icon, IconData activeIcon})>[
+      (label: 'Главная', icon: Icons.home_outlined, activeIcon: Icons.home),
+      (
+        label: 'Расписание',
+        icon: Icons.calendar_today_outlined,
+        activeIcon: Icons.calendar_today,
+      ),
+      (label: 'Оценки', icon: Icons.school_outlined, activeIcon: Icons.school),
+      (label: 'Профиль', icon: Icons.person_outline, activeIcon: Icons.person),
+    ];
+
+    return SizedBox(
+      height: 66,
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(24),
+        child: BackdropFilter(
+          filter: ImageFilter.blur(sigmaX: 22, sigmaY: 22),
+          child: Container(
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(24),
+              color: const Color(0xFF1B2738).withValues(alpha: 0.44),
+              border: Border.all(color: Colors.white.withValues(alpha: 0.12)),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withValues(alpha: 0.22),
+                  blurRadius: 20,
+                  offset: const Offset(0, 8),
+                ),
+              ],
             ),
-            BottomNavigationBarItem(
-              icon: Icon(Icons.calendar_today_outlined),
-              activeIcon: Icon(Icons.calendar_today),
-              label: 'Расписание',
+            child: LayoutBuilder(
+              builder: (context, constraints) {
+                final width = constraints.maxWidth / items.length;
+                final left = width * index;
+                return Stack(
+                  children: [
+                    AnimatedPositioned(
+                      duration: const Duration(milliseconds: 200),
+                      curve: Curves.easeOutCubic,
+                      left: left + (width - 58) / 2,
+                      top: 4,
+                      child: Container(
+                        width: 58,
+                        height: 58,
+                        decoration: BoxDecoration(
+                          borderRadius: BorderRadius.circular(20),
+                          gradient: RadialGradient(
+                            colors: [
+                              cs.primary.withValues(alpha: 0.30),
+                              cs.primary.withValues(alpha: 0.14),
+                              Colors.transparent,
+                            ],
+                          ),
+                        ),
+                      ),
+                    ),
+                    Row(
+                      children: [
+                        for (var i = 0; i < items.length; i++)
+                          Expanded(
+                            child: InkWell(
+                              borderRadius: BorderRadius.circular(24),
+                              onTap: () => onTap(i),
+                              child: _GlassNavItem(
+                                label: items[i].label,
+                                icon: i == index
+                                    ? items[i].activeIcon
+                                    : items[i].icon,
+                                selected: i == index,
+                              ),
+                            ),
+                          ),
+                      ],
+                    ),
+                  ],
+                );
+              },
             ),
-            BottomNavigationBarItem(
-              icon: Icon(Icons.school_outlined),
-              activeIcon: Icon(Icons.school),
-              label: 'Оценки',
-            ),
-            BottomNavigationBarItem(
-              icon: Icon(Icons.person_outline),
-              activeIcon: Icon(Icons.person),
-              label: 'Профиль',
-            ),
-          ],
+          ),
         ),
+      ),
+    );
+  }
+}
+
+class _GlassNavItem extends StatelessWidget {
+  final String label;
+  final IconData icon;
+  final bool selected;
+
+  const _GlassNavItem({
+    required this.label,
+    required this.icon,
+    required this.selected,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    final color = selected ? cs.primary : Colors.white.withValues(alpha: 0.78);
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 7),
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(icon, color: color, size: selected ? 24 : 22),
+          const SizedBox(height: 1),
+          Text(
+            label,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: Theme.of(context).textTheme.labelLarge?.copyWith(
+              color: color,
+              fontWeight: selected ? FontWeight.w800 : FontWeight.w600,
+            ),
+          ),
+        ],
       ),
     );
   }

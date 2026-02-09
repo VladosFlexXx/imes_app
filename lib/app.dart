@@ -4,6 +4,7 @@ import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 
 import 'core/auth/auth_settings.dart';
+import 'core/demo/demo_mode.dart';
 import 'features/auth/login_webview.dart';
 import 'features/home/home_screen.dart';
 import 'theme_controller.dart';
@@ -32,6 +33,7 @@ class _VuzAppState extends State<VuzApp> {
     await Future.wait([
       themeController.load(),
       AuthSettings.instance.load(),
+      DemoMode.instance.load(),
       _loadVersion(),
     ]);
   }
@@ -41,7 +43,9 @@ class _VuzAppState extends State<VuzApp> {
       final info = await PackageInfo.fromPlatform();
       final v = info.version.trim();
       final b = info.buildNumber.trim();
-      final combined = (v.isNotEmpty && b.isNotEmpty) ? '$v+$b' : (v.isNotEmpty ? v : '');
+      final combined = (v.isNotEmpty && b.isNotEmpty)
+          ? '$v+$b'
+          : (v.isNotEmpty ? v : '');
       if (mounted) setState(() => _appVersion = combined);
     } catch (_) {}
   }
@@ -57,7 +61,9 @@ class _VuzAppState extends State<VuzApp> {
   }
 
   Widget _wrapWithBetaBadge(BuildContext context, Widget child) {
-    final bool betaEnabled = !kReleaseMode || const bool.fromEnvironment('BETA', defaultValue: false);
+    final bool betaEnabled =
+        !kReleaseMode ||
+        const bool.fromEnvironment('BETA', defaultValue: false);
     if (!betaEnabled) return child;
 
     final cs = Theme.of(context).colorScheme;
@@ -86,7 +92,10 @@ class _VuzAppState extends State<VuzApp> {
             ),
             child: Text(
               label,
-              style: t.labelLarge?.copyWith(color: cs.onError, fontWeight: FontWeight.w900),
+              style: t.labelLarge?.copyWith(
+                color: cs.onError,
+                fontWeight: FontWeight.w900,
+              ),
             ),
           ),
         ),
@@ -105,10 +114,7 @@ class _VuzAppState extends State<VuzApp> {
         '/login': (_) => const LoginWebViewScreen(),
         '/home': (_) => const HomeScreen(),
       },
-      home: _wrapWithBetaBadge(
-        context,
-        const _BootGate(),
-      ),
+      home: _wrapWithBetaBadge(context, const _BootGate()),
     );
   }
 }
@@ -128,6 +134,12 @@ class _BootGateState extends State<_BootGate> {
   }
 
   Future<void> _go() async {
+    if (DemoMode.instance.enabled) {
+      if (!mounted) return;
+      Navigator.of(context).pushReplacementNamed('/home');
+      return;
+    }
+
     String cookieHeader = '';
     try {
       const storage = FlutterSecureStorage();

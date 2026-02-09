@@ -9,6 +9,8 @@ import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 
+import 'inbox_repository.dart';
+
 /// Куда навигируемся после тапа по пушу.
 enum AppNavTarget { home, schedule, grades, profile }
 
@@ -133,12 +135,14 @@ class NotificationService {
       await _initLocalNotifications();
       await _restoreState();
       await _refreshServerConfigFromBootstrap();
+      await NotificationInboxRepository.instance.init();
 
       FirebaseMessaging.onMessageOpenedApp.listen(_handleRemoteTap);
       final initial = await _fcm!.getInitialMessage();
       if (initial != null) _handleRemoteTap(initial);
 
       FirebaseMessaging.onMessage.listen((message) async {
+        await NotificationInboxRepository.instance.ingestRemoteMessage(message);
         await _maybeApplyRemoteServerConfigFromData(message.data);
         await _showLocalFromRemote(message);
       });
@@ -519,6 +523,10 @@ class NotificationService {
   }
 
   Future<void> _handleRemoteTap(RemoteMessage message) async {
+    await NotificationInboxRepository.instance.ingestRemoteMessage(
+      message,
+      markRead: true,
+    );
     await _maybeApplyRemoteServerConfigFromData(message.data);
     final data = <String, String>{};
     message.data.forEach((k, v) => data[k] = v.toString());
