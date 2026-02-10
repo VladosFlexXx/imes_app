@@ -5,6 +5,8 @@ import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import 'web_notifications_source.dart';
+
 class NotificationInboxItem {
   final String id;
   final String dedupeKey;
@@ -83,6 +85,7 @@ class NotificationInboxRepository extends ChangeNotifier {
 
   static const String _prefsKey = 'notifications_inbox_v1';
   static const int _maxItems = 120;
+  final WebNotificationsSource _webSource = WebNotificationsSource();
 
   final ValueNotifier<int> unreadCount = ValueNotifier<int>(0);
   final List<NotificationInboxItem> _items = [];
@@ -146,34 +149,51 @@ class NotificationInboxRepository extends ChangeNotifier {
       sentMs: sentMs,
     );
 
-    final idx = _items.indexWhere((e) => e.dedupeKey == dedupe);
-    if (idx >= 0) {
-      if (markRead && !_items[idx].isRead) {
-        _items[idx] = _items[idx].copyWith(isRead: true);
-        await _persist();
-      }
-      _syncCounters();
-      return;
-    }
-
-    final item = NotificationInboxItem(
-      id: '${DateTime.now().microsecondsSinceEpoch}_${_items.length}',
-      dedupeKey: dedupe,
-      source: source,
-      title: title,
-      body: body,
-      data: data,
-      createdAtMs: sentMs,
-      isRead: markRead,
+    await _upsertItem(
+      NotificationInboxItem(
+        id: '${DateTime.now().microsecondsSinceEpoch}_${_items.length}',
+        dedupeKey: dedupe,
+        source: source,
+        title: title,
+        body: body,
+        data: data,
+        createdAtMs: sentMs,
+        isRead: markRead,
+      ),
+      markReadIfExists: markRead,
     );
+  }
 
-    _items.insert(0, item);
-    if (_items.length > _maxItems) {
-      _items.removeRange(_maxItems, _items.length);
+  Future<int> syncFromWeb({int maxItems = 20}) async {
+    await init();
+    final webItems = await _webSource.fetchLatest(maxItems: maxItems);
+    var added = 0;
+
+    for (final w in webItems) {
+      final dedupe = _dedupeKey(
+        messageId: null,
+        title: w.title,
+        body: w.body,
+        data: {if (w.link != null) 'link': w.link!, 'source': 'web'},
+        sentMs: w.createdAtMs,
+      );
+
+      final existed = _items.any((e) => e.dedupeKey == dedupe);
+      await _upsertItem(
+        NotificationInboxItem(
+          id: 'web_${w.createdAtMs}_$added',
+          dedupeKey: dedupe,
+          source: 'web',
+          title: w.title,
+          body: w.body,
+          data: {if (w.link != null) 'link': w.link!, 'source': 'web'},
+          createdAtMs: w.createdAtMs,
+          isRead: existed, // старые не трогаем
+        ),
+      );
+      if (!existed) added++;
     }
-
-    await _persist();
-    _syncCounters();
+    return added;
   }
 
   Future<void> markRead(String id) async {
@@ -304,5 +324,27 @@ class NotificationInboxRepository extends ChangeNotifier {
   void _syncCounters() {
     unreadCount.value = _items.where((e) => !e.isRead).length;
     notifyListeners();
+  }
+
+  Future<void> _upsertItem(
+    NotificationInboxItem item, {
+    bool markReadIfExists = false,
+  }) async {
+    final idx = _items.indexWhere((e) => e.dedupeKey == item.dedupeKey);
+    if (idx >= 0) {
+      if (markReadIfExists && !_items[idx].isRead) {
+        _items[idx] = _items[idx].copyWith(isRead: true);
+        await _persist();
+      }
+      _syncCounters();
+      return;
+    }
+
+    _items.insert(0, item);
+    if (_items.length > _maxItems) {
+      _items.removeRange(_maxItems, _items.length);
+    }
+    await _persist();
+    _syncCounters();
   }
 }

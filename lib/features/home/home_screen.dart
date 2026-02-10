@@ -183,6 +183,7 @@ class _GlassBottomNav extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final cs = theme.colorScheme;
+    final isDark = theme.brightness == Brightness.dark;
     final items = const <({String label, IconData icon, IconData activeIcon})>[
       (label: 'Главная', icon: Icons.home_outlined, activeIcon: Icons.home),
       (
@@ -203,13 +204,21 @@ class _GlassBottomNav extends StatelessWidget {
           child: Container(
             decoration: BoxDecoration(
               borderRadius: BorderRadius.circular(24),
-              color: const Color(0xFF1B2738).withValues(alpha: 0.44),
-              border: Border.all(color: Colors.white.withValues(alpha: 0.12)),
+              color: isDark
+                  ? const Color(0xFF1B2738).withValues(alpha: 0.44)
+                  : cs.surface.withValues(alpha: 0.62),
+              border: Border.all(
+                color: isDark
+                    ? Colors.white.withValues(alpha: 0.12)
+                    : cs.outlineVariant.withValues(alpha: 0.42),
+              ),
               boxShadow: [
                 BoxShadow(
-                  color: Colors.black.withValues(alpha: 0.22),
-                  blurRadius: 20,
-                  offset: const Offset(0, 8),
+                  color: isDark
+                      ? Colors.black.withValues(alpha: 0.22)
+                      : cs.shadow.withValues(alpha: 0.10),
+                  blurRadius: isDark ? 20 : 14,
+                  offset: const Offset(0, 6),
                 ),
               ],
             ),
@@ -282,7 +291,12 @@ class _GlassNavItem extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
-    final color = selected ? cs.primary : Colors.white.withValues(alpha: 0.78);
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final color = selected
+        ? cs.primary
+        : (isDark
+              ? Colors.white.withValues(alpha: 0.78)
+              : cs.onSurface.withValues(alpha: 0.72));
 
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 7),

@@ -12,11 +12,38 @@ class NotificationsCenterScreen extends StatefulWidget {
 
 class _NotificationsCenterScreenState extends State<NotificationsCenterScreen> {
   final _repo = NotificationInboxRepository.instance;
+  bool _syncing = false;
 
   @override
   void initState() {
     super.initState();
-    _repo.init();
+    _bootstrap();
+  }
+
+  Future<void> _bootstrap() async {
+    await _repo.init();
+    await _syncWeb();
+  }
+
+  Future<void> _syncWeb() async {
+    if (_syncing) return;
+    setState(() => _syncing = true);
+    try {
+      final added = await _repo.syncFromWeb(maxItems: 30);
+      if (!mounted) return;
+      if (added > 0) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Синхронизировано: +$added уведомл.')),
+        );
+      }
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Не удалось синхронизировать: $e')),
+      );
+    } finally {
+      if (mounted) setState(() => _syncing = false);
+    }
   }
 
   String _fmtDate(int ms) {
@@ -29,6 +56,8 @@ class _NotificationsCenterScreenState extends State<NotificationsCenterScreen> {
     switch (source) {
       case 'system':
         return 'Система';
+      case 'web':
+        return 'ЭИОС';
       case 'push':
       default:
         return 'Изменения';
@@ -45,6 +74,17 @@ class _NotificationsCenterScreenState extends State<NotificationsCenterScreen> {
         title: const Text('Центр уведомлений'),
         actions: [
           IconButton(
+            tooltip: 'Синхр. из ЭИОС',
+            onPressed: _syncing ? null : _syncWeb,
+            icon: _syncing
+                ? const SizedBox(
+                    width: 18,
+                    height: 18,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  )
+                : const Icon(Icons.sync),
+          ),
+          IconButton(
             tooltip: 'Прочитать всё',
             onPressed: () => _repo.markAllRead(),
             icon: const Icon(Icons.done_all),
@@ -56,84 +96,98 @@ class _NotificationsCenterScreenState extends State<NotificationsCenterScreen> {
         builder: (context, _) {
           final items = _repo.items;
           if (items.isEmpty) {
-            return Center(
-              child: Text(
-                'Пока пусто',
-                style: t.titleMedium?.copyWith(
-                  color: cs.onSurface.withValues(alpha: 0.70),
-                ),
+            return RefreshIndicator(
+              onRefresh: _syncWeb,
+              child: ListView(
+                physics: const AlwaysScrollableScrollPhysics(),
+                children: [
+                  SizedBox(
+                    height: MediaQuery.of(context).size.height * 0.65,
+                    child: Center(
+                      child: Text(
+                        'Пока пусто',
+                        style: t.titleMedium?.copyWith(
+                          color: cs.onSurface.withValues(alpha: 0.70),
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
               ),
             );
           }
 
-          return ListView.separated(
-            padding: const EdgeInsets.fromLTRB(12, 12, 12, 24),
-            itemCount: items.length,
-            separatorBuilder: (_, _) => const SizedBox(height: 8),
-            itemBuilder: (context, index) {
-              final item = items[index];
-              return Card(
-                elevation: 0,
-                child: InkWell(
-                  borderRadius: BorderRadius.circular(16),
-                  onTap: () => _repo.markRead(item.id),
-                  child: Padding(
-                    padding: const EdgeInsets.all(12),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Row(
-                          children: [
-                            Container(
-                              width: 9,
-                              height: 9,
-                              decoration: BoxDecoration(
-                                shape: BoxShape.circle,
-                                color: item.isRead
-                                    ? cs.outlineVariant
-                                    : cs.primary,
+          return RefreshIndicator(
+            onRefresh: _syncWeb,
+            child: ListView.separated(
+              padding: const EdgeInsets.fromLTRB(12, 12, 12, 24),
+              itemCount: items.length,
+              separatorBuilder: (_, _) => const SizedBox(height: 8),
+              itemBuilder: (context, index) {
+                final item = items[index];
+                return Card(
+                  elevation: 0,
+                  child: InkWell(
+                    borderRadius: BorderRadius.circular(16),
+                    onTap: () => _repo.markRead(item.id),
+                    child: Padding(
+                      padding: const EdgeInsets.all(12),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            children: [
+                              Container(
+                                width: 9,
+                                height: 9,
+                                decoration: BoxDecoration(
+                                  shape: BoxShape.circle,
+                                  color: item.isRead
+                                      ? cs.outlineVariant
+                                      : cs.primary,
+                                ),
                               ),
-                            ),
-                            const SizedBox(width: 8),
-                            Text(
-                              _sourceLabel(item.source),
-                              style: t.labelLarge?.copyWith(
-                                fontWeight: FontWeight.w800,
+                              const SizedBox(width: 8),
+                              Text(
+                                _sourceLabel(item.source),
+                                style: t.labelLarge?.copyWith(
+                                  fontWeight: FontWeight.w800,
+                                ),
                               ),
+                              const Spacer(),
+                              Text(
+                                _fmtDate(item.createdAtMs),
+                                style: t.labelSmall?.copyWith(
+                                  color: cs.onSurface.withValues(alpha: 0.66),
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 8),
+                          Text(
+                            item.title,
+                            style: t.titleMedium?.copyWith(
+                              fontWeight: item.isRead
+                                  ? FontWeight.w700
+                                  : FontWeight.w900,
                             ),
-                            const Spacer(),
+                          ),
+                          if (item.body.trim().isNotEmpty) ...[
+                            const SizedBox(height: 6),
                             Text(
-                              _fmtDate(item.createdAtMs),
-                              style: t.labelSmall?.copyWith(
-                                color: cs.onSurface.withValues(alpha: 0.66),
+                              item.body,
+                              style: t.bodyMedium?.copyWith(
+                                color: cs.onSurface.withValues(alpha: 0.82),
                               ),
                             ),
                           ],
-                        ),
-                        const SizedBox(height: 8),
-                        Text(
-                          item.title,
-                          style: t.titleMedium?.copyWith(
-                            fontWeight: item.isRead
-                                ? FontWeight.w700
-                                : FontWeight.w900,
-                          ),
-                        ),
-                        if (item.body.trim().isNotEmpty) ...[
-                          const SizedBox(height: 6),
-                          Text(
-                            item.body,
-                            style: t.bodyMedium?.copyWith(
-                              color: cs.onSurface.withValues(alpha: 0.82),
-                            ),
-                          ),
                         ],
-                      ],
+                      ),
                     ),
                   ),
-                ),
-              );
-            },
+                );
+              },
+            ),
           );
         },
       ),

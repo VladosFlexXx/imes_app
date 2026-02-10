@@ -31,20 +31,21 @@ class _WeekMoodMapCard extends StatelessWidget {
     int weekMax,
     int peakDaysCount,
     ColorScheme cs,
+    bool isDark,
   ) {
     if (count <= 0) {
       return (
-        bg: const Color(0xFF262938),
-        border: cs.outlineVariant.withValues(alpha: 0.30),
-        fg: cs.onSurface.withValues(alpha: 0.70),
+        bg: isDark ? const Color(0xFF262938) : cs.surfaceContainerHighest,
+        border: cs.outlineVariant.withValues(alpha: isDark ? 0.30 : 0.55),
+        fg: cs.onSurface.withValues(alpha: isDark ? 0.70 : 0.78),
       );
     }
 
     if (weekMax <= 0) {
       return (
-        bg: const Color(0xFF213C39),
-        border: const Color(0xFF3C8B82),
-        fg: const Color(0xFFB6F2E5),
+        bg: isDark ? const Color(0xFF213C39) : const Color(0xFFD8F3EC),
+        border: isDark ? const Color(0xFF3C8B82) : const Color(0xFF55B79F),
+        fg: isDark ? const Color(0xFFB6F2E5) : const Color(0xFF0E5A4D),
       );
     }
 
@@ -52,22 +53,28 @@ class _WeekMoodMapCard extends StatelessWidget {
     if (ratio >= 0.80) {
       final isRarePeak = peakDaysCount <= 2 && count == weekMax;
       return (
-        bg: isRarePeak ? const Color(0xFF5E3615) : const Color(0xFF4C3117),
-        border: isRarePeak ? const Color(0xFFFFC987) : const Color(0xFFE3A563),
-        fg: isRarePeak ? const Color(0xFFFFF1DE) : const Color(0xFFFFE7C8),
+        bg: isDark
+            ? (isRarePeak ? const Color(0xFF5E3615) : const Color(0xFF4C3117))
+            : (isRarePeak ? const Color(0xFFFFD9B0) : const Color(0xFFFFE1BF)),
+        border: isDark
+            ? (isRarePeak ? const Color(0xFFFFC987) : const Color(0xFFE3A563))
+            : (isRarePeak ? const Color(0xFFCC7A2F) : const Color(0xFFE49A45)),
+        fg: isDark
+            ? (isRarePeak ? const Color(0xFFFFF1DE) : const Color(0xFFFFE7C8))
+            : const Color(0xFF7A3F00),
       );
     }
     if (ratio >= 0.45) {
       return (
-        bg: const Color(0xFF1E3253),
-        border: const Color(0xFF4B8EDF),
-        fg: const Color(0xFFD6EBFF),
+        bg: isDark ? const Color(0xFF1E3253) : const Color(0xFFD9E9FF),
+        border: isDark ? const Color(0xFF4B8EDF) : const Color(0xFF6FA5E8),
+        fg: isDark ? const Color(0xFFD6EBFF) : const Color(0xFF123E6A),
       );
     }
     return (
-      bg: const Color(0xFF1B3A36),
-      border: const Color(0xFF41A28E),
-      fg: const Color(0xFFC2F4E7),
+      bg: isDark ? const Color(0xFF1B3A36) : const Color(0xFFD8F3EC),
+      border: isDark ? const Color(0xFF41A28E) : const Color(0xFF55B79F),
+      fg: isDark ? const Color(0xFFC2F4E7) : const Color(0xFF0E5A4D),
     );
   }
 
@@ -75,6 +82,7 @@ class _WeekMoodMapCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
     final t = Theme.of(context).textTheme;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     final today = DateTime.now();
 
     final heaviest = days
@@ -139,6 +147,7 @@ class _WeekMoodMapCard extends StatelessWidget {
                           weekMax,
                           peakDaysCount,
                           cs,
+                          isDark,
                         ),
                       ),
                     ),
@@ -150,14 +159,34 @@ class _WeekMoodMapCard extends StatelessWidget {
               SingleChildScrollView(
                 scrollDirection: Axis.horizontal,
                 child: Row(
-                  children: const [
-                    _MoodLegend(text: 'Нет пар', color: Color(0xFF747787)),
-                    SizedBox(width: 8),
-                    _MoodLegend(text: 'Мало пар', color: Color(0xFF41A28E)),
-                    SizedBox(width: 8),
-                    _MoodLegend(text: 'Средне', color: Color(0xFF4B8EDF)),
-                    SizedBox(width: 8),
-                    _MoodLegend(text: 'Много', color: Color(0xFFE3A563)),
+                  children: [
+                    _MoodLegend(
+                      text: 'Нет пар',
+                      color: isDark
+                          ? const Color(0xFF747787)
+                          : cs.onSurfaceVariant,
+                    ),
+                    const SizedBox(width: 8),
+                    _MoodLegend(
+                      text: 'Мало пар',
+                      color: isDark
+                          ? const Color(0xFF41A28E)
+                          : const Color(0xFF2E8C78),
+                    ),
+                    const SizedBox(width: 8),
+                    _MoodLegend(
+                      text: 'Средне',
+                      color: isDark
+                          ? const Color(0xFF4B8EDF)
+                          : const Color(0xFF4B86D6),
+                    ),
+                    const SizedBox(width: 8),
+                    _MoodLegend(
+                      text: 'Много',
+                      color: isDark
+                          ? const Color(0xFFE3A563)
+                          : const Color(0xFFCC7A2F),
+                    ),
                   ],
                 ),
               ),
