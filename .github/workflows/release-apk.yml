@@ -83,16 +83,21 @@ jobs:
           name: EIOS-APK-${{ github.ref_name }}
           path: artifacts/*
 
-      # Release: при пуше тега vX.Y.Z создаём полноценный релиз и отмечаем как Latest
-      - name: Create GitHub Release and upload APK(s) (tags only)
+      # Release: при пуше тега создаём/обновляем GitHub Release и загружаем APK
+      - name: Create or update GitHub Release (tags only)
         if: github.ref_type == 'tag'
-        uses: softprops/action-gh-release@v2
-        with:
-          tag_name: ${{ github.ref_name }}
-          name: ${{ github.ref_name }}
-          files: artifacts/*
-          generate_release_notes: true
-          prerelease: false
-          make_latest: true
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG: ${{ github.ref_name }}
+        run: |
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            echo "Release $TAG already exists -> uploading assets"
+            gh release upload "$TAG" artifacts/* --clobber
+            gh release edit "$TAG" --latest
+          else
+            echo "Creating release $TAG"
+            gh release create "$TAG" artifacts/* \
+              --title "$TAG" \
+              --generate-notes \
+              --latest
+          fi
