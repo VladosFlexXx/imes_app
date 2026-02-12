@@ -8,13 +8,16 @@ import 'package:vuz_app/core/auth/session_manager.dart';
 import 'package:vuz_app/core/demo/demo_mode.dart';
 import 'package:vuz_app/core/network/eios_client.dart';
 import 'package:vuz_app/features/auth/login_webview.dart';
+import 'package:vuz_app/ui/app_theme.dart';
 
 import '../notifications/notification_service.dart';
 import '../notifications/inbox_repository.dart';
+import '../grades/repository.dart';
+import '../profile/repository.dart';
 import '../schedule/schedule_repository.dart';
 import 'tab_dashboard.dart';
 import 'tab_grades.dart';
-import 'tab_profile.dart';
+import 'tab_more.dart';
 import 'tab_schedule.dart';
 
 class HomeScreen extends StatefulWidget {
@@ -24,7 +27,8 @@ class HomeScreen extends StatefulWidget {
   State<HomeScreen> createState() => _HomeScreenState();
 }
 
-class _HomeScreenState extends State<HomeScreen> {
+class _HomeScreenState extends State<HomeScreen>
+    with SingleTickerProviderStateMixin {
   static const _storage = FlutterSecureStorage();
 
   late final VoidCallback _sessionListener;
@@ -47,24 +51,33 @@ class _HomeScreenState extends State<HomeScreen> {
 
   int _index = 0;
   DateTime? _lastBackPress;
+  final Set<int> _visitedTabs = <int>{0};
+  late final AnimationController _tabOverlayController;
+  int _tabOverlayDir = 1;
 
-  void _navigateTo(int i) => setState(() => _index = i);
-
-  late final List<Widget> _pages = [
-    DashboardTab(onNavigate: _navigateTo),
-    const ScheduleTab(),
-    const GradesTab(),
-    const ProfileTab(),
-  ];
+  void _navigateTo(int i) {
+    if (i == _index) return;
+    final old = _index;
+    setState(() {
+      _index = i;
+      _visitedTabs.add(i);
+      _tabOverlayDir = i > old ? 1 : -1;
+    });
+    _tabOverlayController.forward(from: 0);
+  }
 
   final _notif = NotificationService.instance;
+  Timer? _deferredRefreshTimer;
 
   @override
   void initState() {
     super.initState();
+    _tabOverlayController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 260),
+    );
 
-    ScheduleRepository.instance.initAndRefresh();
-    NotificationInboxRepository.instance.init();
+    _warmupCoreData();
     if (DemoMode.instance.enabled) {
       unawaited(NotificationInboxRepository.instance.seedDemoItems());
     }
@@ -78,6 +91,47 @@ class _HomeScreenState extends State<HomeScreen> {
       }
     };
     SessionManager.instance.expired.addListener(_sessionListener);
+  }
+
+  Future<void> _warmupCoreData() async {
+    // На этом этапе только локальный кэш, без сетевых вызовов:
+    // это не мешает интро-анимации на главной.
+    await Future.wait([
+      ScheduleRepository.instance.init(),
+      GradesRepository.instance.init(),
+      ProfileRepository.instance.init(),
+      NotificationInboxRepository.instance.init(),
+    ]);
+
+    // Сетевые refresh — только после завершения интро-анимации.
+    _deferredRefreshTimer?.cancel();
+    _deferredRefreshTimer = Timer(const Duration(milliseconds: 3400), () {
+      unawaited(ScheduleRepository.instance.refresh(force: false));
+      Future<void>.delayed(const Duration(milliseconds: 350), () {
+        unawaited(ProfileRepository.instance.refresh(force: false));
+      });
+      Future<void>.delayed(const Duration(milliseconds: 900), () {
+        unawaited(GradesRepository.instance.refresh(force: false));
+      });
+    });
+  }
+
+  Widget _buildTab(int index) {
+    if (!_visitedTabs.contains(index)) {
+      return const SizedBox.shrink();
+    }
+    switch (index) {
+      case 0:
+        return DashboardTab(onNavigate: _navigateTo);
+      case 1:
+        return const ScheduleTab();
+      case 2:
+        return const GradesTab();
+      case 3:
+        return const MoreTab();
+      default:
+        return const SizedBox.shrink();
+    }
   }
 
   void _onNotificationAction() {
@@ -105,15 +159,17 @@ class _HomeScreenState extends State<HomeScreen> {
 
   @override
   void dispose() {
+    _deferredRefreshTimer?.cancel();
     _notif.action.removeListener(_onNotificationAction);
     SessionManager.instance.expired.removeListener(_sessionListener);
+    _tabOverlayController.dispose();
     super.dispose();
   }
 
   Future<bool> _onWillPop() async {
     // Назад на любой вкладке -> возвращаем на Главную.
     if (_index != 0) {
-      setState(() => _index = 0);
+      _navigateTo(0);
       return false;
     }
 
@@ -143,6 +199,7 @@ class _HomeScreenState extends State<HomeScreen> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final accent = appAccentOf(context);
 
     return PopScope(
       canPop: false,
@@ -156,7 +213,46 @@ class _HomeScreenState extends State<HomeScreen> {
         body: SafeArea(
           child: Stack(
             children: [
-              IndexedStack(index: _index, children: _pages),
+              IndexedStack(
+                index: _index,
+                children: List<Widget>.generate(4, _buildTab),
+              ),
+              Positioned.fill(
+                child: IgnorePointer(
+                  child: AnimatedBuilder(
+                    animation: _tabOverlayController,
+                    builder: (context, _) {
+                      final v = _tabOverlayController.value;
+                      if (v <= 0 || v >= 1) return const SizedBox.shrink();
+                      final dir = _tabOverlayDir;
+                      final dx = (1 - v) * 120 * (dir > 0 ? -1 : 1);
+                      return Opacity(
+                        opacity: (1 - v) * 0.18,
+                        child: Transform.translate(
+                          offset: Offset(dx, 0),
+                          child: DecoratedBox(
+                            decoration: BoxDecoration(
+                              gradient: LinearGradient(
+                                begin: dir > 0
+                                    ? Alignment.centerRight
+                                    : Alignment.centerLeft,
+                                end: dir > 0
+                                    ? Alignment.centerLeft
+                                    : Alignment.centerRight,
+                                colors: [
+                                  accent.withValues(alpha: 0.42),
+                                  accent.withValues(alpha: 0.08),
+                                  Colors.transparent,
+                                ],
+                              ),
+                            ),
+                          ),
+                        ),
+                      );
+                    },
+                  ),
+                ),
+              ),
               Positioned(
                 left: 28,
                 right: 28,
@@ -190,6 +286,7 @@ class _GlassBottomNav extends StatelessWidget {
   Widget build(BuildContext context) {
     final cs = theme.colorScheme;
     final isDark = theme.brightness == Brightness.dark;
+    final accent = appAccentOf(context);
     final items = const <({String label, IconData icon, IconData activeIcon})>[
       (label: 'Главная', icon: Icons.home_outlined, activeIcon: Icons.home),
       (
@@ -198,7 +295,11 @@ class _GlassBottomNav extends StatelessWidget {
         activeIcon: Icons.calendar_today,
       ),
       (label: 'Оценки', icon: Icons.school_outlined, activeIcon: Icons.school),
-      (label: 'Профиль', icon: Icons.person_outline, activeIcon: Icons.person),
+      (
+        label: 'Еще',
+        icon: Icons.widgets_outlined,
+        activeIcon: Icons.widgets_rounded,
+      ),
     ];
 
     return SizedBox(
@@ -206,16 +307,28 @@ class _GlassBottomNav extends StatelessWidget {
       child: ClipRRect(
         borderRadius: BorderRadius.circular(24),
         child: BackdropFilter(
-          filter: ImageFilter.blur(sigmaX: 22, sigmaY: 22),
+          filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
           child: Container(
             decoration: BoxDecoration(
               borderRadius: BorderRadius.circular(24),
-              color: isDark
-                  ? const Color(0xFF1B2738).withValues(alpha: 0.44)
-                  : cs.surface.withValues(alpha: 0.40),
+              gradient: LinearGradient(
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+                colors: isDark
+                    ? [
+                        const Color(0xFF1A1E23).withValues(alpha: 0.78),
+                        const Color(0xFF12213E).withValues(alpha: 0.64),
+                        const Color(0xFF171B21).withValues(alpha: 0.78),
+                      ]
+                    : [
+                        const Color(0xFFEFF4FF).withValues(alpha: 0.82),
+                        const Color(0xFFDDE9FF).withValues(alpha: 0.72),
+                        const Color(0xFFF1F5FF).withValues(alpha: 0.82),
+                      ],
+              ),
               border: Border.all(
                 color: isDark
-                    ? Colors.white.withValues(alpha: 0.12)
+                    ? Colors.white.withValues(alpha: 0.14)
                     : cs.outlineVariant.withValues(alpha: 0.24),
               ),
               boxShadow: [
@@ -246,8 +359,8 @@ class _GlassBottomNav extends StatelessWidget {
                           borderRadius: BorderRadius.circular(20),
                           gradient: RadialGradient(
                             colors: [
-                              cs.primary.withValues(alpha: 0.30),
-                              cs.primary.withValues(alpha: 0.14),
+                              accent.withValues(alpha: 0.56),
+                              accent.withValues(alpha: 0.26),
                               Colors.transparent,
                             ],
                           ),
@@ -298,8 +411,9 @@ class _GlassNavItem extends StatelessWidget {
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
     final isDark = Theme.of(context).brightness == Brightness.dark;
+    final accent = appAccentOf(context);
     final color = selected
-        ? cs.primary
+        ? accent
         : (isDark
               ? Colors.white.withValues(alpha: 0.78)
               : cs.onSurface.withValues(alpha: 0.72));

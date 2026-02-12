@@ -9,6 +9,7 @@ import '../../core/auth/auth_settings.dart';
 import '../../core/demo/demo_mode.dart';
 import '../../core/network/eios_client.dart';
 import '../../core/network/eios_endpoints.dart';
+import '../../theme_controller.dart';
 
 // debug/log/share
 import '../../core/logging/app_logger.dart';
@@ -478,9 +479,24 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
   Widget _buildAuthReloginCard() {
     final t = Theme.of(context).textTheme;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
 
-    return Card(
-      elevation: 0,
+    return Container(
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(24),
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: isDark
+              ? const [Color(0xFF1A1E23), Color(0xFF171B21)]
+              : const [Color(0xFFF1F3F7), Color(0xFFE9EDF4)],
+        ),
+        border: Border.all(
+          color: isDark
+              ? Colors.white.withValues(alpha: 0.08)
+              : Colors.black.withValues(alpha: 0.08),
+        ),
+      ),
       child: Padding(
         padding: const EdgeInsets.symmetric(vertical: 8),
         child: Column(
@@ -520,6 +536,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 ),
                 subtitle: const Text('Без этого тихий авторелогин не работает'),
                 value: _auth.credsEnabled,
+                activeThumbColor: Colors.white,
+                activeTrackColor: Theme.of(context).colorScheme.primary,
                 onChanged: (v) async {
                   await _auth.setCredsEnabled(v);
                   if (!mounted) return;
@@ -567,6 +585,32 @@ class _SettingsScreenState extends State<SettingsScreen> {
     }
   }
 
+  static String _accentLabel(AppAccent accent) {
+    switch (accent) {
+      case AppAccent.blue:
+        return 'Синий';
+      case AppAccent.orange:
+        return 'Оранжевый';
+      case AppAccent.purple:
+        return 'Фиолетовый';
+      case AppAccent.red:
+        return 'Красный';
+    }
+  }
+
+  static Color _accentColor(AppAccent accent) {
+    switch (accent) {
+      case AppAccent.blue:
+        return const Color(0xFF2868EC);
+      case AppAccent.orange:
+        return const Color(0xFFEC5C0D);
+      case AppAccent.purple:
+        return const Color(0xFF973AED);
+      case AppAccent.red:
+        return const Color(0xFFDF2B2B);
+    }
+  }
+
   static void _showThemePicker(BuildContext context) {
     showModalBottomSheet(
       context: context,
@@ -610,6 +654,52 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   Navigator.pop(context);
                 },
               ),
+              const SizedBox(height: 10),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  static void _showAccentPicker(BuildContext context) {
+    showModalBottomSheet(
+      context: context,
+      showDragHandle: true,
+      builder: (_) {
+        return SafeArea(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Padding(
+                padding: EdgeInsets.fromLTRB(16, 8, 16, 8),
+                child: Align(
+                  alignment: Alignment.centerLeft,
+                  child: Text(
+                    'Акцентный цвет',
+                    style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800),
+                  ),
+                ),
+              ),
+              for (final accent in AppAccent.values)
+                ListTile(
+                  leading: Container(
+                    width: 18,
+                    height: 18,
+                    decoration: BoxDecoration(
+                      color: _accentColor(accent),
+                      shape: BoxShape.circle,
+                    ),
+                  ),
+                  title: Text(_accentLabel(accent)),
+                  trailing: themeController.accent == accent
+                      ? Icon(Icons.check_rounded, color: _accentColor(accent))
+                      : null,
+                  onTap: () {
+                    themeController.setAccent(accent);
+                    Navigator.pop(context);
+                  },
+                ),
               const SizedBox(height: 10),
             ],
           ),
@@ -667,6 +757,14 @@ class _SettingsScreenState extends State<SettingsScreen> {
   @override
   Widget build(BuildContext context) {
     final t = Theme.of(context).textTheme;
+    final cs = Theme.of(context).colorScheme;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final tileChevron = Icon(
+      Icons.chevron_right,
+      color: isDark
+          ? Colors.white.withValues(alpha: 0.74)
+          : cs.onSurface.withValues(alpha: 0.72),
+    );
 
     return Scaffold(
       appBar: AppBar(title: const Text('Настройки')),
@@ -694,8 +792,22 @@ class _SettingsScreenState extends State<SettingsScreen> {
             style: t.titleMedium?.copyWith(fontWeight: FontWeight.w900),
           ),
           const SizedBox(height: 10),
-          Card(
-            elevation: 0,
+          Container(
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(24),
+              gradient: LinearGradient(
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+                colors: isDark
+                    ? const [Color(0xFF1A1E23), Color(0xFF171B21)]
+                    : const [Color(0xFFF1F3F7), Color(0xFFE9EDF4)],
+              ),
+              border: Border.all(
+                color: isDark
+                    ? Colors.white.withValues(alpha: 0.08)
+                    : Colors.black.withValues(alpha: 0.08),
+              ),
+            ),
             child: Column(
               children: [
                 ListTile(
@@ -705,7 +817,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     style: t.titleMedium?.copyWith(fontWeight: FontWeight.w800),
                   ),
                   subtitle: const Text('Открыть my/ в WebView'),
-                  trailing: const Icon(Icons.chevron_right),
+                  trailing: tileChevron,
                   onTap: () {
                     Navigator.of(context).push(
                       MaterialPageRoute(
@@ -722,8 +834,22 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     style: t.titleMedium?.copyWith(fontWeight: FontWeight.w800),
                   ),
                   subtitle: Text(_themeLabel(themeController.mode)),
-                  trailing: const Icon(Icons.chevron_right),
+                  trailing: tileChevron,
                   onTap: () => _showThemePicker(context),
+                ),
+                const Divider(height: 1),
+                ListTile(
+                  leading: Icon(
+                    Icons.color_lens_outlined,
+                    color: _accentColor(themeController.accent),
+                  ),
+                  title: Text(
+                    'Акцент',
+                    style: t.titleMedium?.copyWith(fontWeight: FontWeight.w800),
+                  ),
+                  subtitle: Text(_accentLabel(themeController.accent)),
+                  trailing: tileChevron,
+                  onTap: () => _showAccentPicker(context),
                 ),
                 const Divider(height: 1),
                 ListTile(
@@ -743,6 +869,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     style: t.titleMedium?.copyWith(fontWeight: FontWeight.w800),
                   ),
                   subtitle: const Text('Версия, репозиторий'),
+                  trailing: tileChevron,
                   onTap: () => _showAbout(context),
                 ),
               ],
@@ -755,16 +882,25 @@ class _SettingsScreenState extends State<SettingsScreen> {
             style: t.titleMedium?.copyWith(fontWeight: FontWeight.w900),
           ),
           const SizedBox(height: 10),
-          Card(
-            elevation: 0,
-            child: ListTile(
-              leading: const Icon(Icons.logout),
-              title: Text(
-                'Выйти',
-                style: t.titleMedium?.copyWith(fontWeight: FontWeight.w800),
+          OutlinedButton(
+            onPressed: () => _logout(context),
+            style: OutlinedButton.styleFrom(
+              foregroundColor: const Color(0xFFFF5C5C),
+              side: const BorderSide(color: Color(0xFF5A1313), width: 1.2),
+              backgroundColor: isDark
+                  ? const Color(0xFF1C0707)
+                  : const Color(0xFFFFEAEA),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(16),
               ),
-              subtitle: const Text('Очистить сессию и войти заново'),
-              onTap: () => _logout(context),
+              padding: const EdgeInsets.symmetric(vertical: 16),
+            ),
+            child: Text(
+              'Выйти из аккаунта',
+              style: t.titleSmall?.copyWith(
+                color: const Color(0xFFFF5C5C),
+                fontWeight: FontWeight.w900,
+              ),
             ),
           ),
         ],

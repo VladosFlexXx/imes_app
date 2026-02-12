@@ -88,9 +88,24 @@ class _PushCardState extends State<_PushCard> {
     final ns = NotificationService.instance;
     final t = Theme.of(context).textTheme;
     final cs = Theme.of(context).colorScheme;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
 
-    return Card(
-      elevation: 0,
+    return Container(
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(24),
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: isDark
+              ? const [Color(0xFF1A1E23), Color(0xFF171B21)]
+              : const [Color(0xFFF1F3F7), Color(0xFFE9EDF4)],
+        ),
+        border: Border.all(
+          color: isDark
+              ? Colors.white.withValues(alpha: 0.08)
+              : Colors.black.withValues(alpha: 0.08),
+        ),
+      ),
       child: Padding(
         padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 4),
         child: AnimatedBuilder(
@@ -118,6 +133,8 @@ class _PushCardState extends State<_PushCard> {
                   ),
                   subtitle: Text(status),
                   value: on,
+                  activeThumbColor: Colors.white,
+                  activeTrackColor: Theme.of(context).colorScheme.primary,
                   onChanged: (v) async {
                     try {
                       await ns.setEnabled(v);
@@ -141,7 +158,12 @@ class _PushCardState extends State<_PushCard> {
                         ? 'Не задан'
                         : cfg.baseUrl.trim(),
                   ),
-                  trailing: const Icon(Icons.chevron_right),
+                  trailing: Icon(
+                    Icons.chevron_right,
+                    color: isDark
+                        ? Colors.white.withValues(alpha: 0.74)
+                        : cs.onSurface.withValues(alpha: 0.72),
+                  ),
                   onTap: () => _openServerSheet(ns),
                 ),
                 if (err != null && err.trim().isNotEmpty)
@@ -172,6 +194,16 @@ class _PushCardState extends State<_PushCard> {
                     children: [
                       Expanded(
                         child: OutlinedButton.icon(
+                          style: OutlinedButton.styleFrom(
+                            foregroundColor: isDark
+                                ? const Color(0xFFCFD8FF)
+                                : cs.primary,
+                            side: BorderSide(
+                              color: isDark
+                                  ? Colors.white.withValues(alpha: 0.12)
+                                  : Colors.black.withValues(alpha: 0.10),
+                            ),
+                          ),
                           onPressed: _busy
                               ? null
                               : () async {
@@ -193,6 +225,12 @@ class _PushCardState extends State<_PushCard> {
                       const SizedBox(width: 8),
                       Expanded(
                         child: FilledButton.icon(
+                          style: FilledButton.styleFrom(
+                            backgroundColor: Theme.of(
+                              context,
+                            ).colorScheme.primary,
+                            foregroundColor: Colors.white,
+                          ),
                           onPressed: _busy || !on
                               ? null
                               : () async {

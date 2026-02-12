@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_inappwebview/flutter_inappwebview.dart';
+import 'package:vuz_app/ui/shimmer_skeleton.dart';
 
 class SiteTab extends StatefulWidget {
   const SiteTab({super.key});
@@ -28,8 +29,7 @@ class _SiteTabState extends State<SiteTab> {
       ),
       body: Column(
         children: [
-          if (_progress < 1)
-            LinearProgressIndicator(value: _progress, minHeight: 3),
+          if (_progress < 1) const LoadingSkeletonStrip(),
           Expanded(
             child: InAppWebView(
               initialUrlRequest: URLRequest(url: WebUri(startUrl)),

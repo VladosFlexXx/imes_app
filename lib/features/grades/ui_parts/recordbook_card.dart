@@ -1,4 +1,4 @@
-﻿part of '../../home/tab_grades.dart';
+part of '../../home/tab_grades.dart';
 
 class _RecordbookCard extends StatelessWidget {
   final RecordbookRow row;
@@ -9,6 +9,7 @@ class _RecordbookCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final t = Theme.of(context).textTheme;
     final cs = Theme.of(context).colorScheme;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
 
     final chips = <Widget>[];
     if (row.controlType.trim().isNotEmpty) {
@@ -20,9 +21,23 @@ class _RecordbookCard extends StatelessWidget {
       chips.add(_Chip(text: 'Пересдача: ${row.retake.trim()}'));
     }
 
-    return Card(
-      elevation: 0,
+    return Container(
       margin: const EdgeInsets.only(bottom: 10),
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(18),
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: isDark
+              ? const [Color(0xFF1A1E23), Color(0xFF171B21)]
+              : const [Color(0xFFF1F3F7), Color(0xFFE9EDF4)],
+        ),
+        border: Border.all(
+          color: isDark
+              ? Colors.white.withValues(alpha: 0.08)
+              : Colors.black.withValues(alpha: 0.08),
+        ),
+      ),
       child: SizedBox(
         width: double.infinity,
         child: Padding(
@@ -32,7 +47,12 @@ class _RecordbookCard extends StatelessWidget {
             children: [
               Text(
                 row.discipline,
-                style: t.titleMedium?.copyWith(fontWeight: FontWeight.w900),
+                style: t.titleMedium?.copyWith(
+                  fontWeight: FontWeight.w900,
+                  color: isDark
+                      ? Colors.white.withValues(alpha: 0.95)
+                      : cs.onSurface.withValues(alpha: 0.92),
+                ),
               ),
               const SizedBox(height: 8),
               if (chips.isNotEmpty)
@@ -42,7 +62,9 @@ class _RecordbookCard extends StatelessWidget {
                 Text(
                   row.teacher.trim(),
                   style: t.bodySmall?.copyWith(
-                    color: cs.onSurface.withValues(alpha: 0.7),
+                    color: isDark
+                        ? Colors.white.withValues(alpha: 0.68)
+                        : cs.onSurface.withValues(alpha: 0.62),
                   ),
                 ),
               ],
@@ -57,4 +79,3 @@ class _RecordbookCard extends StatelessWidget {
 // =========================
 // UI helpers
 // =========================
-

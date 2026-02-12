@@ -6,7 +6,13 @@ import 'package:package_info_plus/package_info_plus.dart';
 import 'core/auth/auth_settings.dart';
 import 'core/demo/demo_mode.dart';
 import 'features/auth/login_webview.dart';
+import 'features/grades/repository.dart';
 import 'features/home/home_screen.dart';
+import 'features/profile/repository.dart';
+import 'features/schedule/schedule_repository.dart';
+import 'features/study_plan/repository.dart';
+import 'features/recordbook/repository.dart';
+import 'features/notifications/inbox_repository.dart';
 import 'theme_controller.dart';
 import 'ui/app_theme.dart';
 
@@ -84,7 +90,7 @@ class _VuzAppState extends State<VuzApp> {
               borderRadius: BorderRadius.circular(999),
               boxShadow: [
                 BoxShadow(
-                  color: cs.shadow.withOpacity(0.25),
+                  color: cs.shadow.withValues(alpha: 0.25),
                   blurRadius: 10,
                   offset: const Offset(0, 6),
                 ),
@@ -107,8 +113,8 @@ class _VuzAppState extends State<VuzApp> {
   Widget build(BuildContext context) {
     return MaterialApp(
       title: 'ЭИОС ИМЭС',
-      theme: AppTheme.light(),
-      darkTheme: AppTheme.dark(),
+      theme: AppTheme.light(seed: themeController.seedColor),
+      darkTheme: AppTheme.dark(seed: themeController.seedColor),
       themeMode: themeController.mode,
       routes: {
         '/login': (_) => const LoginWebViewScreen(),
@@ -127,14 +133,38 @@ class _BootGate extends StatefulWidget {
 }
 
 class _BootGateState extends State<_BootGate> {
+  static const _kMinBootScreen = Duration(milliseconds: 2800);
+  late final DateTime _bootStartedAt;
+
   @override
   void initState() {
     super.initState();
+    _bootStartedAt = DateTime.now();
     _go();
   }
 
+  Future<void> _ensureMinBootScreen() async {
+    final elapsed = DateTime.now().difference(_bootStartedAt);
+    final remain = _kMinBootScreen - elapsed;
+    if (remain > Duration.zero) {
+      await Future<void>.delayed(remain);
+    }
+  }
+
   Future<void> _go() async {
+    // Прогреваем локальные кэши, пока пользователь видит стартовый экран.
+    // Важно: тут только init (чтение кэша), без сетевого refresh.
+    await Future.wait([
+      ScheduleRepository.instance.init(),
+      GradesRepository.instance.init(),
+      ProfileRepository.instance.init(),
+      StudyPlanRepository.instance.init(),
+      RecordbookRepository.instance.init(),
+      NotificationInboxRepository.instance.init(),
+    ]);
+
     if (DemoMode.instance.enabled) {
+      await _ensureMinBootScreen();
       if (!mounted) return;
       Navigator.of(context).pushReplacementNamed('/home');
       return;
@@ -149,6 +179,8 @@ class _BootGateState extends State<_BootGate> {
     }
 
     if (!mounted) return;
+    await _ensureMinBootScreen();
+    if (!mounted) return;
 
     final normalized = cookieHeader.trim();
     final hasSession = normalized.contains('MoodleSession=');
@@ -162,6 +194,70 @@ class _BootGateState extends State<_BootGate> {
 
   @override
   Widget build(BuildContext context) {
-    return const Scaffold(body: Center(child: CircularProgressIndicator()));
+    final cs = Theme.of(context).colorScheme;
+    final t = Theme.of(context).textTheme;
+
+    return Scaffold(
+      body: Container(
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topCenter,
+            end: Alignment.bottomCenter,
+            colors: [
+              cs.surfaceContainerHighest.withValues(alpha: 0.55),
+              cs.surface,
+            ],
+          ),
+        ),
+        child: Center(
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 28),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Container(
+                  width: 78,
+                  height: 78,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: cs.primary.withValues(alpha: 0.16),
+                    border: Border.all(
+                      color: cs.primary.withValues(alpha: 0.35),
+                    ),
+                  ),
+                  child: Icon(
+                    Icons.school_rounded,
+                    size: 40,
+                    color: cs.primary,
+                  ),
+                ),
+                const SizedBox(height: 18),
+                Text(
+                  'ЭИОС ИМЭС',
+                  style: t.headlineSmall?.copyWith(fontWeight: FontWeight.w800),
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  'Подготавливаем данные',
+                  style: t.bodyMedium?.copyWith(color: cs.onSurfaceVariant),
+                ),
+                const SizedBox(height: 18),
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(999),
+                  child: SizedBox(
+                    width: 170,
+                    child: LinearProgressIndicator(
+                      minHeight: 6,
+                      color: cs.primary,
+                      backgroundColor: cs.surfaceContainerHighest,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
   }
 }

@@ -1,4 +1,4 @@
-﻿part of '../../home/tab_schedule.dart';
+part of '../../home/tab_schedule.dart';
 
 class _DayPage extends StatelessWidget {
   final DateTime date;
@@ -22,13 +22,13 @@ class _DayPage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final cs = Theme.of(context).colorScheme;
     final t = Theme.of(context).textTheme;
+    final accent = _scheduleAccent(context);
 
     if (lessons.isEmpty) {
       return Row(
         children: [
-          Icon(Icons.event_busy_outlined, color: cs.primary),
+          Icon(Icons.event_busy_outlined, color: accent),
           const SizedBox(width: 12),
           Expanded(
             child: Text(
@@ -60,4 +60,3 @@ class _DayPage extends StatelessWidget {
     );
   }
 }
-

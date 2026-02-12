@@ -26,76 +26,15 @@ class _WeekMoodMapCard extends StatelessWidget {
     }
   }
 
-  ({Color bg, Color border, Color fg}) _toneFor(
-    int count,
-    int weekMax,
-    int peakDaysCount,
-    ColorScheme cs,
-    bool isDark,
-  ) {
-    if (count <= 0) {
-      return (
-        bg: isDark ? const Color(0xFF262938) : cs.surfaceContainerHighest,
-        border: cs.outlineVariant.withValues(alpha: isDark ? 0.30 : 0.55),
-        fg: cs.onSurface.withValues(alpha: isDark ? 0.70 : 0.78),
-      );
-    }
-
-    if (weekMax <= 0) {
-      return (
-        bg: isDark ? const Color(0xFF213C39) : const Color(0xFFD8F3EC),
-        border: isDark ? const Color(0xFF3C8B82) : const Color(0xFF55B79F),
-        fg: isDark ? const Color(0xFFB6F2E5) : const Color(0xFF0E5A4D),
-      );
-    }
-
-    final ratio = count / weekMax;
-    if (ratio >= 0.80) {
-      final isRarePeak = peakDaysCount <= 2 && count == weekMax;
-      return (
-        bg: isDark
-            ? (isRarePeak ? const Color(0xFF5E3615) : const Color(0xFF4C3117))
-            : (isRarePeak ? const Color(0xFFFFD9B0) : const Color(0xFFFFE1BF)),
-        border: isDark
-            ? (isRarePeak ? const Color(0xFFFFC987) : const Color(0xFFE3A563))
-            : (isRarePeak ? const Color(0xFFCC7A2F) : const Color(0xFFE49A45)),
-        fg: isDark
-            ? (isRarePeak ? const Color(0xFFFFF1DE) : const Color(0xFFFFE7C8))
-            : const Color(0xFF7A3F00),
-      );
-    }
-    if (ratio >= 0.45) {
-      return (
-        bg: isDark ? const Color(0xFF1E3253) : const Color(0xFFD9E9FF),
-        border: isDark ? const Color(0xFF4B8EDF) : const Color(0xFF6FA5E8),
-        fg: isDark ? const Color(0xFFD6EBFF) : const Color(0xFF123E6A),
-      );
-    }
-    return (
-      bg: isDark ? const Color(0xFF1B3A36) : const Color(0xFFD8F3EC),
-      border: isDark ? const Color(0xFF41A28E) : const Color(0xFF55B79F),
-      fg: isDark ? const Color(0xFFC2F4E7) : const Color(0xFF0E5A4D),
-    );
-  }
-
   @override
   Widget build(BuildContext context) {
-    final cs = Theme.of(context).colorScheme;
     final t = Theme.of(context).textTheme;
     final isDark = Theme.of(context).brightness == Brightness.dark;
+    final accent = _dashboardAccent(context);
     final today = DateTime.now();
-
-    final heaviest = days
-        .map((d) => (day: d, count: lessonsByDay[d.weekday] ?? 0))
-        .reduce((a, b) => b.count > a.count ? b : a);
-    final weekMax = heaviest.count;
-    final peakDaysCount = days
-        .where((d) => (lessonsByDay[d.weekday] ?? 0) == weekMax && weekMax > 0)
-        .length;
-
-    final summary = heaviest.count == 0
-        ? 'Неделя выглядит спокойно'
-        : 'Пик нагрузки: ${_dayLabel(heaviest.day.weekday)} (${heaviest.count} пар)';
+    final weekMax = days
+        .map((d) => lessonsByDay[d.weekday] ?? 0)
+        .fold<int>(0, (a, b) => a > b ? a : b);
 
     return Card(
       elevation: 0,
@@ -106,90 +45,51 @@ class _WeekMoodMapCard extends StatelessWidget {
           gradient: LinearGradient(
             begin: Alignment.topLeft,
             end: Alignment.bottomRight,
-            colors: [
-              cs.surface.withValues(alpha: 0.94),
-              cs.surface.withValues(alpha: 0.86),
-            ],
+            colors: isDark
+                ? const [Color(0xFF121316), Color(0xFF17181C)]
+                : const [Color(0xFFEDEEF0), Color(0xFFE7E8EB)],
+          ),
+          border: Border.all(
+            color: isDark
+                ? Colors.white.withValues(alpha: 0.10)
+                : Colors.black.withValues(alpha: 0.08),
           ),
         ),
         child: Padding(
-          padding: const EdgeInsets.all(14),
+          padding: const EdgeInsets.fromLTRB(14, 12, 14, 14),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text(
-                'Карта настроения недели',
-                style: t.titleMedium?.copyWith(fontWeight: FontWeight.w900),
+              Row(
+                children: [
+                  Icon(Icons.bar_chart_rounded, size: 18, color: accent),
+                  const SizedBox(width: 8),
+                  Text(
+                    'Карта настроения недели',
+                    style: t.titleMedium?.copyWith(fontWeight: FontWeight.w900),
+                  ),
+                ],
               ),
-              const SizedBox(height: 4),
-              Text(
-                summary,
-                style: t.bodySmall?.copyWith(
-                  color: cs.onSurface.withValues(alpha: 0.64),
-                  fontWeight: FontWeight.w700,
-                ),
-              ),
-              const SizedBox(height: 12),
+              const SizedBox(height: 14),
               Row(
                 children: [
                   for (int i = 0; i < days.length; i++) ...[
                     Expanded(
-                      child: _MoodDayCell(
-                        dayLabel: _dayLabel(days[i].weekday),
-                        dayNumber: days[i].day,
-                        lessonsCount: lessonsByDay[days[i].weekday] ?? 0,
+                      child: _MiniMoodDay(
+                        count: lessonsByDay[days[i].weekday] ?? 0,
+                        maxCount: weekMax,
+                        label: _dayLabel(days[i].weekday),
                         isToday:
                             days[i].year == today.year &&
                             days[i].month == today.month &&
                             days[i].day == today.day,
-                        tone: _toneFor(
-                          lessonsByDay[days[i].weekday] ?? 0,
-                          weekMax,
-                          peakDaysCount,
-                          cs,
-                          isDark,
-                        ),
+                        accent: accent,
                       ),
                     ),
                     if (i != days.length - 1) const SizedBox(width: 8),
                   ],
                 ],
               ),
-              const SizedBox(height: 10),
-              SingleChildScrollView(
-                scrollDirection: Axis.horizontal,
-                child: Row(
-                  children: [
-                    _MoodLegend(
-                      text: 'Нет пар',
-                      color: isDark
-                          ? const Color(0xFF747787)
-                          : cs.onSurfaceVariant,
-                    ),
-                    const SizedBox(width: 8),
-                    _MoodLegend(
-                      text: 'Мало пар',
-                      color: isDark
-                          ? const Color(0xFF41A28E)
-                          : const Color(0xFF2E8C78),
-                    ),
-                    const SizedBox(width: 8),
-                    _MoodLegend(
-                      text: 'Средне',
-                      color: isDark
-                          ? const Color(0xFF4B8EDF)
-                          : const Color(0xFF4B86D6),
-                    ),
-                    const SizedBox(width: 8),
-                    _MoodLegend(
-                      text: 'Много',
-                      color: isDark
-                          ? const Color(0xFFE3A563)
-                          : const Color(0xFFCC7A2F),
-                    ),
-                  ],
-                ),
-              ),
             ],
           ),
         ),
@@ -198,99 +98,105 @@ class _WeekMoodMapCard extends StatelessWidget {
   }
 }
 
-class _MoodDayCell extends StatelessWidget {
-  final String dayLabel;
-  final int dayNumber;
-  final int lessonsCount;
+class _MiniMoodDay extends StatelessWidget {
+  final int count;
+  final int maxCount;
+  final String label;
   final bool isToday;
-  final ({Color bg, Color border, Color fg}) tone;
+  final Color accent;
 
-  const _MoodDayCell({
-    required this.dayLabel,
-    required this.dayNumber,
-    required this.lessonsCount,
+  const _MiniMoodDay({
+    required this.count,
+    required this.maxCount,
+    required this.label,
     required this.isToday,
-    required this.tone,
+    required this.accent,
   });
 
   @override
   Widget build(BuildContext context) {
     final t = Theme.of(context).textTheme;
-    return AnimatedContainer(
-      duration: const Duration(milliseconds: 220),
-      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 10),
-      decoration: BoxDecoration(
-        color: tone.bg,
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(
-          color: isToday ? tone.fg : tone.border,
-          width: isToday ? 2.0 : 1.0,
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final normalized = maxCount <= 0 ? 0.0 : (count / maxCount).clamp(0.0, 1.0);
+    const minBarHeight = 16.0;
+    const maxBarHeight = 40.0;
+    final barHeight = minBarHeight + (maxBarHeight - minBarHeight) * normalized;
+
+    final barBg = isToday
+        ? accent
+        : (count > 0
+              ? (isDark ? const Color(0xFF2E3138) : const Color(0xFFE4E6EB))
+              : (isDark ? const Color(0xFF24272E) : const Color(0xFFD6D9E1)));
+
+    final barBorder = isToday
+        ? accent.withValues(alpha: 0.95)
+        : (isDark
+              ? Colors.white.withValues(alpha: 0.12)
+              : Colors.black.withValues(alpha: 0.10));
+
+    final countColor = isDark
+        ? Colors.white.withValues(alpha: isToday ? 0.98 : 0.88)
+        : (isToday ? Colors.white : const Color(0xFF2B3240));
+    final dayColor = isToday
+        ? accent
+        : (isDark
+              ? Colors.white.withValues(alpha: 0.76)
+              : const Color(0xFF596170));
+
+    return Column(
+      children: [
+        AnimatedContainer(
+          duration: const Duration(milliseconds: 250),
+          curve: Curves.easeOutCubic,
+          height: count > 0 ? barHeight : 14,
+          alignment: Alignment.bottomCenter,
+          child: count > 0
+              ? Container(
+                  width: 30,
+                  height: barHeight,
+                  decoration: BoxDecoration(
+                    color: barBg,
+                    borderRadius: BorderRadius.circular(9),
+                    border: Border.all(color: barBorder),
+                    boxShadow: isToday
+                        ? [
+                            BoxShadow(
+                              color: accent.withValues(alpha: 0.42),
+                              blurRadius: 14,
+                              offset: const Offset(0, 4),
+                            ),
+                          ]
+                        : null,
+                  ),
+                  alignment: Alignment.center,
+                  child: Text(
+                    '$count',
+                    style: t.labelLarge?.copyWith(
+                      color: countColor,
+                      fontWeight: FontWeight.w900,
+                    ),
+                  ),
+                )
+              : Container(
+                  width: 28,
+                  height: 2,
+                  decoration: BoxDecoration(
+                    color: isDark
+                        ? Colors.white.withValues(alpha: 0.34)
+                        : Colors.black.withValues(alpha: 0.26),
+                    borderRadius: BorderRadius.circular(999),
+                  ),
+                ),
         ),
-      ),
-      child: Column(
-        children: [
-          Text(
-            dayLabel,
-            style: t.labelMedium?.copyWith(
-              fontWeight: FontWeight.w900,
-              color: tone.fg,
-            ),
+        const SizedBox(height: 6),
+        Text(
+          label,
+          style: t.labelMedium?.copyWith(
+            color: dayColor,
+            fontWeight: FontWeight.w800,
           ),
-          const SizedBox(height: 2),
-          Text(
-            '$dayNumber',
-            style: t.labelSmall?.copyWith(
-              color: tone.fg.withValues(alpha: 0.88),
-              fontWeight: FontWeight.w800,
-            ),
-          ),
-          const SizedBox(height: 8),
-          Text(
-            '$lessonsCount',
-            style: t.titleLarge?.copyWith(
-              fontWeight: FontWeight.w900,
-              color: tone.fg,
-              height: 1,
-            ),
-          ),
-          const SizedBox(height: 2),
-          Text(
-            lessonsCount == 1 ? 'пара' : 'пар',
-            style: t.labelSmall?.copyWith(
-              color: tone.fg.withValues(alpha: 0.88),
-              fontWeight: FontWeight.w700,
-              height: 1,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _MoodLegend extends StatelessWidget {
-  final String text;
-  final Color color;
-
-  const _MoodLegend({required this.text, required this.color});
-
-  @override
-  Widget build(BuildContext context) {
-    final t = Theme.of(context).textTheme;
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
-      decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.10),
-        borderRadius: BorderRadius.circular(999),
-        border: Border.all(color: color.withValues(alpha: 0.24)),
-      ),
-      child: Text(
-        text,
-        style: t.labelSmall?.copyWith(
-          color: color,
-          fontWeight: FontWeight.w900,
         ),
-      ),
+      ],
     );
   }
 }

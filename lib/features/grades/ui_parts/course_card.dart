@@ -1,4 +1,4 @@
-﻿part of '../../home/tab_grades.dart';
+part of '../../home/tab_grades.dart';
 
 class _CourseCard extends StatelessWidget {
   final GradeCourse course;
@@ -18,13 +18,28 @@ class _CourseCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final t = Theme.of(context).textTheme;
     final cs = Theme.of(context).colorScheme;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
 
     final any = _hasGrade();
     final grade = course.grade?.trim();
 
-    return Card(
-      elevation: 0,
+    return Container(
       margin: const EdgeInsets.only(bottom: 10),
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(18),
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: isDark
+              ? const [Color(0xFF1A1E23), Color(0xFF171B21)]
+              : const [Color(0xFFF1F3F7), Color(0xFFE9EDF4)],
+        ),
+        border: Border.all(
+          color: isDark
+              ? Colors.white.withValues(alpha: 0.08)
+              : Colors.black.withValues(alpha: 0.08),
+        ),
+      ),
       child: SizedBox(
         width: double.infinity,
         child: InkWell(
@@ -40,7 +55,12 @@ class _CourseCard extends StatelessWidget {
                     course.courseName,
                     maxLines: 3,
                     overflow: TextOverflow.ellipsis,
-                    style: t.titleMedium?.copyWith(fontWeight: FontWeight.w900),
+                    style: t.titleMedium?.copyWith(
+                      fontWeight: FontWeight.w900,
+                      color: isDark
+                          ? Colors.white.withValues(alpha: 0.95)
+                          : cs.onSurface.withValues(alpha: 0.92),
+                    ),
                   ),
                 ),
                 const SizedBox(width: 10),
@@ -49,12 +69,19 @@ class _CourseCard extends StatelessWidget {
                 else
                   Text(
                     '—',
-                    style: t.titleLarge?.copyWith(fontWeight: FontWeight.w900),
+                    style: t.titleLarge?.copyWith(
+                      fontWeight: FontWeight.w900,
+                      color: isDark
+                          ? Colors.white.withValues(alpha: 0.86)
+                          : cs.onSurface.withValues(alpha: 0.82),
+                    ),
                   ),
                 const SizedBox(width: 6),
                 Icon(
                   Icons.chevron_right,
-                  color: cs.onSurface.withValues(alpha: 0.6),
+                  color: isDark
+                      ? Colors.white.withValues(alpha: 0.55)
+                      : cs.onSurface.withValues(alpha: 0.54),
                 ),
               ],
             ),
@@ -64,4 +91,3 @@ class _CourseCard extends StatelessWidget {
     );
   }
 }
-

@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_inappwebview/flutter_inappwebview.dart';
+import '../../ui/app_theme.dart';
+import '../../ui/shimmer_skeleton.dart';
 
 import 'models.dart';
 import 'repository.dart';
@@ -98,7 +100,9 @@ class _CourseGradeReportScreenState extends State<CourseGradeReportScreen> {
         ? (currentScore / maxScore).clamp(0.0, 1.0)
         : null;
 
-    final forecast5 = (progress == null) ? null : (2 + 3 * progress).clamp(2.0, 5.0);
+    final forecast5 = (progress == null)
+        ? null
+        : (2 + 3 * progress).clamp(2.0, 5.0);
 
     final itemRows = report.rows
         .where((r) => r.type == GradeReportRowType.item)
@@ -111,7 +115,9 @@ class _CourseGradeReportScreenState extends State<CourseGradeReportScreen> {
       history.add(
         _HistoryPoint(
           label: r.title,
-          shortLabel: _extractOrder(r.title) > 0 ? '№${_extractOrder(r.title)}' : '${i + 1}',
+          shortLabel: _extractOrder(r.title) > 0
+              ? '№${_extractOrder(r.title)}'
+              : '${i + 1}',
           value: v,
         ),
       );
@@ -135,18 +141,31 @@ class _CourseGradeReportScreenState extends State<CourseGradeReportScreen> {
 
   String _fmtNum(double v, {int digits = 1}) {
     final fixed = v.toStringAsFixed(digits);
-    if (fixed.endsWith('.0')) return fixed.substring(0, fixed.length - 2).replaceAll('.', ',');
+    if (fixed.endsWith('.0')) {
+      return fixed.substring(0, fixed.length - 2).replaceAll('.', ',');
+    }
     return fixed.replaceAll('.', ',');
   }
 
-  Widget _kpiTile(BuildContext context, String title, String value, {IconData? icon}) {
+  Widget _kpiTile(
+    BuildContext context,
+    String title,
+    String value, {
+    IconData? icon,
+  }) {
     final t = Theme.of(context).textTheme;
     final cs = Theme.of(context).colorScheme;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     return Expanded(
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
         decoration: BoxDecoration(
-          color: cs.surfaceContainerHighest.withValues(alpha: 0.22),
+          color: isDark ? const Color(0xFF252A34) : const Color(0xFFE7EAF1),
+          border: Border.all(
+            color: isDark
+                ? Colors.white.withValues(alpha: 0.10)
+                : Colors.black.withValues(alpha: 0.10),
+          ),
           borderRadius: BorderRadius.circular(14),
         ),
         child: Column(
@@ -155,12 +174,14 @@ class _CourseGradeReportScreenState extends State<CourseGradeReportScreen> {
             Row(
               children: [
                 if (icon != null)
-                  Icon(icon, size: 14, color: cs.primary),
+                  Icon(icon, size: 14, color: appAccentOf(context)),
                 if (icon != null) const SizedBox(width: 6),
                 Text(
                   title,
                   style: t.labelMedium?.copyWith(
-                    color: cs.onSurface.withValues(alpha: 0.72),
+                    color: isDark
+                        ? Colors.white.withValues(alpha: 0.72)
+                        : cs.onSurface.withValues(alpha: 0.62),
                     fontWeight: FontWeight.w700,
                   ),
                 ),
@@ -171,7 +192,12 @@ class _CourseGradeReportScreenState extends State<CourseGradeReportScreen> {
               value,
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
-              style: t.titleMedium?.copyWith(fontWeight: FontWeight.w900),
+              style: t.titleMedium?.copyWith(
+                fontWeight: FontWeight.w900,
+                color: isDark
+                    ? Colors.white.withValues(alpha: 0.96)
+                    : cs.onSurface.withValues(alpha: 0.92),
+              ),
             ),
           ],
         ),
@@ -182,15 +208,28 @@ class _CourseGradeReportScreenState extends State<CourseGradeReportScreen> {
   Widget _buildInsights(BuildContext context, _ReportAnalytics a) {
     final t = Theme.of(context).textTheme;
     final cs = Theme.of(context).colorScheme;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
 
     final current = (a.currentScore != null && a.maxScore != null)
         ? '${_fmtNum(a.currentScore!)} / ${_fmtNum(a.maxScore!)}'
         : '—';
-    final progress = a.progress == null ? '—' : '${(a.progress! * 100).round()}%';
-    final forecast = a.forecast5 == null ? '—' : '${_fmtNum(a.forecast5!, digits: 2)} / 5';
+    final progress = a.progress == null
+        ? '—'
+        : '${(a.progress! * 100).round()}%';
+    final forecast = a.forecast5 == null
+        ? '—'
+        : '${_fmtNum(a.forecast5!, digits: 2)} / 5';
 
-    return Card(
-      elevation: 0,
+    return Container(
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(20),
+        color: isDark ? const Color(0xFF1A1E23) : const Color(0xFFF1F3F7),
+        border: Border.all(
+          color: isDark
+              ? Colors.white.withValues(alpha: 0.08)
+              : Colors.black.withValues(alpha: 0.08),
+        ),
+      ),
       child: Padding(
         padding: const EdgeInsets.all(12),
         child: Column(
@@ -198,16 +237,31 @@ class _CourseGradeReportScreenState extends State<CourseGradeReportScreen> {
           children: [
             Text(
               'Сводка по предмету',
-              style: t.titleSmall?.copyWith(fontWeight: FontWeight.w900),
+              style: t.titleSmall?.copyWith(
+                fontWeight: FontWeight.w900,
+                color: isDark
+                    ? Colors.white.withValues(alpha: 0.96)
+                    : cs.onSurface.withValues(alpha: 0.92),
+              ),
             ),
             const SizedBox(height: 10),
             Row(
               children: [
                 _kpiTile(context, 'Баллы', current, icon: Icons.score_outlined),
                 const SizedBox(width: 8),
-                _kpiTile(context, 'Прогресс', progress, icon: Icons.timeline_rounded),
+                _kpiTile(
+                  context,
+                  'Прогресс',
+                  progress,
+                  icon: Icons.timeline_rounded,
+                ),
                 const SizedBox(width: 8),
-                _kpiTile(context, 'Прогноз', forecast, icon: Icons.auto_graph_rounded),
+                _kpiTile(
+                  context,
+                  'Прогноз',
+                  forecast,
+                  icon: Icons.auto_graph_rounded,
+                ),
               ],
             ),
             if (a.progress != null) ...[
@@ -217,7 +271,12 @@ class _CourseGradeReportScreenState extends State<CourseGradeReportScreen> {
                 child: LinearProgressIndicator(
                   value: a.progress,
                   minHeight: 8,
-                  backgroundColor: cs.surfaceContainerHighest.withValues(alpha: 0.35),
+                  backgroundColor: isDark
+                      ? Colors.white.withValues(alpha: 0.14)
+                      : Colors.black.withValues(alpha: 0.10),
+                  valueColor: AlwaysStoppedAnimation<Color>(
+                    appAccentOf(context),
+                  ),
                 ),
               ),
             ],
@@ -237,14 +296,18 @@ class _CourseGradeReportScreenState extends State<CourseGradeReportScreen> {
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                         style: t.bodySmall?.copyWith(
-                          color: cs.onSurface.withValues(alpha: 0.84),
+                          color: isDark
+                              ? Colors.white.withValues(alpha: 0.84)
+                              : cs.onSurface.withValues(alpha: 0.78),
                         ),
                       ),
                     ),
                     const SizedBox(width: 8),
                     Text(
                       '${_fmtNum(c.score)} / ${_fmtNum(c.max)}',
-                      style: t.labelMedium?.copyWith(fontWeight: FontWeight.w800),
+                      style: t.labelMedium?.copyWith(
+                        fontWeight: FontWeight.w800,
+                      ),
                     ),
                   ],
                 ),
@@ -254,7 +317,12 @@ class _CourseGradeReportScreenState extends State<CourseGradeReportScreen> {
                   child: LinearProgressIndicator(
                     value: (c.score / c.max).clamp(0.0, 1.0),
                     minHeight: 6,
-                    backgroundColor: cs.surfaceContainerHighest.withValues(alpha: 0.30),
+                    backgroundColor: isDark
+                        ? Colors.white.withValues(alpha: 0.12)
+                        : Colors.black.withValues(alpha: 0.08),
+                    valueColor: AlwaysStoppedAnimation<Color>(
+                      appAccentOf(context),
+                    ),
                   ),
                 ),
                 const SizedBox(height: 8),
@@ -277,9 +345,19 @@ class _CourseGradeReportScreenState extends State<CourseGradeReportScreen> {
                     final h = a.history[index];
                     return Container(
                       width: 66,
-                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 8,
+                        vertical: 8,
+                      ),
                       decoration: BoxDecoration(
-                        color: cs.surfaceContainerHighest.withValues(alpha: 0.20),
+                        color: isDark
+                            ? const Color(0xFF252A34)
+                            : const Color(0xFFE7EAF1),
+                        border: Border.all(
+                          color: isDark
+                              ? Colors.white.withValues(alpha: 0.10)
+                              : Colors.black.withValues(alpha: 0.10),
+                        ),
                         borderRadius: BorderRadius.circular(12),
                       ),
                       child: Column(
@@ -288,13 +366,20 @@ class _CourseGradeReportScreenState extends State<CourseGradeReportScreen> {
                           Text(
                             h.shortLabel,
                             style: t.labelSmall?.copyWith(
-                              color: cs.onSurface.withValues(alpha: 0.7),
+                              color: isDark
+                                  ? Colors.white.withValues(alpha: 0.7)
+                                  : cs.onSurface.withValues(alpha: 0.62),
                               fontWeight: FontWeight.w700,
                             ),
                           ),
                           Text(
                             _fmtNum(h.value),
-                            style: t.titleSmall?.copyWith(fontWeight: FontWeight.w900),
+                            style: t.titleSmall?.copyWith(
+                              fontWeight: FontWeight.w900,
+                              color: isDark
+                                  ? Colors.white.withValues(alpha: 0.95)
+                                  : cs.onSurface.withValues(alpha: 0.9),
+                            ),
                           ),
                         ],
                       ),
@@ -310,18 +395,24 @@ class _CourseGradeReportScreenState extends State<CourseGradeReportScreen> {
   }
 
   Widget _buildSkeleton(BuildContext context) {
-    final cs = Theme.of(context).colorScheme;
-    Widget block({double h = 14, double w = double.infinity}) => Container(
-      width: w,
-      height: h,
-      decoration: BoxDecoration(
-        color: cs.surfaceContainerHighest.withValues(alpha: 0.34),
-        borderRadius: BorderRadius.circular(8),
-      ),
-    );
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    Widget block({double h = 14, double w = double.infinity}) =>
+        ShimmerSkeleton(
+          width: w,
+          height: h,
+          borderRadius: BorderRadius.circular(8),
+        );
 
-    return Card(
-      elevation: 0,
+    return Container(
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(20),
+        color: isDark ? const Color(0xFF1A1E23) : const Color(0xFFF1F3F7),
+        border: Border.all(
+          color: isDark
+              ? Colors.white.withValues(alpha: 0.08)
+              : Colors.black.withValues(alpha: 0.08),
+        ),
+      ),
       child: Padding(
         padding: const EdgeInsets.all(12),
         child: Column(
@@ -355,6 +446,7 @@ class _CourseGradeReportScreenState extends State<CourseGradeReportScreen> {
   Widget _buildRow(BuildContext context, GradeReportRow row) {
     final t = Theme.of(context).textTheme;
     final cs = Theme.of(context).colorScheme;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     final isSection =
         row.type == GradeReportRowType.category ||
         row.type == GradeReportRowType.course;
@@ -362,16 +454,24 @@ class _CourseGradeReportScreenState extends State<CourseGradeReportScreen> {
     final left = (row.level - 1) * 12.0;
 
     final gradeColor = isAggregate
-        ? cs.primary
-        : (row.type == GradeReportRowType.item
-              ? cs.onSurface
-              : cs.onSurfaceVariant);
+        ? appAccentOf(context)
+        : (isDark
+              ? Colors.white.withValues(alpha: 0.90)
+              : cs.onSurface.withValues(alpha: 0.86));
 
     return Padding(
       padding: EdgeInsets.only(left: left, bottom: 8),
-      child: Card(
-        elevation: 0,
+      child: Container(
         margin: EdgeInsets.zero,
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(16),
+          color: isDark ? const Color(0xFF1A1E23) : const Color(0xFFF1F3F7),
+          border: Border.all(
+            color: isDark
+                ? Colors.white.withValues(alpha: 0.08)
+                : Colors.black.withValues(alpha: 0.08),
+          ),
+        ),
         child: InkWell(
           borderRadius: BorderRadius.circular(16),
           onTap: row.link == null
@@ -412,7 +512,9 @@ class _CourseGradeReportScreenState extends State<CourseGradeReportScreen> {
                         Text(
                           row.subtitle!,
                           style: t.bodySmall?.copyWith(
-                            color: cs.onSurface.withValues(alpha: 0.64),
+                            color: isDark
+                                ? Colors.white.withValues(alpha: 0.64)
+                                : cs.onSurface.withValues(alpha: 0.58),
                           ),
                         ),
                       ],
@@ -432,7 +534,9 @@ class _CourseGradeReportScreenState extends State<CourseGradeReportScreen> {
                   Icon(
                     Icons.open_in_new_rounded,
                     size: 18,
-                    color: cs.onSurface.withValues(alpha: 0.56),
+                    color: isDark
+                        ? Colors.white.withValues(alpha: 0.56)
+                        : cs.onSurface.withValues(alpha: 0.52),
                   ),
                 ],
               ],
@@ -446,11 +550,15 @@ class _CourseGradeReportScreenState extends State<CourseGradeReportScreen> {
   @override
   Widget build(BuildContext context) {
     final t = Theme.of(context).textTheme;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     final report = _report;
     final analytics = report == null ? null : _analyze(report);
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Баллы по дисциплине')),
+      appBar: AppBar(
+        title: const Text('Баллы по дисциплине'),
+        backgroundColor: isDark ? const Color(0xFF1A1E23) : Colors.white,
+      ),
       body: RefreshIndicator(
         onRefresh: _load,
         child: ListView(
@@ -472,7 +580,7 @@ class _CourseGradeReportScreenState extends State<CourseGradeReportScreen> {
                       padding: const EdgeInsets.only(bottom: 14),
                       child: Column(
                         children: [
-                          const LinearProgressIndicator(minHeight: 3),
+                          const LoadingSkeletonStrip(),
                           const SizedBox(height: 12),
                           _buildSkeleton(context),
                         ],
@@ -481,8 +589,18 @@ class _CourseGradeReportScreenState extends State<CourseGradeReportScreen> {
                   : const SizedBox.shrink(key: ValueKey('loaded')),
             ),
             if (_error != null) ...[
-              Card(
-                elevation: 0,
+              Container(
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(16),
+                  color: isDark
+                      ? const Color(0xFF1A1E23)
+                      : const Color(0xFFF1F3F7),
+                  border: Border.all(
+                    color: isDark
+                        ? Colors.white.withValues(alpha: 0.08)
+                        : Colors.black.withValues(alpha: 0.08),
+                  ),
+                ),
                 child: Padding(
                   padding: const EdgeInsets.all(14),
                   child: Text('Не удалось загрузить отчёт: $_error'),
@@ -495,8 +613,18 @@ class _CourseGradeReportScreenState extends State<CourseGradeReportScreen> {
               const SizedBox(height: 10),
             ],
             if (!_loading && report != null && report.rows.isEmpty)
-              Card(
-                elevation: 0,
+              Container(
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(16),
+                  color: isDark
+                      ? const Color(0xFF1A1E23)
+                      : const Color(0xFFF1F3F7),
+                  border: Border.all(
+                    color: isDark
+                        ? Colors.white.withValues(alpha: 0.08)
+                        : Colors.black.withValues(alpha: 0.08),
+                  ),
+                ),
                 child: Padding(
                   padding: const EdgeInsets.all(14),
                   child: Text(

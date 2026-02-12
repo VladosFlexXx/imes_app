@@ -1,4 +1,4 @@
-﻿part of '../../home/tab_schedule.dart';
+part of '../../home/tab_schedule.dart';
 
 class _LessonCard extends StatelessWidget {
   final Lesson lesson;
@@ -21,132 +21,201 @@ class _LessonCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final cs = Theme.of(context).colorScheme;
     final t = Theme.of(context).textTheme;
+    final cs = Theme.of(context).colorScheme;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final accent = _scheduleAccent(context);
 
     final isCancelled = lesson.status == LessonStatus.cancelled;
+    final isFinished = isPast;
 
-    Color bg;
-    Color border;
-    IconData? badgeIcon;
-    String? badgeText;
-
-    if (isOngoing) {
-      bg = cs.tertiaryContainer.withValues(alpha: 0.75);
-      border = cs.tertiary.withValues(alpha: 0.55);
-      badgeIcon = Icons.play_circle_outline;
-      badgeText = 'идёт';
-    } else if (isNext) {
-      bg = cs.primaryContainer.withValues(alpha: 0.55);
-      border = cs.primary.withValues(alpha: 0.45);
-      badgeIcon = Icons.skip_next_outlined;
-      badgeText = 'следующая';
-    } else if (lesson.status == LessonStatus.changed) {
-      bg = cs.primaryContainer.withValues(alpha: 0.42);
-      border = cs.primary.withValues(alpha: 0.40);
-      badgeIcon = Icons.edit_calendar_outlined;
-      badgeText = 'изменение';
-    } else if (lesson.status == LessonStatus.cancelled) {
-      bg = cs.errorContainer.withValues(alpha: 0.55);
-      border = cs.error.withValues(alpha: 0.45);
-      badgeIcon = Icons.cancel_outlined;
-      badgeText = 'отмена';
-    } else {
-      bg = cs.surfaceContainerHighest.withValues(alpha: 0.22);
-      border = cs.outlineVariant.withValues(alpha: 0.35);
-      badgeIcon = null;
-      badgeText = null;
-    }
-
-    final faded = isPast && isToday;
-    final opacity = faded ? 0.72 : 1.0;
+    final opacity = 1.0;
 
     final titleStyle = t.bodyLarge?.copyWith(
       fontWeight: FontWeight.w900,
+      fontSize: 35 / 2, // ~17.5
       decoration: isCancelled ? TextDecoration.lineThrough : null,
     );
 
     final timeStyle = t.bodySmall?.copyWith(
       fontWeight: FontWeight.w900,
-      color: cs.onSurface.withValues(alpha: 0.80),
+      fontSize: 16,
+      color: isDark
+          ? Colors.white.withValues(alpha: 0.9)
+          : cs.onSurface.withValues(alpha: 0.88),
       decoration: isCancelled ? TextDecoration.lineThrough : null,
     );
 
+    String startTime() {
+      final pieces = lesson.time.split('-');
+      final raw = pieces.isNotEmpty ? pieces.first.trim() : lesson.time;
+      return raw.replaceAll('.', ':');
+    }
+
+    String endTime() {
+      final pieces = lesson.time.split('-');
+      final raw = pieces.length > 1 ? pieces[1].trim() : '';
+      return raw.replaceAll('.', ':');
+    }
+
+    final lineColor = isOngoing
+        ? const Color(0xFF00D04D)
+        : (isFinished ? const Color(0xFF5B6070) : accent);
+    final typeChipAccent = isFinished ? const Color(0xFF565D6A) : accent;
+    final cardBg = isFinished
+        ? (isDark ? const Color(0xFF14171C) : const Color(0xFFDCE0E8))
+        : (isDark ? const Color(0xFF1A1D23) : const Color(0xFFF1F3F7));
+    final cardBorder = isFinished
+        ? (isDark
+              ? Colors.white.withValues(alpha: 0.05)
+              : Colors.black.withValues(alpha: 0.08))
+        : (isDark
+              ? Colors.white.withValues(alpha: 0.08)
+              : Colors.black.withValues(alpha: 0.10));
+    final subjectColor = isFinished
+        ? (isDark
+              ? Colors.white.withValues(alpha: 0.82)
+              : cs.onSurface.withValues(alpha: 0.72))
+        : (isDark
+              ? Colors.white.withValues(alpha: 0.96)
+              : cs.onSurface.withValues(alpha: 0.92));
+    final teacherColor = isFinished
+        ? (isDark
+              ? Colors.white.withValues(alpha: 0.58)
+              : cs.onSurface.withValues(alpha: 0.52))
+        : (isDark
+              ? Colors.white.withValues(alpha: 0.76)
+              : cs.onSurface.withValues(alpha: 0.68));
+
     return Opacity(
       opacity: opacity,
-      child: InkWell(
-        borderRadius: BorderRadius.circular(14),
-        onTap: onTap,
-        child: Container(
-          margin: const EdgeInsets.only(bottom: 10),
-          padding: const EdgeInsets.all(12),
-          decoration: BoxDecoration(
-            color: bg,
-            borderRadius: BorderRadius.circular(14),
-            border: Border.all(color: border),
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                children: [
-                  Text(lesson.time, style: timeStyle),
-                  const Spacer(),
-                  if (badgeText != null)
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 10,
-                        vertical: 6,
-                      ),
-                      decoration: BoxDecoration(
-                        color: cs.surface.withValues(alpha: 0.70),
-                        borderRadius: BorderRadius.circular(999),
-                        border: Border.all(
-                          color: cs.outlineVariant.withValues(alpha: 0.35),
-                        ),
-                      ),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
+      child: Container(
+        margin: const EdgeInsets.only(bottom: 10),
+        child: Material(
+          color: Colors.transparent,
+          borderRadius: BorderRadius.circular(18),
+          clipBehavior: Clip.antiAlias,
+          child: Ink(
+            decoration: BoxDecoration(
+              color: cardBg,
+              borderRadius: BorderRadius.circular(18),
+              border: Border.all(color: cardBorder),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withValues(
+                    alpha: isDark ? (isFinished ? 0.14 : 0.2) : 0.06,
+                  ),
+                  blurRadius: 12,
+                  offset: const Offset(0, 4),
+                ),
+              ],
+            ),
+            child: InkWell(
+              borderRadius: BorderRadius.circular(18),
+              onTap: onTap,
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(14, 14, 14, 14),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    SizedBox(
+                      width: 52,
+                      child: Column(
                         children: [
-                          if (badgeIcon != null) ...[
-                            Icon(
-                              badgeIcon,
-                              size: 16,
-                              color: cs.onSurface.withValues(alpha: 0.80),
+                          Text(startTime(), style: timeStyle),
+                          const SizedBox(height: 8),
+                          Container(
+                            width: 4,
+                            height: 62,
+                            decoration: BoxDecoration(
+                              color: lineColor,
+                              borderRadius: BorderRadius.circular(999),
                             ),
-                            const SizedBox(width: 6),
-                          ],
+                          ),
+                          const SizedBox(height: 8),
                           Text(
-                            badgeText,
-                            style: t.labelSmall?.copyWith(
-                              fontWeight: FontWeight.w900,
+                            endTime(),
+                            style: t.bodySmall?.copyWith(
+                              color: isDark
+                                  ? Colors.white.withValues(alpha: 0.52)
+                                  : cs.onSurface.withValues(alpha: 0.52),
+                              fontWeight: FontWeight.w700,
+                              fontSize: 15,
                             ),
                           ),
                         ],
                       ),
                     ),
-                ],
+                    const SizedBox(width: 14),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            children: [
+                              Expanded(
+                                child: Text(
+                                  lesson.subject,
+                                  style: titleStyle?.copyWith(
+                                    color: subjectColor,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 10),
+                          Wrap(
+                            spacing: 10,
+                            runSpacing: 10,
+                            children: [
+                              if (lesson.type.trim().isNotEmpty)
+                                _InfoChip(
+                                  icon: Icons.circle,
+                                  text: lesson.type,
+                                  accentBlue: true,
+                                  accentColor: typeChipAccent,
+                                ),
+                              if (lesson.place.trim().isNotEmpty)
+                                _InfoChip(
+                                  icon: Icons.place_outlined,
+                                  text: lesson.place,
+                                ),
+                            ],
+                          ),
+                          if (lesson.teacher.trim().isNotEmpty) ...[
+                            const SizedBox(height: 12),
+                            Row(
+                              children: [
+                                Icon(
+                                  Icons.person_outline,
+                                  size: 18,
+                                  color: isDark
+                                      ? Colors.white.withValues(alpha: 0.66)
+                                      : cs.onSurface.withValues(alpha: 0.56),
+                                ),
+                                const SizedBox(width: 8),
+                                Expanded(
+                                  child: Text(
+                                    lesson.teacher,
+                                    style: t.bodyMedium?.copyWith(
+                                      color: teacherColor,
+                                      fontWeight: FontWeight.w600,
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ],
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
               ),
-              const SizedBox(height: 8),
-              Text(lesson.subject, style: titleStyle),
-              const SizedBox(height: 8),
-              Wrap(
-                spacing: 8,
-                runSpacing: 8,
-                children: [
-                  if (lesson.type.trim().isNotEmpty)
-                    _InfoChip(icon: Icons.info_outline, text: lesson.type),
-                  if (lesson.place.trim().isNotEmpty)
-                    _InfoChip(icon: Icons.place_outlined, text: lesson.place),
-                  if (lesson.teacher.trim().isNotEmpty)
-                    _InfoChip(icon: Icons.person_outline, text: lesson.teacher),
-                ],
-              ),
-            ],
+            ),
           ),
         ),
       ),
     );
   }
 }
-

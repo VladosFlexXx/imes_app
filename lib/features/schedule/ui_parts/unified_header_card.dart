@@ -1,4 +1,4 @@
-﻿part of '../../home/tab_schedule.dart';
+part of '../../home/tab_schedule.dart';
 
 class _UnifiedHeaderCard extends StatelessWidget {
   final String parityText;
@@ -31,16 +31,38 @@ class _UnifiedHeaderCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final cs = Theme.of(context).colorScheme;
     final t = Theme.of(context).textTheme;
+    final cs = Theme.of(context).colorScheme;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
 
     final titleStyle = t.titleMedium?.copyWith(fontWeight: FontWeight.w900);
     final subStyle = t.bodySmall?.copyWith(
       fontWeight: FontWeight.w800,
-      color: cs.onSurface.withValues(alpha: 0.78),
+      color: isDark
+          ? Colors.white.withValues(alpha: 0.78)
+          : cs.onSurface.withValues(alpha: 0.72),
     );
 
-    return Card(
+    return Container(
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(24),
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: isDark
+              ? const [Color(0xFF1A1E23), Color(0xFF1A1E23)]
+              : const [Color(0xFFF1F3F7), Color(0xFFE9EDF4)],
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: isDark
+                ? Colors.black.withValues(alpha: 0.2)
+                : Colors.black.withValues(alpha: 0.08),
+            blurRadius: 14,
+            offset: const Offset(0, 8),
+          ),
+        ],
+      ),
       child: Padding(
         padding: const EdgeInsets.all(14),
         child: Column(
@@ -64,7 +86,9 @@ class _UnifiedHeaderCard extends StatelessWidget {
                           overflow: TextOverflow.ellipsis,
                           style: t.bodyMedium?.copyWith(
                             fontWeight: FontWeight.w800,
-                            color: cs.onSurface.withValues(alpha: 0.82),
+                            color: isDark
+                                ? Colors.white.withValues(alpha: 0.82)
+                                : cs.onSurface.withValues(alpha: 0.78),
                           ),
                         ),
                       ),
@@ -75,15 +99,26 @@ class _UnifiedHeaderCard extends StatelessWidget {
                 Icon(
                   Icons.sync,
                   size: 16,
-                  color: cs.onSurface.withValues(alpha: 0.75),
+                  color: isDark
+                      ? Colors.white.withValues(alpha: 0.78)
+                      : cs.onSurface.withValues(alpha: 0.72),
                 ),
                 const SizedBox(width: 6),
-                Text(updatedText, style: subStyle),
+                Text(
+                  updatedText,
+                  style: subStyle?.copyWith(
+                    color: isDark
+                        ? Colors.white.withValues(alpha: 0.78)
+                        : cs.onSurface.withValues(alpha: 0.72),
+                  ),
+                ),
               ],
             ),
             const SizedBox(height: 12),
             Divider(
-              color: cs.outlineVariant.withValues(alpha: 0.35),
+              color: isDark
+                  ? Colors.white.withValues(alpha: 0.12)
+                  : Colors.black.withValues(alpha: 0.10),
               height: 1,
             ),
             const SizedBox(height: 12),
@@ -92,7 +127,9 @@ class _UnifiedHeaderCard extends StatelessWidget {
                 Expanded(
                   child: Text(
                     dayTitle,
-                    style: titleStyle,
+                    style: titleStyle?.copyWith(
+                      color: isDark ? Colors.white : cs.onSurface,
+                    ),
                     overflow: TextOverflow.ellipsis,
                   ),
                 ),
@@ -100,7 +137,9 @@ class _UnifiedHeaderCard extends StatelessWidget {
                 Icon(
                   Icons.swap_vert_circle_outlined,
                   size: 17,
-                  color: cs.onSurface.withValues(alpha: 0.78),
+                  color: isDark
+                      ? Colors.white.withValues(alpha: 0.78)
+                      : cs.onSurface.withValues(alpha: 0.72),
                 ),
                 const SizedBox(width: 6),
                 Flexible(
@@ -108,7 +147,9 @@ class _UnifiedHeaderCard extends StatelessWidget {
                     parityText,
                     style: t.bodyMedium?.copyWith(
                       fontWeight: FontWeight.w800,
-                      color: cs.onSurface.withValues(alpha: 0.82),
+                      color: isDark
+                          ? Colors.white.withValues(alpha: 0.82)
+                          : cs.onSurface.withValues(alpha: 0.78),
                     ),
                     overflow: TextOverflow.ellipsis,
                   ),
@@ -146,4 +187,3 @@ class _UnifiedHeaderCard extends StatelessWidget {
     );
   }
 }
-

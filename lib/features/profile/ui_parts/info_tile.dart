@@ -4,11 +4,13 @@ class _InfoTile extends StatelessWidget {
   final IconData icon;
   final String title;
   final String? value;
+  final Color accent;
 
   const _InfoTile({
     required this.icon,
     required this.title,
     required this.value,
+    required this.accent,
   });
 
   @override
@@ -19,18 +21,46 @@ class _InfoTile extends StatelessWidget {
     final v = (value ?? '').trim();
     final show = v.isNotEmpty;
 
-    return ListTile(
-      leading: Icon(icon),
-      title: Text(
-        title,
-        style: t.titleSmall?.copyWith(fontWeight: FontWeight.w900),
-      ),
-      subtitle: Text(
-        show ? v : '—',
-        style: t.bodyMedium?.copyWith(
-          color: cs.onSurface.withValues(alpha: show ? 0.85 : 0.55),
-          fontWeight: FontWeight.w600,
-        ),
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(12, 12, 12, 12),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Container(
+            width: 44,
+            height: 44,
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(12),
+              color: accent.withValues(alpha: 0.16),
+              border: Border.all(color: accent.withValues(alpha: 0.46)),
+            ),
+            child: Icon(icon, size: 22, color: accent),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  title,
+                  style: t.titleSmall?.copyWith(
+                    fontWeight: FontWeight.w700,
+                    color: cs.onSurface.withValues(alpha: 0.86),
+                  ),
+                ),
+                const SizedBox(height: 3),
+                Text(
+                  show ? v : '—',
+                  style: t.titleMedium?.copyWith(
+                    color: cs.onSurface.withValues(alpha: show ? 0.98 : 0.55),
+                    fontWeight: FontWeight.w900,
+                    height: 1.2,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
       ),
     );
   }

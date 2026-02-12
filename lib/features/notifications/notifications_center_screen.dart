@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:vuz_app/ui/app_theme.dart';
 
 import 'inbox_repository.dart';
 
@@ -68,6 +69,15 @@ class _NotificationsCenterScreenState extends State<NotificationsCenterScreen> {
   Widget build(BuildContext context) {
     final t = Theme.of(context).textTheme;
     final cs = Theme.of(context).colorScheme;
+    final accent = appAccentOf(context);
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final cardGradient = LinearGradient(
+      begin: Alignment.topLeft,
+      end: Alignment.bottomRight,
+      colors: isDark
+          ? const [Color(0xFF1A1E23), Color(0xFF171B21)]
+          : const [Color(0xFFF1F3F7), Color(0xFFE9EDF4)],
+    );
 
     return Scaffold(
       appBar: AppBar(
@@ -125,63 +135,74 @@ class _NotificationsCenterScreenState extends State<NotificationsCenterScreen> {
               separatorBuilder: (_, _) => const SizedBox(height: 8),
               itemBuilder: (context, index) {
                 final item = items[index];
-                return Card(
-                  elevation: 0,
-                  child: InkWell(
-                    borderRadius: BorderRadius.circular(16),
-                    onTap: () => _repo.markRead(item.id),
-                    child: Padding(
-                      padding: const EdgeInsets.all(12),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Row(
-                            children: [
-                              Container(
-                                width: 9,
-                                height: 9,
-                                decoration: BoxDecoration(
-                                  shape: BoxShape.circle,
-                                  color: item.isRead
-                                      ? cs.outlineVariant
-                                      : cs.primary,
+                return Container(
+                  decoration: BoxDecoration(
+                    gradient: cardGradient,
+                    borderRadius: BorderRadius.circular(18),
+                    border: Border.all(
+                      color: isDark
+                          ? Colors.white.withValues(alpha: 0.08)
+                          : Colors.black.withValues(alpha: 0.08),
+                    ),
+                  ),
+                  child: Material(
+                    color: Colors.transparent,
+                    child: InkWell(
+                      borderRadius: BorderRadius.circular(18),
+                      onTap: () => _repo.markRead(item.id),
+                      child: Padding(
+                        padding: const EdgeInsets.all(12),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Row(
+                              children: [
+                                Container(
+                                  width: 9,
+                                  height: 9,
+                                  decoration: BoxDecoration(
+                                    shape: BoxShape.circle,
+                                    color: item.isRead
+                                        ? const Color(0xFF5E6677)
+                                        : accent,
+                                  ),
                                 ),
-                              ),
-                              const SizedBox(width: 8),
-                              Text(
-                                _sourceLabel(item.source),
-                                style: t.labelLarge?.copyWith(
-                                  fontWeight: FontWeight.w800,
+                                const SizedBox(width: 8),
+                                Text(
+                                  _sourceLabel(item.source),
+                                  style: t.labelLarge?.copyWith(
+                                    fontWeight: FontWeight.w800,
+                                  ),
                                 ),
+                                const Spacer(),
+                                Text(
+                                  _fmtDate(item.createdAtMs),
+                                  style: t.labelSmall?.copyWith(
+                                    color: cs.onSurface.withValues(alpha: 0.66),
+                                  ),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 8),
+                            Text(
+                              item.title,
+                              style: t.titleMedium?.copyWith(
+                                fontWeight: item.isRead
+                                    ? FontWeight.w700
+                                    : FontWeight.w900,
                               ),
-                              const Spacer(),
+                            ),
+                            if (item.body.trim().isNotEmpty) ...[
+                              const SizedBox(height: 6),
                               Text(
-                                _fmtDate(item.createdAtMs),
-                                style: t.labelSmall?.copyWith(
-                                  color: cs.onSurface.withValues(alpha: 0.66),
+                                item.body,
+                                style: t.bodyMedium?.copyWith(
+                                  color: cs.onSurface.withValues(alpha: 0.82),
                                 ),
                               ),
                             ],
-                          ),
-                          const SizedBox(height: 8),
-                          Text(
-                            item.title,
-                            style: t.titleMedium?.copyWith(
-                              fontWeight: item.isRead
-                                  ? FontWeight.w700
-                                  : FontWeight.w900,
-                            ),
-                          ),
-                          if (item.body.trim().isNotEmpty) ...[
-                            const SizedBox(height: 6),
-                            Text(
-                              item.body,
-                              style: t.bodyMedium?.copyWith(
-                                color: cs.onSurface.withValues(alpha: 0.82),
-                              ),
-                            ),
                           ],
-                        ],
+                        ),
                       ),
                     ),
                   ),

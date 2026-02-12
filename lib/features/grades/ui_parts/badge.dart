@@ -1,4 +1,4 @@
-﻿part of '../../home/tab_grades.dart';
+part of '../../home/tab_grades.dart';
 
 class _Badge extends StatelessWidget {
   final String text;
@@ -19,24 +19,28 @@ class _Badge extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final cs = Theme.of(context).colorScheme;
     final p = _scorePercent(text);
+    final accent = _gradesAccent(context);
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final cs = Theme.of(context).colorScheme;
 
     final bool hasScore = p != null;
     final bool low = hasScore && p < 45;
     final bool mid = hasScore && p >= 45 && p < 75;
 
     final bg = !hasScore
-        ? cs.primaryContainer
+        ? (isDark ? const Color(0xFF2B3040) : const Color(0xFFE3E7EF))
         : (low
-              ? cs.primary.withValues(alpha: 0.16)
+              ? accent.withValues(alpha: 0.22)
               : (mid
-                    ? cs.primary.withValues(alpha: 0.24)
-                    : cs.primary.withValues(alpha: 0.34)));
-    final fg = !hasScore ? cs.onPrimaryContainer : cs.primary;
+                    ? accent.withValues(alpha: 0.30)
+                    : accent.withValues(alpha: 0.42)));
+    final fg = isDark
+        ? Colors.white.withValues(alpha: 0.95)
+        : cs.onSurface.withValues(alpha: 0.92);
     final borderColor = !hasScore
-        ? cs.onPrimaryContainer.withValues(alpha: 0.12)
-        : cs.primary.withValues(alpha: 0.45);
+        ? Colors.white.withValues(alpha: 0.14)
+        : accent;
 
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
@@ -56,4 +60,3 @@ class _Badge extends StatelessWidget {
     );
   }
 }
-

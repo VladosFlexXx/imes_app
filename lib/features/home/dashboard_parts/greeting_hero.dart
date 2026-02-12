@@ -1,10 +1,39 @@
-﻿part of '../tab_dashboard.dart';
+part of '../tab_dashboard.dart';
 
 class _GreetingHero extends StatelessWidget {
   final String? fullName;
+  final String? avatarUrl;
   final int lessonsToday;
+  final String? group;
+  final String? level;
+  final bool evenWeek;
+  final int progressPercent;
+  final double progressValue;
+  final double? avgGrade;
+  final int? attendance;
+  final int? courseNumber;
+  final bool skeletonize;
+  final VoidCallback onOpenProfile;
+  final VoidCallback onOpenNotifications;
+  final bool hasUnreadNotifications;
 
-  const _GreetingHero({required this.fullName, required this.lessonsToday});
+  const _GreetingHero({
+    required this.fullName,
+    required this.avatarUrl,
+    required this.lessonsToday,
+    required this.group,
+    required this.level,
+    required this.evenWeek,
+    required this.progressPercent,
+    required this.progressValue,
+    required this.avgGrade,
+    required this.attendance,
+    required this.courseNumber,
+    required this.skeletonize,
+    required this.onOpenProfile,
+    required this.onOpenNotifications,
+    required this.hasUnreadNotifications,
+  });
 
   String _firstName(String? fullName) {
     if (fullName == null) return 'друг';
@@ -18,19 +47,12 @@ class _GreetingHero extends StatelessWidget {
     return parts.first;
   }
 
-  ({String greeting, _DayPhase phase}) _greetingForNow() {
+  String _greetingForNow() {
     final h = DateTime.now().hour;
-
-    if (h >= 5 && h < 12) {
-      return (greeting: 'Доброе утро', phase: _DayPhase.morning);
-    }
-    if (h >= 12 && h < 18) {
-      return (greeting: 'Добрый день', phase: _DayPhase.day);
-    }
-    if (h >= 18 && h < 23) {
-      return (greeting: 'Добрый вечер', phase: _DayPhase.evening);
-    }
-    return (greeting: 'Доброй ночи', phase: _DayPhase.night);
+    if (h >= 5 && h < 12) return 'Доброе утро';
+    if (h >= 12 && h < 18) return 'Добрый день';
+    if (h >= 18 && h < 23) return 'Добрый вечер';
+    return 'Доброй ночи';
   }
 
   String _weekdayRu(int wd) {
@@ -71,120 +93,363 @@ class _GreetingHero extends StatelessWidget {
     return months[(m - 1).clamp(0, 11)];
   }
 
-  List<Color> _gradientFor(_DayPhase p) {
-    switch (p) {
-      case _DayPhase.morning:
-        return const [Color(0xFFD4CCFF), Color(0xFFC5B9FF), Color(0xFFBDA8F7)];
-      case _DayPhase.day:
-        return const [Color(0xFFC7CFFF), Color(0xFFB9C2FF), Color(0xFFA8B0F3)];
-      case _DayPhase.evening:
-        return const [Color(0xFFB8B8E5), Color(0xFFA7A3D8), Color(0xFF958DCD)];
-      case _DayPhase.night:
-        return const [Color(0xFFA5A6CA), Color(0xFF8F8FB9), Color(0xFF7F7EA8)];
-    }
+  String _fmtOne(double? v) {
+    if (v == null) return '—';
+    return v.toStringAsFixed(1).replaceAll('.', ',');
   }
 
   @override
   Widget build(BuildContext context) {
+    final mq = MediaQuery.of(context);
+    final baseScale = MediaQuery.textScalerOf(context).scale(1.0);
+    final targetScale = (baseScale * 0.94).clamp(0.75, 1.0).toDouble();
     final now = DateTime.now();
     final name = _firstName(fullName);
-
-    final g = _greetingForNow();
-    final gradient = _gradientFor(g.phase);
-
-    final cs = Theme.of(context).colorScheme;
+    final greeting = _greetingForNow();
+    final accent = _dashboardAccent(context);
+    final isDark = Theme.of(context).brightness == Brightness.dark;
 
     final title =
         '${_weekdayRu(now.weekday)}, ${now.day} ${_monthRu(now.month)}';
-    final subtitle = 'чётная неделя';
+    final subtitle = evenWeek ? 'чётная неделя' : 'нечётная неделя';
+    final profileLine = [
+      if (group != null && group!.trim().isNotEmpty) group!.trim(),
+      if (level != null && level!.trim().isNotEmpty) level!.trim(),
+    ].join(' · ');
 
-    return Container(
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(24),
-        gradient: LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: gradient,
-        ),
-        border: Border.all(color: Colors.white.withValues(alpha: 0.28)),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.18),
-            blurRadius: 24,
-            offset: const Offset(0, 12),
+    return MediaQuery(
+      data: mq.copyWith(textScaler: TextScaler.linear(targetScale)),
+      child: Container(
+        clipBehavior: Clip.antiAlias,
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(28),
+          gradient: LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: isDark
+                ? const [Color(0xFF1A1A1D), Color(0xFF242426)]
+                : [
+                    accent.withValues(alpha: 0.92),
+                    accent.withValues(alpha: 0.84),
+                  ],
           ),
-        ],
-      ),
-      child: Stack(
-        children: [
-          Positioned(
-            right: -34,
-            top: -28,
-            child: Container(
-              width: 132,
-              height: 132,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                color: Colors.white.withValues(alpha: 0.18),
+          border: Border.all(
+            color: isDark
+                ? Colors.white.withValues(alpha: 0.12)
+                : Colors.white.withValues(alpha: 0.34),
+          ),
+          boxShadow: [
+            BoxShadow(
+              color: isDark
+                  ? Colors.black.withValues(alpha: 0.25)
+                  : accent.withValues(alpha: 0.22),
+              blurRadius: isDark ? 22 : 16,
+              offset: const Offset(0, 8),
+            ),
+          ],
+        ),
+        child: Stack(
+          children: [
+            Positioned(
+              right: -34,
+              top: -28,
+              child: Container(
+                width: 132,
+                height: 132,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: accent.withValues(alpha: 0.13),
+                ),
               ),
             ),
-          ),
-          Padding(
-            padding: const EdgeInsets.fromLTRB(16, 16, 16, 16),
-            child: DefaultTextStyle(
-              style: TextStyle(color: cs.onPrimaryContainer),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(14, 14, 14, 14),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(
-                    '${g.greeting}, $name',
-                    style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                      fontWeight: FontWeight.w800,
-                      color: Colors.black.withValues(alpha: 0.72),
-                    ),
-                  ),
-                  const SizedBox(height: 6),
-                  Text(
-                    title,
-                    style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                      fontWeight: FontWeight.w900,
-                      color: Colors.black.withValues(alpha: 0.80),
-                    ),
-                  ),
-                  const SizedBox(height: 6),
-                  Text(
-                    subtitle,
-                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                      color: Colors.black.withValues(alpha: 0.60),
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                  const SizedBox(height: 16),
                   Row(
                     children: [
-                      Icon(
-                        Icons.calendar_month_outlined,
-                        color: Colors.black.withValues(alpha: 0.70),
+                      Material(
+                        color: Colors.transparent,
+                        child: InkWell(
+                          onTap: onOpenProfile,
+                          customBorder: const CircleBorder(),
+                          child: Container(
+                            width: 66,
+                            height: 66,
+                            decoration: BoxDecoration(
+                              shape: BoxShape.circle,
+                              border: Border.all(
+                                color: accent.withValues(alpha: 0.68),
+                              ),
+                            ),
+                            child: ClipOval(
+                              child: AuthAvatar(
+                                avatarUrl: avatarUrl,
+                                radius: 33,
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              greeting,
+                              style: Theme.of(context).textTheme.titleSmall
+                                  ?.copyWith(
+                                    color: Colors.white.withValues(alpha: 0.78),
+                                    fontWeight: FontWeight.w500,
+                                  ),
+                            ),
+                            const SizedBox(height: 2),
+                            if (skeletonize)
+                              const _DashSkLine(width: 170, height: 26)
+                            else
+                              Text(
+                                name,
+                                style: Theme.of(context).textTheme.headlineSmall
+                                    ?.copyWith(
+                                      color: Colors.white,
+                                      fontWeight: FontWeight.w900,
+                                    ),
+                              ),
+                            if (profileLine.isNotEmpty) ...[
+                              const SizedBox(height: 2),
+                              if (skeletonize)
+                                const _DashSkLine(width: 150, height: 14)
+                              else
+                                Text(
+                                  profileLine,
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: Theme.of(context).textTheme.bodyMedium
+                                      ?.copyWith(
+                                        color: Colors.white.withValues(
+                                          alpha: 0.76,
+                                        ),
+                                        fontWeight: FontWeight.w600,
+                                      ),
+                                ),
+                            ],
+                          ],
+                        ),
+                      ),
+                      Material(
+                        color: Colors.transparent,
+                        child: InkWell(
+                          onTap: onOpenNotifications,
+                          borderRadius: BorderRadius.circular(12),
+                          child: Padding(
+                            padding: const EdgeInsets.all(4),
+                            child: Stack(
+                              clipBehavior: Clip.none,
+                              children: [
+                                Icon(
+                                  Icons.notifications_none_rounded,
+                                  color: Colors.white.withValues(alpha: 0.95),
+                                  size: 28,
+                                ),
+                                if (hasUnreadNotifications)
+                                  Positioned(
+                                    right: 1,
+                                    top: 2,
+                                    child: Container(
+                                      width: 8,
+                                      height: 8,
+                                      decoration: BoxDecoration(
+                                        color: accent,
+                                        shape: BoxShape.circle,
+                                        border: Border.all(
+                                          color: Colors.white,
+                                          width: 1,
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 14),
+                  Container(
+                    padding: const EdgeInsets.fromLTRB(14, 14, 14, 12),
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(18),
+                      color: Colors.white.withValues(alpha: 0.04),
+                      border: Border.all(
+                        color: Colors.white.withValues(
+                          alpha: isDark ? 0.16 : 0.36,
+                        ),
+                      ),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        if (skeletonize)
+                          const _DashSkLine(width: 220, height: 30)
+                        else
+                          Text(
+                            title,
+                            style: Theme.of(context).textTheme.headlineSmall
+                                ?.copyWith(
+                                  color: Colors.white,
+                                  fontWeight: FontWeight.w900,
+                                ),
+                          ),
+                        const SizedBox(height: 4),
+                        if (skeletonize)
+                          const _DashSkLine(width: 130, height: 18)
+                        else
+                          Text(
+                            subtitle,
+                            style: Theme.of(context).textTheme.titleMedium
+                                ?.copyWith(
+                                  color: Colors.white.withValues(alpha: 0.78),
+                                  fontWeight: FontWeight.w700,
+                                ),
+                          ),
+                        const SizedBox(height: 10),
+                        Row(
+                          children: [
+                            Text(
+                              'Прогресс недели',
+                              style: Theme.of(context).textTheme.titleMedium
+                                  ?.copyWith(
+                                    color: Colors.white.withValues(alpha: 0.82),
+                                    fontWeight: FontWeight.w700,
+                                  ),
+                            ),
+                            const Spacer(),
+                            if (skeletonize)
+                              const _DashSkLine(width: 44, height: 20)
+                            else
+                              Text(
+                                '$progressPercent%',
+                                style: Theme.of(context).textTheme.titleMedium
+                                    ?.copyWith(
+                                      color: Colors.white,
+                                      fontWeight: FontWeight.w900,
+                                    ),
+                              ),
+                          ],
+                        ),
+                        const SizedBox(height: 8),
+                        ClipRRect(
+                          borderRadius: BorderRadius.circular(999),
+                          child: LinearProgressIndicator(
+                            minHeight: 9,
+                            value: progressValue.clamp(0.0, 1.0),
+                            backgroundColor: Colors.white.withValues(
+                              alpha: isDark ? 0.18 : 0.36,
+                            ),
+                            valueColor: AlwaysStoppedAnimation<Color>(accent),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  Row(
+                    children: [
+                      _StatBox(
+                        title: 'Пары сегодня',
+                        value: '$lessonsToday',
+                        skeletonize: skeletonize,
+                        accent: accent,
                       ),
                       const SizedBox(width: 10),
-                      Text(
-                        'Сегодня $lessonsToday пары',
-                        style: Theme.of(context).textTheme.titleMedium
-                            ?.copyWith(
-                              fontWeight: FontWeight.w800,
-                              color: Colors.black.withValues(alpha: 0.74),
-                            ),
+                      _StatBox(
+                        title: 'Средний балл',
+                        value: _fmtOne(avgGrade),
+                        skeletonize: skeletonize,
+                        accent: accent,
+                        emphasize: true,
+                      ),
+                      const SizedBox(width: 10),
+                      _StatBox(
+                        title: attendance != null
+                            ? 'Посещаемость'
+                            : (courseNumber != null ? 'Курс' : 'Посещаемость'),
+                        value: attendance != null
+                            ? '$attendance%'
+                            : (courseNumber?.toString() ?? '—'),
+                        skeletonize: skeletonize,
+                        accent: accent,
                       ),
                     ],
                   ),
                 ],
               ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
 }
 
-enum _DayPhase { morning, day, evening, night }
+class _StatBox extends StatelessWidget {
+  final String title;
+  final String value;
+  final bool skeletonize;
+  final Color accent;
+  final bool emphasize;
+
+  const _StatBox({
+    required this.title,
+    required this.value,
+    required this.skeletonize,
+    required this.accent,
+    this.emphasize = false,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    return Expanded(
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 12),
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(16),
+          color: Colors.white.withValues(alpha: isDark ? 0.06 : 0.16),
+          border: Border.all(
+            color: Colors.white.withValues(alpha: isDark ? 0.20 : 0.34),
+          ),
+        ),
+        child: Column(
+          children: [
+            if (skeletonize)
+              const _DashSkLine(width: 46, height: 26)
+            else
+              Text(
+                value,
+                style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+                  color: Colors.white,
+                  fontWeight: FontWeight.w900,
+                ),
+              ),
+            const SizedBox(height: 4),
+            if (skeletonize)
+              const _DashSkLine(width: 68, height: 14)
+            else
+              Text(
+                title,
+                textAlign: TextAlign.center,
+                style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                  color: Colors.white.withValues(alpha: 0.82),
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+}

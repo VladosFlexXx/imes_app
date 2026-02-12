@@ -1,4 +1,4 @@
-﻿part of '../../home/tab_schedule.dart';
+part of '../../home/tab_schedule.dart';
 
 class _TapPill extends StatelessWidget {
   final IconData icon;
@@ -17,14 +17,13 @@ class _TapPill extends StatelessWidget {
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
     final t = Theme.of(context).textTheme;
+    final accent = _scheduleAccent(context);
 
     final bg = active
-        ? cs.primary.withValues(alpha: 0.18)
+        ? accent
         : cs.surfaceContainerHighest.withValues(alpha: 0.28);
-    final border = active
-        ? cs.primary.withValues(alpha: 0.45)
-        : cs.outlineVariant.withValues(alpha: 0.35);
-    final fg = active ? cs.primary : cs.onSurface.withValues(alpha: 0.78);
+    final border = active ? accent : cs.outlineVariant.withValues(alpha: 0.35);
+    final fg = active ? Colors.white : cs.onSurface.withValues(alpha: 0.78);
 
     return InkWell(
       borderRadius: BorderRadius.circular(999),
@@ -55,4 +54,3 @@ class _TapPill extends StatelessWidget {
     );
   }
 }
-

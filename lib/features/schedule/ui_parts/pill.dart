@@ -1,4 +1,4 @@
-﻿part of '../../home/tab_schedule.dart';
+part of '../../home/tab_schedule.dart';
 
 class _Pill extends StatelessWidget {
   final IconData icon;
@@ -15,15 +15,16 @@ class _Pill extends StatelessWidget {
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
     final t = Theme.of(context).textTheme;
+    final accent = _scheduleAccent(context);
 
     Color border = cs.outlineVariant.withValues(alpha: 0.35);
     Color bg = cs.surfaceContainerHighest.withValues(alpha: 0.35);
     Color fg = cs.onSurface.withValues(alpha: 0.80);
 
     if (tone == _PillTone.warn) {
-      border = cs.primary.withValues(alpha: 0.40);
-      bg = cs.primaryContainer.withValues(alpha: 0.35);
-      fg = cs.primary;
+      border = accent.withValues(alpha: 0.40);
+      bg = accent.withValues(alpha: 0.24);
+      fg = accent;
     }
 
     return Container(
@@ -50,4 +51,3 @@ class _Pill extends StatelessWidget {
     );
   }
 }
-

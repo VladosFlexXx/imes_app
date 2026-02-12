@@ -5,6 +5,7 @@ import 'package:flutter_inappwebview/flutter_inappwebview.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:vuz_app/core/demo/demo_mode.dart';
 import 'package:vuz_app/core/network/eios_client.dart';
+import 'package:vuz_app/ui/shimmer_skeleton.dart';
 
 import '../home/home_screen.dart';
 import '../notifications/inbox_repository.dart';
@@ -192,7 +193,7 @@ class _LoginWebViewScreenState extends State<LoginWebViewScreen> {
         bottom: PreferredSize(
           preferredSize: const Size.fromHeight(3),
           child: _progress < 1
-              ? LinearProgressIndicator(value: _progress)
+              ? const LoadingSkeletonStrip()
               : const SizedBox(height: 3),
         ),
       ),

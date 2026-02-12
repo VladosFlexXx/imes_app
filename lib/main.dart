@@ -43,10 +43,14 @@ Future<void> main() async {
 
 Future<void> _startPushes() async {
   try {
+    // Даем UI пройти стартовую анимацию без конкуренции за главный поток.
+    await Future<void>.delayed(const Duration(milliseconds: 3200));
     debugPrint('[BOOT] Push ensureStarted()');
     NotificationService.instance.ensureStarted();
     await NotificationService.instance.init();
-    debugPrint('[BOOT] Push init finished. status=${NotificationService.instance.status.value}');
+    debugPrint(
+      '[BOOT] Push init finished. status=${NotificationService.instance.status.value}',
+    );
   } catch (e, st) {
     AppLogger.instance.e('[BOOT] Push init failed', e, st);
   }

@@ -1,4 +1,4 @@
-﻿part of '../../home/tab_profile.dart';
+part of '../../home/tab_profile.dart';
 
 class _ProfileInfoCard extends StatelessWidget {
   final UserProfile? profile;
@@ -13,6 +13,8 @@ class _ProfileInfoCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final p = profile;
     final cs = Theme.of(context).colorScheme;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final accent = _profileAccent(context);
 
     if (p == null) {
       return Card(
@@ -63,35 +65,55 @@ class _ProfileInfoCard extends StatelessWidget {
     final recordBook = p.recordBook;
 
     final items = <Widget>[
-      _InfoTile(icon: Icons.email_outlined, title: 'Почта', value: email),
+      const SizedBox(height: 2),
+      _InfoTile(
+        icon: Icons.email_outlined,
+        title: 'Почта',
+        value: email,
+        accent: accent,
+      ),
       _InfoTile(
         icon: Icons.school_outlined,
         title: 'Профиль / направление',
         value: profileLine,
+        accent: accent.withValues(alpha: 0.85),
       ),
       _CopyTile(
         icon: Icons.confirmation_number_outlined,
         title: '№ зачётной книжки',
         value: recordBook,
         onCopy: recordBook == null ? null : () => onCopyRecordBook(recordBook),
+        accent: accent.withValues(alpha: 0.72),
       ),
+      const SizedBox(height: 2),
     ].whereType<Widget>().toList();
 
-    return Card(
-      elevation: 0,
-      child: Padding(
-        padding: const EdgeInsets.symmetric(vertical: 6),
-        child: Column(
-          children: [
-            ..._withDividers(
-              items,
-              Divider(
-                color: cs.outlineVariant.withValues(alpha: 0.35),
-                height: 1,
-              ),
-            ),
-          ],
+    return Container(
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(24),
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: isDark
+              ? const [Color(0xFF121D33), Color(0xFF0D1527)]
+              : const [Color(0xFFF1F3F7), Color(0xFFE9EDF4)],
         ),
+        border: Border.all(
+          color: isDark
+              ? Colors.white.withValues(alpha: 0.08)
+              : Colors.black.withValues(alpha: 0.08),
+        ),
+      ),
+      child: Column(
+        children: [
+          ..._withDividers(
+            items,
+            Divider(
+              color: cs.outlineVariant.withValues(alpha: 0.28),
+              height: 1,
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -105,4 +127,3 @@ class _ProfileInfoCard extends StatelessWidget {
     return out;
   }
 }
-

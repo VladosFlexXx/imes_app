@@ -1,5 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'dart:async';
+import '../../ui/app_theme.dart';
+import '../../ui/shimmer_skeleton.dart';
 
 import '../grades/models.dart';
 import '../grades/repository.dart';
@@ -19,6 +22,8 @@ part '../grades/ui_parts/badge.dart';
 part '../grades/ui_parts/chip.dart';
 
 enum StudySection { disciplines, studyPlan, recordbook }
+
+Color _gradesAccent(BuildContext context) => appAccentOf(context);
 
 class GradesTab extends StatefulWidget {
   const GradesTab({super.key});
@@ -55,11 +60,21 @@ class _GradesTabState extends State<GradesTab>
   void initState() {
     super.initState();
 
-    gradesRepo.initAndRefresh();
-    scheduleRepo.initAndRefresh();
+    unawaited(gradesRepo.init());
+    unawaited(scheduleRepo.init());
+    unawaited(planRepo.init());
+    unawaited(recordRepo.init());
 
-    planRepo.initAndRefresh();
-    recordRepo.initAndRefresh();
+    // Ленивая догрузка второстепенных вкладок без стартового "шторма".
+    Future<void>.delayed(const Duration(milliseconds: 500), () {
+      unawaited(gradesRepo.refresh(force: false));
+    });
+    Future<void>.delayed(const Duration(milliseconds: 1100), () {
+      unawaited(planRepo.refresh(force: false));
+    });
+    Future<void>.delayed(const Duration(milliseconds: 1700), () {
+      unawaited(recordRepo.refresh(force: false));
+    });
 
     _tabController = TabController(
       length: 3,
@@ -100,28 +115,60 @@ class _GradesTabState extends State<GradesTab>
   Widget _sectionTabs() {
     final t = Theme.of(context).textTheme;
     final cs = Theme.of(context).colorScheme;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
 
-    return TabBar(
-      controller: _tabController,
-      isScrollable: false,
-      indicatorSize: TabBarIndicatorSize.label,
-      dividerColor: Colors.transparent,
-      indicatorColor: cs.primary,
-      indicatorWeight: 2.2,
-      labelStyle: t.titleSmall?.copyWith(fontWeight: FontWeight.w900),
-      unselectedLabelStyle: t.titleSmall?.copyWith(fontWeight: FontWeight.w700),
-      onTap: (idx) {
-        if (idx == _tabController.index) return;
-        _tabController.animateTo(
-          idx,
-          duration: const Duration(milliseconds: 220),
-        );
-      },
-      tabs: const [
-        Tab(text: 'Дисциплины'),
-        Tab(text: 'План'),
-        Tab(text: 'Зачётка'),
-      ],
+    return Container(
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(24),
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: isDark
+              ? const [Color(0xFF1A1E23), Color(0xFF171B21)]
+              : const [Color(0xFFF1F3F7), Color(0xFFE9EDF4)],
+        ),
+        border: Border.all(
+          color: isDark
+              ? Colors.white.withValues(alpha: 0.08)
+              : Colors.black.withValues(alpha: 0.08),
+        ),
+      ),
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+      child: TabBar(
+        controller: _tabController,
+        isScrollable: false,
+        indicatorSize: TabBarIndicatorSize.tab,
+        dividerColor: Colors.transparent,
+        indicator: BoxDecoration(
+          borderRadius: BorderRadius.circular(14),
+          color: _gradesAccent(context),
+          border: Border.all(color: _gradesAccent(context)),
+        ),
+        labelColor: isDark ? Colors.white : cs.onPrimary,
+        unselectedLabelColor: isDark
+            ? Colors.white.withValues(alpha: 0.74)
+            : cs.onSurface.withValues(alpha: 0.74),
+        indicatorPadding: const EdgeInsets.symmetric(
+          horizontal: 2,
+          vertical: 2,
+        ),
+        labelStyle: t.titleSmall?.copyWith(fontWeight: FontWeight.w900),
+        unselectedLabelStyle: t.titleSmall?.copyWith(
+          fontWeight: FontWeight.w700,
+        ),
+        onTap: (idx) {
+          if (idx == _tabController.index) return;
+          _tabController.animateTo(
+            idx,
+            duration: const Duration(milliseconds: 220),
+          );
+        },
+        tabs: const [
+          Tab(text: 'Дисциплины'),
+          Tab(text: 'План'),
+          Tab(text: 'Зачётка'),
+        ],
+      ),
     );
   }
 
@@ -475,6 +522,10 @@ class _GradesTabState extends State<GradesTab>
     required int selected,
     required ValueChanged<int> onSelect,
   }) {
+    final t = Theme.of(context).textTheme;
+    final cs = Theme.of(context).colorScheme;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
     String label(int sem) {
       const map = {
         1: '1',
@@ -498,6 +549,29 @@ class _GradesTabState extends State<GradesTab>
             ChoiceChip(
               label: Text(label(sem)),
               selected: sem == selected,
+              showCheckmark: false,
+              selectedColor: _gradesAccent(context),
+              backgroundColor: isDark
+                  ? const Color(0xFF252A34)
+                  : const Color(0xFFE7EAF1),
+              side: BorderSide(
+                color: sem == selected
+                    ? _gradesAccent(context)
+                    : (isDark
+                          ? Colors.white.withValues(alpha: 0.14)
+                          : Colors.black.withValues(alpha: 0.10)),
+              ),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(999),
+              ),
+              labelStyle: t.labelLarge?.copyWith(
+                color: sem == selected
+                    ? Colors.white
+                    : (isDark
+                          ? Colors.white.withValues(alpha: 0.96)
+                          : cs.onSurface),
+                fontWeight: FontWeight.w800,
+              ),
               onSelected: (_) => onSelect(sem),
             ),
         ],
@@ -530,7 +604,7 @@ class _GradesTabState extends State<GradesTab>
                 size: 18,
                 color: planRepo.lastError != null
                     ? cs.error.withValues(alpha: 0.86)
-                    : cs.primary.withValues(alpha: 0.86),
+                    : _gradesAccent(context).withValues(alpha: 0.86),
               ),
               const SizedBox(width: 8),
               Expanded(
@@ -614,6 +688,7 @@ class _GradesTabState extends State<GradesTab>
   Widget _pageRecordbook() {
     final t = Theme.of(context).textTheme;
     final cs = Theme.of(context).colorScheme;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
 
     final gradebookData = recordRepo.gradebooks;
     final gradebooks = _gradebooks(gradebookData);
@@ -660,7 +735,7 @@ class _GradesTabState extends State<GradesTab>
                 size: 18,
                 color: recordRepo.lastError != null
                     ? cs.error.withValues(alpha: 0.86)
-                    : cs.primary.withValues(alpha: 0.86),
+                    : _gradesAccent(context).withValues(alpha: 0.86),
               ),
               const SizedBox(width: 8),
               Expanded(
@@ -682,6 +757,18 @@ class _GradesTabState extends State<GradesTab>
               'gradebook-dd-${_selectedGradebook ?? ''}-${gradebooks.join('|')}',
             ),
             initialValue: _selectedGradebook,
+            dropdownColor: isDark
+                ? const Color(0xFF1A1E23)
+                : const Color(0xFFFFFFFF),
+            iconEnabledColor: isDark
+                ? Colors.white.withValues(alpha: 0.86)
+                : cs.onSurface.withValues(alpha: 0.86),
+            style: t.bodyMedium?.copyWith(
+              color: isDark
+                  ? Colors.white.withValues(alpha: 0.94)
+                  : cs.onSurface,
+              fontWeight: FontWeight.w700,
+            ),
             items: [
               for (final g in gradebooks)
                 DropdownMenuItem(value: g, child: Text('Зачётка № $g')),
@@ -689,7 +776,34 @@ class _GradesTabState extends State<GradesTab>
             onChanged: (v) => setState(() {
               _selectedGradebook = v;
             }),
-            decoration: const InputDecoration(labelText: 'Выбор зачётки'),
+            decoration: InputDecoration(
+              labelText: 'Выбор зачётки',
+              labelStyle: t.bodyMedium?.copyWith(
+                color: isDark
+                    ? Colors.white.withValues(alpha: 0.78)
+                    : cs.onSurface.withValues(alpha: 0.72),
+                fontWeight: FontWeight.w600,
+              ),
+              filled: true,
+              fillColor: isDark
+                  ? const Color(0xFF1A1E23)
+                  : const Color(0xFFFFFFFF),
+              enabledBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(14),
+                borderSide: BorderSide(
+                  color: isDark
+                      ? Colors.white.withValues(alpha: 0.12)
+                      : Colors.black.withValues(alpha: 0.10),
+                ),
+              ),
+              focusedBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(14),
+                borderSide: BorderSide(
+                  color: _gradesAccent(context),
+                  width: 1.3,
+                ),
+              ),
+            ),
           ),
           const SizedBox(height: 12),
         ] else if (gradebooks.length == 1) ...[
@@ -778,13 +892,10 @@ class _GradesTabState extends State<GradesTab>
   }
 
   Widget _skeletonBlock(double h, {double radius = 14}) {
-    final cs = Theme.of(context).colorScheme;
-    return Container(
+    return ShimmerSkeleton(
+      width: double.infinity,
       height: h,
-      decoration: BoxDecoration(
-        color: cs.surfaceContainerHighest.withValues(alpha: 0.36),
-        borderRadius: BorderRadius.circular(radius),
-      ),
+      borderRadius: BorderRadius.circular(radius),
     );
   }
 
@@ -847,7 +958,9 @@ class _GradesTabState extends State<GradesTab>
               child: _sectionSkeleton(section),
             )
           : TweenAnimationBuilder<double>(
-              key: ValueKey('content_${section.name}_${isLoading ? 'loading' : 'ready'}'),
+              key: ValueKey(
+                'content_${section.name}_${isLoading ? 'loading' : 'ready'}',
+              ),
               tween: Tween(begin: 0.0, end: 1.0),
               duration: const Duration(milliseconds: 240),
               curve: Curves.easeOutCubic,
@@ -871,7 +984,7 @@ class _GradesTabState extends State<GradesTab>
         padding: const EdgeInsets.fromLTRB(16, 12, 16, 106),
         children: [
           if (isLoading) ...[
-            const LinearProgressIndicator(minHeight: 3),
+            const LoadingSkeletonStrip(),
             const SizedBox(height: 12),
           ],
           content,
@@ -898,59 +1011,65 @@ class _GradesTabState extends State<GradesTab>
       ]),
       builder: (context, _) {
         return Scaffold(
-          body: Column(
-            children: [
-              const SizedBox(height: 6),
-              _sectionTabs(),
-              const SizedBox(height: 6),
-              Expanded(
-                child: GestureDetector(
-                  behavior: HitTestBehavior.opaque,
-                  onHorizontalDragEnd: (details) {
-                    final v = details.primaryVelocity ?? 0;
-                    if (v.abs() < 250) return;
-                    if (v < 0) {
-                      _swipeSection(1);
-                    } else {
-                      _swipeSection(-1);
-                    }
-                  },
-                  child: TabBarView(
-                    controller: _tabController,
-                    physics: const NeverScrollableScrollPhysics(),
-                    children: [
-                      RepaintBoundary(
-                        child: _sectionPage(
-                          StudySection.disciplines,
-                          KeyedSubtree(
-                            key: const ValueKey('disciplines'),
-                            child: _pageDisciplines(),
+          body: SafeArea(
+            bottom: false,
+            child: Column(
+              children: [
+                const SizedBox(height: 8),
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 16),
+                  child: _sectionTabs(),
+                ),
+                const SizedBox(height: 8),
+                Expanded(
+                  child: GestureDetector(
+                    behavior: HitTestBehavior.opaque,
+                    onHorizontalDragEnd: (details) {
+                      final v = details.primaryVelocity ?? 0;
+                      if (v.abs() < 250) return;
+                      if (v < 0) {
+                        _swipeSection(1);
+                      } else {
+                        _swipeSection(-1);
+                      }
+                    },
+                    child: TabBarView(
+                      controller: _tabController,
+                      physics: const NeverScrollableScrollPhysics(),
+                      children: [
+                        RepaintBoundary(
+                          child: _sectionPage(
+                            StudySection.disciplines,
+                            KeyedSubtree(
+                              key: const ValueKey('disciplines'),
+                              child: _pageDisciplines(),
+                            ),
                           ),
                         ),
-                      ),
-                      RepaintBoundary(
-                        child: _sectionPage(
-                          StudySection.studyPlan,
-                          KeyedSubtree(
-                            key: const ValueKey('study_plan'),
-                            child: _pageStudyPlan(),
+                        RepaintBoundary(
+                          child: _sectionPage(
+                            StudySection.studyPlan,
+                            KeyedSubtree(
+                              key: const ValueKey('study_plan'),
+                              child: _pageStudyPlan(),
+                            ),
                           ),
                         ),
-                      ),
-                      RepaintBoundary(
-                        child: _sectionPage(
-                          StudySection.recordbook,
-                          KeyedSubtree(
-                            key: const ValueKey('recordbook'),
-                            child: _pageRecordbook(),
+                        RepaintBoundary(
+                          child: _sectionPage(
+                            StudySection.recordbook,
+                            KeyedSubtree(
+                              key: const ValueKey('recordbook'),
+                              child: _pageRecordbook(),
+                            ),
                           ),
                         ),
-                      ),
-                    ],
+                      ],
+                    ),
                   ),
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
         );
       },

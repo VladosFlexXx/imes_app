@@ -1,16 +1,14 @@
-import 'dart:convert';
+import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
-import 'package:http/http.dart' as http;
-import 'package:shared_preferences/shared_preferences.dart';
+import '../../ui/app_theme.dart';
+import '../../ui/shimmer_skeleton.dart';
 
 import '../profile/models.dart';
 import '../profile/repository.dart';
-import '../settings/settings_screen.dart';
-import '../notifications/inbox_repository.dart';
-import '../notifications/notifications_center_screen.dart';
+import '../profile/widgets/auth_avatar.dart';
 
 import 'package:vuz_app/core/network/eios_client.dart';
 import 'package:vuz_app/core/demo/demo_mode.dart';
@@ -22,6 +20,8 @@ part '../profile/ui_parts/copy_tile.dart';
 part '../profile/ui_parts/skeleton_tile.dart';
 part '../profile/ui_parts/skeleton_circle.dart';
 part '../profile/ui_parts/skeleton_line.dart';
+
+Color _profileAccent(BuildContext context) => appAccentOf(context);
 
 class ProfileTab extends StatefulWidget {
   const ProfileTab({super.key});
@@ -37,7 +37,10 @@ class _ProfileTabState extends State<ProfileTab> {
   @override
   void initState() {
     super.initState();
-    repo.initAndRefresh();
+    unawaited(repo.init());
+    Future<void>.delayed(const Duration(milliseconds: 450), () {
+      unawaited(repo.refresh(force: false));
+    });
   }
 
   static bool _isAuthExpiredError(Object? err) {
@@ -61,7 +64,6 @@ class _ProfileTabState extends State<ProfileTab> {
   @override
   Widget build(BuildContext context) {
     final t = Theme.of(context).textTheme;
-    final inbox = NotificationInboxRepository.instance;
 
     return AnimatedBuilder(
       animation: repo,
@@ -70,161 +72,92 @@ class _ProfileTabState extends State<ProfileTab> {
         final authExpired = _isAuthExpiredError(repo.lastError);
 
         return Scaffold(
-          body: RefreshIndicator(
-            onRefresh: () async {
-              if (authExpired) return;
-              await repo.refresh(force: true);
-            },
-            child: ListView(
-              physics: const AlwaysScrollableScrollPhysics(),
-              padding: const EdgeInsets.fromLTRB(14, 12, 14, 106),
-              children: [
-                if (repo.loading) ...[
-                  const LinearProgressIndicator(minHeight: 3),
-                  const SizedBox(height: 12),
-                ],
-                if (authExpired) ...[
-                  Card(
-                    elevation: 0,
-                    child: Padding(
-                      padding: const EdgeInsets.all(14),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            'Сессия истекла',
-                            style: t.titleMedium?.copyWith(
-                              fontWeight: FontWeight.w900,
-                            ),
-                          ),
-                          const SizedBox(height: 8),
-                          const Text(
-                            'Похоже, ЭИОС разлогинила тебя. Поэтому данные не обновляются и показывается старый кэш.',
-                          ),
-                          const SizedBox(height: 10),
-                          Row(
-                            children: [
-                              FilledButton.icon(
-                                onPressed: () async {
-                                  await _logoutCookieOnly();
-                                  if (!context.mounted) return;
-                                  ScaffoldMessenger.of(context).showSnackBar(
-                                    const SnackBar(
-                                      content: Text(
-                                        'Куки очищены. Открой вход и залогинься заново.',
-                                      ),
-                                    ),
-                                  );
-                                },
-                                icon: const Icon(Icons.login),
-                                label: const Text('Очистить куки'),
-                              ),
-                            ],
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: 12),
-                ],
-
-                // ✅ Хедер профиля + тонкая строка "обновлено" (без жирного баннера)
-                _ProfileHeader(profile: p),
-                const SizedBox(height: 14),
-
-                Text(
-                  'Данные',
-                  style: t.titleMedium?.copyWith(fontWeight: FontWeight.w900),
-                ),
-                const SizedBox(height: 10),
-
-                _ProfileInfoCard(
-                  profile: p,
-                  onCopyRecordBook: (text) async {
-                    await Clipboard.setData(ClipboardData(text: text));
-                    if (!context.mounted) return;
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(
-                        content: Text('№ зачётной скопирован'),
-                        duration: Duration(milliseconds: 900),
-                      ),
-                    );
-                  },
-                ),
-                const SizedBox(height: 14),
-                Text(
-                  'Сервисы',
-                  style: t.titleMedium?.copyWith(fontWeight: FontWeight.w900),
-                ),
-                const SizedBox(height: 10),
-                Card(
-                  child: Column(
-                    children: [
-                      ValueListenableBuilder<int>(
-                        valueListenable: inbox.unreadCount,
-                        builder: (context, unread, _) {
-                          return ListTile(
-                            leading: const Icon(Icons.notifications_outlined),
-                            title: Text(
-                              'Центр уведомлений',
-                              style: t.titleSmall?.copyWith(
+          body: SafeArea(
+            bottom: false,
+            child: RefreshIndicator(
+              onRefresh: () async {
+                if (authExpired) return;
+                await repo.refresh(force: true);
+              },
+              child: ListView(
+                physics: const AlwaysScrollableScrollPhysics(),
+                padding: const EdgeInsets.fromLTRB(14, 16, 14, 106),
+                children: [
+                  if (repo.loading) ...[
+                    const LoadingSkeletonStrip(),
+                    const SizedBox(height: 12),
+                  ],
+                  if (authExpired) ...[
+                    Card(
+                      elevation: 0,
+                      child: Padding(
+                        padding: const EdgeInsets.all(14),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'Сессия истекла',
+                              style: t.titleMedium?.copyWith(
                                 fontWeight: FontWeight.w900,
                               ),
                             ),
-                            subtitle: Text(
-                              unread > 0
-                                  ? 'Непрочитанных: $unread'
-                                  : 'Последние уведомления по приложению',
+                            const SizedBox(height: 8),
+                            const Text(
+                              'Похоже, ЭИОС разлогинила тебя. Поэтому данные не обновляются и показывается старый кэш.',
                             ),
-                            trailing: unread > 0
-                                ? Badge(
-                                    label: Text(
-                                      unread > 99 ? '99+' : '$unread',
-                                    ),
-                                    child: const Icon(
-                                      Icons.chevron_right_rounded,
-                                    ),
-                                  )
-                                : const Icon(Icons.chevron_right_rounded),
-                            onTap: () {
-                              Navigator.of(context).push(
-                                MaterialPageRoute(
-                                  builder: (_) =>
-                                      const NotificationsCenterScreen(),
+                            const SizedBox(height: 10),
+                            Row(
+                              children: [
+                                FilledButton.icon(
+                                  onPressed: () async {
+                                    await _logoutCookieOnly();
+                                    if (!context.mounted) return;
+                                    ScaffoldMessenger.of(context).showSnackBar(
+                                      const SnackBar(
+                                        content: Text(
+                                          'Куки очищены. Открой вход и залогинься заново.',
+                                        ),
+                                      ),
+                                    );
+                                  },
+                                  icon: const Icon(Icons.login),
+                                  label: const Text('Очистить куки'),
                                 ),
-                              );
-                            },
-                          );
-                        },
-                      ),
-                      const Divider(height: 1),
-                      ListTile(
-                        leading: const Icon(Icons.settings_outlined),
-                        title: Text(
-                          'Настройки',
-                          style: t.titleSmall?.copyWith(
-                            fontWeight: FontWeight.w900,
-                          ),
-                        ),
-                        subtitle: const Text(
-                          'Автовход, пуши, тема и параметры приложения',
-                        ),
-                        trailing: const Icon(Icons.chevron_right_rounded),
-                        onTap: () {
-                          Navigator.of(context).push(
-                            MaterialPageRoute(
-                              builder: (_) => const SettingsScreen(),
+                              ],
                             ),
-                          );
-                        },
+                          ],
+                        ),
                       ),
-                    ],
-                  ),
-                ),
+                    ),
+                    const SizedBox(height: 12),
+                  ],
 
-                // ✅ оставляем место внизу под будущие штуки
-                const SizedBox(height: 80),
-              ],
+                  // ✅ Хедер профиля + тонкая строка "обновлено" (без жирного баннера)
+                  _ProfileHeader(profile: p),
+                  const SizedBox(height: 14),
+
+                  Text(
+                    'Данные',
+                    style: t.titleMedium?.copyWith(fontWeight: FontWeight.w900),
+                  ),
+                  const SizedBox(height: 10),
+
+                  _ProfileInfoCard(
+                    profile: p,
+                    onCopyRecordBook: (text) async {
+                      await Clipboard.setData(ClipboardData(text: text));
+                      if (!context.mounted) return;
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(
+                          content: Text('№ зачётной скопирован'),
+                          duration: Duration(milliseconds: 900),
+                        ),
+                      );
+                    },
+                  ),
+                  const SizedBox(height: 80),
+                ],
+              ),
             ),
           ),
         );

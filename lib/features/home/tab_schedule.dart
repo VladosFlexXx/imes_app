@@ -1,8 +1,13 @@
 import 'package:flutter/material.dart';
+import '../../ui/app_theme.dart';
+import '../../ui/shimmer_skeleton.dart';
+import '../grades/models.dart';
+import '../grades/repository.dart';
 
 import '../schedule/models.dart';
 import '../schedule/schedule_filter.dart' as rules_filter;
 import '../schedule/schedule_repository.dart';
+import '../schedule/schedule_rule.dart';
 import '../schedule/week_calendar_sheet.dart';
 import '../schedule/week_parity.dart';
 import '../schedule/week_parity_service.dart';
@@ -18,6 +23,8 @@ part '../schedule/ui_parts/pill.dart';
 part '../schedule/ui_parts/tap_pill.dart';
 
 enum ScheduleUiFilter { all, changes } // changes = changed + cancelled
+
+Color _scheduleAccent(BuildContext context) => appAccentOf(context);
 
 class ScheduleTab extends StatefulWidget {
   const ScheduleTab({super.key});
@@ -209,7 +216,12 @@ class _ScheduleTabState extends State<ScheduleTab>
 
   bool _isPast(Lesson l, DateTime day) {
     final now = DateTime.now();
-    if (!_isSameDay(day, now)) return false;
+    final today = DateTime(now.year, now.month, now.day);
+    final targetDay = DateTime(day.year, day.month, day.day);
+
+    if (targetDay.isBefore(today)) return true;
+    if (targetDay.isAfter(today)) return false;
+
     final e = _parseEndForDay(l.time, day);
     if (e == null) return false;
     return e.isBefore(now);
@@ -256,6 +268,153 @@ class _ScheduleTabState extends State<ScheduleTab>
     }
 
     return best;
+  }
+
+  String _normSubjectForLink(String s) {
+    var x = s.toLowerCase().trim();
+    x = x.replaceAll('_', ' ');
+    x = x.replaceAll(
+      RegExp(r'^\s*(од\.|дисциплина:|дисц\.)\s*', caseSensitive: false),
+      '',
+    );
+    x = x.replaceAll(RegExp(r'\(.*?недел.*?\)'), '');
+    x = x.replaceAll(RegExp(r'\(.*?\)'), '');
+    x = x.replaceAll(RegExp(r'\b\d+\s*/\s*\d+\s*/\s*\d+\b'), '');
+    x = x.replaceAll(RegExp(r'\b\d+\s*/\s*\d+\b'), '');
+    x = x.replaceAll(RegExp(r'\s+'), ' ').trim();
+    return x;
+  }
+
+  double? _parseScoreText(String? raw) {
+    if (raw == null || raw.trim().isEmpty) return null;
+    final norm = raw.replaceAll(' ', '').replaceAll(',', '.');
+    final m = RegExp(r'-?\d+(?:\.\d+)?').firstMatch(norm);
+    if (m == null) return null;
+    return double.tryParse(m.group(0)!);
+  }
+
+  GradeCourse? _findCourseForLesson(Lesson lesson) {
+    final courses = GradesRepository.instance.courses;
+    if (courses.isEmpty) return null;
+
+    final subj = _normSubjectForLink(lesson.subject);
+    GradeCourse? best;
+    var bestRank = -1;
+
+    for (final c in courses) {
+      final name = _normSubjectForLink(c.courseName);
+      if (name.isEmpty) continue;
+
+      var rank = 0;
+      if (name == subj) {
+        rank = 4;
+      } else if (name.contains(subj) || subj.contains(name)) {
+        rank = 3;
+      } else {
+        final a = name.split(' ').where((e) => e.isNotEmpty).toSet();
+        final b = subj.split(' ').where((e) => e.isNotEmpty).toSet();
+        final inter = a.intersection(b).length;
+        if (inter >= 2) rank = 2;
+      }
+
+      if (rank > bestRank) {
+        bestRank = rank;
+        best = c;
+      }
+    }
+
+    return bestRank <= 0 ? null : best;
+  }
+
+  double? _extractCourseScore(GradeCourse? c) {
+    if (c == null) return null;
+
+    final direct = _parseScoreText(c.grade) ?? _parseScoreText(c.percent);
+    if (direct != null) return direct;
+
+    double? best;
+    for (final v in c.columns.values) {
+      final x = _parseScoreText(v.toString());
+      if (x == null) continue;
+      if (best == null || x > best) best = x;
+    }
+    return best;
+  }
+
+  String _fmtScore(double? v) {
+    if (v == null) return '—';
+    if ((v - v.round()).abs() < 0.01) return v.round().toString();
+    return v.toStringAsFixed(1).replaceAll('.', ',');
+  }
+
+  int _countConductedLessonsBySchedule(Lesson lesson, DateTime upToDate) {
+    final weekday = _weekdayIndexFromLessonDay(lesson.day);
+    if (weekday == null) return 0;
+
+    final semesterStart = DateTime(
+      WeekParityService.dateStartWeek1.year,
+      WeekParityService.dateStartWeek1.month,
+      WeekParityService.dateStartWeek1.day,
+    );
+    final target = DateTime(upToDate.year, upToDate.month, upToDate.day);
+    if (target.isBefore(semesterStart)) return 0;
+
+    final rule = ScheduleRule.parseFromSubject(lesson.subject);
+    var weekStart = WeekUtils.weekStart(semesterStart);
+    var total = 0;
+
+    while (!weekStart.isAfter(target)) {
+      final weekEnd = weekStart.add(const Duration(days: 6));
+      final parity = WeekParityService.parityFor(weekStart);
+      final applies = rule.appliesForWeek(
+        parity: parity,
+        weekStart: weekStart,
+        weekEnd: weekEnd,
+      );
+
+      if (applies) {
+        final lessonDate = weekStart.add(Duration(days: weekday - 1));
+        if (!lessonDate.isAfter(target) &&
+            !lessonDate.isBefore(semesterStart)) {
+          total++;
+        }
+      }
+
+      weekStart = weekStart.add(const Duration(days: 7));
+    }
+    return total;
+  }
+
+  int _countMarkedAttendanceRows(CourseGradeReport report) {
+    var count = 0;
+    for (final r in report.rows) {
+      if (r.type != GradeReportRowType.item) continue;
+      final g = r.grade.trim();
+      if (g.isEmpty || g == '-' || g == '—') continue;
+      count++;
+    }
+    return count;
+  }
+
+  Future<({int attended, int total})> _buildAttendanceInfo(
+    Lesson lesson,
+    DateTime upToDate,
+  ) async {
+    final total = _countConductedLessonsBySchedule(lesson, upToDate);
+    final linkedCourse = _findCourseForLesson(lesson);
+    if (linkedCourse == null) {
+      return (attended: 0, total: total);
+    }
+
+    try {
+      final report = await GradesRepository.instance.fetchCourseReport(
+        linkedCourse,
+      );
+      final attended = _countMarkedAttendanceRows(report);
+      return (attended: attended, total: total);
+    } catch (_) {
+      return (attended: 0, total: total);
+    }
   }
 
   // =========================
@@ -363,83 +522,500 @@ class _ScheduleTabState extends State<ScheduleTab>
   // =========================
 
   void _openLessonDetails(Lesson l) {
-    final cs = Theme.of(context).colorScheme;
     final t = Theme.of(context).textTheme;
+    final cs = Theme.of(context).colorScheme;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final dayDate = _dateForSelected();
+    final weekLessons = _weekRelevantLessonsFor(_contentWeekStart);
+    final grouped = _groupWeekByWeekday(weekLessons);
+    final dayLessonsAll = grouped[dayDate.weekday] ?? const <Lesson>[];
+    final dayLessonsFiltered = _applyUiFilter(dayLessonsAll);
+    final dayLessonsCount = dayLessonsFiltered.length;
+    final dayChangesCount = dayLessonsAll
+        .where(
+          (x) =>
+              x.status == LessonStatus.changed ||
+              x.status == LessonStatus.cancelled,
+        )
+        .length;
+    final maxDayLoad = grouped.values.fold<int>(
+      1,
+      (m, list) => list.length > m ? list.length : m,
+    );
 
-    String statusText;
-    IconData statusIcon;
-    Color statusColor;
+    final linkedCourse = _findCourseForLesson(l);
+    final score = _extractCourseScore(linkedCourse);
+    final scoreProgress = score == null
+        ? 0.0
+        : ((score <= 5 ? score / 5 : score / 100).clamp(0.0, 1.0));
+    final attendanceFuture = _buildAttendanceInfo(l, dayDate);
 
-    switch (l.status) {
-      case LessonStatus.changed:
-        statusText = 'Изменение';
-        statusIcon = Icons.edit_calendar_outlined;
-        statusColor = cs.primary;
-        break;
-      case LessonStatus.cancelled:
-        statusText = 'Отмена';
-        statusIcon = Icons.cancel_outlined;
-        statusColor = cs.error;
-        break;
-      case LessonStatus.normal:
-        statusText = 'Обычная пара';
-        statusIcon = Icons.check_circle_outline;
-        statusColor = cs.primary;
-        break;
+    final statusText = _isOngoing(l, dayDate)
+        ? 'Пара идёт сейчас'
+        : (_isPast(l, dayDate) ? 'Пара завершена' : 'Пара запланирована');
+
+    void toastSoon() {
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('Скоро добавим функционал')));
+    }
+
+    Widget statCard({
+      required IconData icon,
+      required Color iconBg,
+      required String value,
+      required String title,
+      required Color progressColor,
+      required double progress,
+    }) {
+      return Expanded(
+        child: Container(
+          padding: const EdgeInsets.fromLTRB(14, 14, 14, 12),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(14),
+            color: isDark ? const Color(0xFF33445F) : const Color(0xFFE2E8F4),
+            border: Border.all(
+              color: isDark
+                  ? Colors.white.withValues(alpha: 0.12)
+                  : Colors.black.withValues(alpha: 0.10),
+            ),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Container(
+                width: 36,
+                height: 36,
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(10),
+                  color: iconBg,
+                ),
+                child: Icon(icon, size: 20, color: Colors.white),
+              ),
+              const SizedBox(height: 10),
+              Text(
+                value,
+                style: t.headlineMedium?.copyWith(
+                  fontWeight: FontWeight.w900,
+                  color: isDark
+                      ? Colors.white.withValues(alpha: 0.96)
+                      : cs.onSurface.withValues(alpha: 0.92),
+                ),
+              ),
+              const SizedBox(height: 2),
+              Text(
+                title,
+                style: t.bodyMedium?.copyWith(
+                  color: isDark
+                      ? Colors.white.withValues(alpha: 0.74)
+                      : cs.onSurface.withValues(alpha: 0.68),
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+              const SizedBox(height: 10),
+              ClipRRect(
+                borderRadius: BorderRadius.circular(999),
+                child: LinearProgressIndicator(
+                  minHeight: 4,
+                  value: progress.clamp(0.0, 1.0),
+                  backgroundColor: isDark
+                      ? Colors.white.withValues(alpha: 0.14)
+                      : Colors.black.withValues(alpha: 0.10),
+                  valueColor: AlwaysStoppedAnimation(progressColor),
+                ),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
+    Widget infoItem({
+      required IconData icon,
+      required Color iconBg,
+      required String title,
+      required String subtitle,
+    }) {
+      return Material(
+        color: Colors.transparent,
+        child: InkWell(
+          borderRadius: BorderRadius.circular(12),
+          onTap: toastSoon,
+          child: Padding(
+            padding: const EdgeInsets.symmetric(vertical: 10),
+            child: Row(
+              children: [
+                Container(
+                  width: 38,
+                  height: 38,
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(10),
+                    color: iconBg,
+                  ),
+                  child: Icon(icon, size: 19, color: Colors.white),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        title,
+                        style: t.titleMedium?.copyWith(
+                          fontWeight: FontWeight.w900,
+                          color: isDark
+                              ? Colors.white.withValues(alpha: 0.94)
+                              : cs.onSurface.withValues(alpha: 0.90),
+                        ),
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        subtitle,
+                        style: t.bodySmall?.copyWith(
+                          color: isDark
+                              ? Colors.white.withValues(alpha: 0.64)
+                              : cs.onSurface.withValues(alpha: 0.62),
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                Icon(
+                  Icons.chevron_right,
+                  color: isDark
+                      ? Colors.white.withValues(alpha: 0.56)
+                      : cs.onSurface.withValues(alpha: 0.54),
+                ),
+              ],
+            ),
+          ),
+        ),
+      );
     }
 
     showModalBottomSheet(
       context: context,
       showDragHandle: true,
       isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      enableDrag: true,
       builder: (ctx) {
-        return Padding(
-          padding: EdgeInsets.only(
-            left: 16,
-            right: 16,
-            top: 8,
-            bottom: 16 + MediaQuery.of(ctx).viewInsets.bottom,
-          ),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                children: [
-                  Icon(statusIcon, color: statusColor),
-                  const SizedBox(width: 10),
-                  Expanded(
-                    child: Text(
-                      statusText,
-                      style: t.titleMedium?.copyWith(
-                        fontWeight: FontWeight.w900,
+        const minSheet = 0.52;
+        const maxSheet = 0.88;
+        var closingSheet = false;
+
+        return NotificationListener<DraggableScrollableNotification>(
+          onNotification: (n) {
+            if (closingSheet) return true;
+            // Если стянули до минимума — закрываем.
+            if (n.extent <= (minSheet + 0.005)) {
+              closingSheet = true;
+              Navigator.of(ctx).pop();
+              return true;
+            }
+            return false;
+          },
+          child: DraggableScrollableSheet(
+            expand: false,
+            initialChildSize: maxSheet,
+            minChildSize: minSheet,
+            maxChildSize: maxSheet,
+            snap: true,
+            snapSizes: const [minSheet, maxSheet],
+            builder: (context, scrollController) {
+              return Padding(
+                padding: EdgeInsets.only(
+                  left: 12,
+                  right: 12,
+                  top: 6,
+                  bottom: 12 + MediaQuery.of(ctx).viewInsets.bottom,
+                ),
+                child: Container(
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(20),
+                    gradient: LinearGradient(
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                      colors: isDark
+                          ? const [Color(0xFF243654), Color(0xFF1A2436)]
+                          : const [Color(0xFFF1F4FA), Color(0xFFE8EDF7)],
+                    ),
+                    border: Border.all(
+                      color: isDark
+                          ? Colors.white.withValues(alpha: 0.10)
+                          : Colors.black.withValues(alpha: 0.08),
+                    ),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withValues(
+                          alpha: isDark ? 0.28 : 0.10,
+                        ),
+                        blurRadius: 18,
+                        offset: const Offset(0, 8),
+                      ),
+                    ],
+                  ),
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(20),
+                    child: SingleChildScrollView(
+                      controller: scrollController,
+                      padding: const EdgeInsets.fromLTRB(14, 8, 14, 14),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            l.subject,
+                            style: t.headlineSmall?.copyWith(
+                              fontWeight: FontWeight.w900,
+                              color: isDark
+                                  ? Colors.white.withValues(alpha: 0.97)
+                                  : cs.onSurface.withValues(alpha: 0.93),
+                            ),
+                          ),
+                          const SizedBox(height: 6),
+                          Wrap(
+                            spacing: 8,
+                            runSpacing: 8,
+                            children: [
+                              _InfoChip(
+                                icon: Icons.calendar_today_outlined,
+                                text: l.day,
+                              ),
+                              _InfoChip(icon: Icons.schedule, text: l.time),
+                              if (l.type.trim().isNotEmpty)
+                                _InfoChip(
+                                  icon: Icons.info_outline,
+                                  text: l.type,
+                                ),
+                              if (l.place.trim().isNotEmpty)
+                                _InfoChip(
+                                  icon: Icons.place_outlined,
+                                  text: l.place,
+                                ),
+                            ],
+                          ),
+                          const SizedBox(height: 14),
+                          Row(
+                            children: [
+                              statCard(
+                                icon: Icons.assignment_outlined,
+                                iconBg: _scheduleAccent(context),
+                                value: _fmtScore(score),
+                                title: 'Текущий балл',
+                                progressColor: _scheduleAccent(context),
+                                progress: scoreProgress,
+                              ),
+                              const SizedBox(width: 10),
+                              FutureBuilder<({int attended, int total})>(
+                                future: attendanceFuture,
+                                builder: (context, snap) {
+                                  final isLoading =
+                                      snap.connectionState ==
+                                      ConnectionState.waiting;
+                                  final attended = snap.data?.attended ?? 0;
+                                  final total = snap.data?.total ?? 0;
+                                  final progress = total == 0
+                                      ? 0.0
+                                      : (attended / total).clamp(0.0, 1.0);
+
+                                  return statCard(
+                                    icon: Icons.event_available_outlined,
+                                    iconBg: const Color(0xFF1A8B71),
+                                    value: isLoading
+                                        ? '...'
+                                        : '$attended/$total',
+                                    title: 'Посещаемость',
+                                    progressColor: const Color(0xFF36E3AE),
+                                    progress: progress,
+                                  );
+                                },
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 16),
+                          Text(
+                            'ИНФОРМАЦИЯ',
+                            style: t.labelMedium?.copyWith(
+                              color: isDark
+                                  ? Colors.white.withValues(alpha: 0.42)
+                                  : cs.onSurface.withValues(alpha: 0.46),
+                              fontWeight: FontWeight.w900,
+                              letterSpacing: 0.9,
+                            ),
+                          ),
+                          const SizedBox(height: 8),
+                          infoItem(
+                            icon: Icons.info_outline,
+                            iconBg: _scheduleAccent(context),
+                            title: 'О дисциплине',
+                            subtitle:
+                                linkedCourse?.courseName ??
+                                'Дисциплина из расписания',
+                          ),
+                          infoItem(
+                            icon: Icons.event_note_outlined,
+                            iconBg: const Color(0xFF1A8B71),
+                            title: 'Нагрузка по дню',
+                            subtitle:
+                                '${_full[_selectedIndex]} · пар: $dayLessonsCount (макс $maxDayLoad), изм: $dayChangesCount',
+                          ),
+                          infoItem(
+                            icon: Icons.auto_graph_outlined,
+                            iconBg: _scheduleAccent(context),
+                            title: 'Оценки и рейтинг',
+                            subtitle: score == null
+                                ? 'Пока без данных по баллам'
+                                : 'Текущий балл: ${_fmtScore(score)}',
+                          ),
+                          const SizedBox(height: 12),
+                          Text(
+                            'ПРЕПОДАВАТЕЛЬ',
+                            style: t.labelMedium?.copyWith(
+                              color: isDark
+                                  ? Colors.white.withValues(alpha: 0.42)
+                                  : cs.onSurface.withValues(alpha: 0.46),
+                              fontWeight: FontWeight.w900,
+                              letterSpacing: 0.9,
+                            ),
+                          ),
+                          const SizedBox(height: 8),
+                          Container(
+                            width: double.infinity,
+                            padding: const EdgeInsets.all(12),
+                            decoration: BoxDecoration(
+                              borderRadius: BorderRadius.circular(14),
+                              color: isDark
+                                  ? const Color(0xFF2B4268)
+                                  : const Color(0xFFD8E4FA),
+                              border: Border.all(
+                                color: _scheduleAccent(
+                                  context,
+                                ).withValues(alpha: 0.55),
+                              ),
+                            ),
+                            child: Row(
+                              children: [
+                                Container(
+                                  width: 46,
+                                  height: 46,
+                                  decoration: BoxDecoration(
+                                    borderRadius: BorderRadius.circular(12),
+                                    color: _scheduleAccent(context),
+                                  ),
+                                  child: const Icon(
+                                    Icons.person,
+                                    color: Colors.white,
+                                    size: 24,
+                                  ),
+                                ),
+                                const SizedBox(width: 12),
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
+                                    children: [
+                                      Text(
+                                        l.teacher.trim().isEmpty
+                                            ? 'Преподаватель не указан'
+                                            : l.teacher.trim(),
+                                        style: t.titleSmall?.copyWith(
+                                          color: isDark
+                                              ? Colors.white.withValues(
+                                                  alpha: 0.95,
+                                                )
+                                              : cs.onSurface.withValues(
+                                                  alpha: 0.92,
+                                                ),
+                                          fontWeight: FontWeight.w900,
+                                        ),
+                                      ),
+                                      const SizedBox(height: 2),
+                                      Text(
+                                        statusText,
+                                        style: t.bodySmall?.copyWith(
+                                          color: isDark
+                                              ? Colors.white.withValues(
+                                                  alpha: 0.66,
+                                                )
+                                              : cs.onSurface.withValues(
+                                                  alpha: 0.62,
+                                                ),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                          const SizedBox(height: 14),
+                          Row(
+                            children: [
+                              Expanded(
+                                child: OutlinedButton.icon(
+                                  onPressed: toastSoon,
+                                  icon: const Icon(Icons.email_outlined),
+                                  label: const Text('Email'),
+                                  style: OutlinedButton.styleFrom(
+                                    foregroundColor:
+                                        Theme.of(context).brightness ==
+                                            Brightness.dark
+                                        ? Colors.white.withValues(alpha: 0.82)
+                                        : const Color(0xFF3D4654),
+                                    side: BorderSide(
+                                      color: Colors.white.withValues(
+                                        alpha: 0.12,
+                                      ),
+                                    ),
+                                    backgroundColor:
+                                        Theme.of(context).brightness ==
+                                            Brightness.dark
+                                        ? const Color(0xFF2C374A)
+                                        : const Color(0xFFE6E8ED),
+                                    padding: const EdgeInsets.symmetric(
+                                      vertical: 12,
+                                    ),
+                                  ),
+                                ),
+                              ),
+                              const SizedBox(width: 10),
+                              Expanded(
+                                child: OutlinedButton.icon(
+                                  onPressed: toastSoon,
+                                  icon: const Icon(Icons.chat_bubble_outline),
+                                  label: const Text('Чат'),
+                                  style: OutlinedButton.styleFrom(
+                                    foregroundColor:
+                                        Theme.of(context).brightness ==
+                                            Brightness.dark
+                                        ? Colors.white.withValues(alpha: 0.82)
+                                        : const Color(0xFF3D4654),
+                                    side: BorderSide(
+                                      color: Colors.white.withValues(
+                                        alpha: 0.12,
+                                      ),
+                                    ),
+                                    backgroundColor:
+                                        Theme.of(context).brightness ==
+                                            Brightness.dark
+                                        ? const Color(0xFF2C374A)
+                                        : const Color(0xFFE6E8ED),
+                                    padding: const EdgeInsets.symmetric(
+                                      vertical: 12,
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ],
                       ),
                     ),
                   ),
-                ],
-              ),
-              const SizedBox(height: 12),
-              Text(
-                l.subject,
-                style: t.titleLarge?.copyWith(fontWeight: FontWeight.w900),
-              ),
-              const SizedBox(height: 10),
-              Wrap(
-                spacing: 10,
-                runSpacing: 8,
-                children: [
-                  _InfoChip(icon: Icons.calendar_today_outlined, text: l.day),
-                  _InfoChip(icon: Icons.schedule, text: l.time),
-                  if (l.place.trim().isNotEmpty)
-                    _InfoChip(icon: Icons.place_outlined, text: l.place),
-                  if (l.teacher.trim().isNotEmpty)
-                    _InfoChip(icon: Icons.person_outline, text: l.teacher),
-                  if (l.type.trim().isNotEmpty)
-                    _InfoChip(icon: Icons.info_outline, text: l.type),
-                ],
-              ),
-              const SizedBox(height: 10),
-            ],
+                ),
+              );
+            },
           ),
         );
       },
@@ -513,7 +1089,7 @@ class _ScheduleTabState extends State<ScheduleTab>
               padding: const EdgeInsets.fromLTRB(16, 12, 16, 106),
               children: [
                 if (repo.loading) ...[
-                  const LinearProgressIndicator(minHeight: 3),
+                  const LoadingSkeletonStrip(),
                   const SizedBox(height: 12),
                 ],
                 GestureDetector(
@@ -595,12 +1171,12 @@ class _ScheduleTabState extends State<ScheduleTab>
                             ),
                           );
                         },
-                        child: Card(
+                        child: KeyedSubtree(
                           key: ValueKey(
                             '${_contentWeekStart.year}-${_contentWeekStart.month}-${_contentWeekStart.day}-$_selectedIndex-${_filter.name}',
                           ),
                           child: Padding(
-                            padding: const EdgeInsets.fromLTRB(14, 14, 14, 12),
+                            padding: const EdgeInsets.fromLTRB(0, 14, 0, 12),
                             child: _DayPage(
                               date: contentDate,
                               lessons: dayLessons,

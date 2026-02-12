@@ -1,4 +1,4 @@
-﻿part of '../../home/tab_profile.dart';
+part of '../../home/tab_profile.dart';
 
 class _SkeletonLine extends StatelessWidget {
   final double width;
@@ -7,18 +7,13 @@ class _SkeletonLine extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final cs = Theme.of(context).colorScheme;
     return Align(
       alignment: Alignment.centerLeft,
-      child: Container(
+      child: ShimmerSkeleton(
         width: width,
         height: height,
-        decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(8),
-          color: cs.surfaceContainerHighest.withValues(alpha: 0.45),
-        ),
+        borderRadius: BorderRadius.circular(8),
       ),
     );
   }
 }
-
