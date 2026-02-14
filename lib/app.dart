@@ -48,10 +48,7 @@ class _VuzAppState extends State<VuzApp> {
     try {
       final info = await PackageInfo.fromPlatform();
       final v = info.version.trim();
-      final b = info.buildNumber.trim();
-      final combined = (v.isNotEmpty && b.isNotEmpty)
-          ? '$v+$b'
-          : (v.isNotEmpty ? v : '');
+      final combined = v.isNotEmpty ? v : '';
       if (mounted) setState(() => _appVersion = combined);
     } catch (_) {}
   }

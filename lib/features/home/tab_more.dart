@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:package_info_plus/package_info_plus.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import 'package:vuz_app/core/auth/session_manager.dart';
 import 'package:vuz_app/core/demo/demo_mode.dart';
@@ -17,6 +19,7 @@ class MoreTab extends StatefulWidget {
 
 class _MoreTabState extends State<MoreTab> {
   static const _storage = FlutterSecureStorage();
+  static final Uri _tgUri = Uri.parse('https://t.me/t3w11');
   String _versionText = '';
 
   @override
@@ -29,10 +32,9 @@ class _MoreTabState extends State<MoreTab> {
     try {
       final info = await PackageInfo.fromPlatform();
       final v = info.version.trim();
-      final b = info.buildNumber.trim();
       if (!mounted) return;
       setState(() {
-        _versionText = (v.isNotEmpty && b.isNotEmpty) ? '$v+$b' : v;
+        _versionText = v;
       });
     } catch (_) {}
   }
@@ -49,38 +51,94 @@ class _MoreTabState extends State<MoreTab> {
     );
   }
 
-  void _showAbout() {
-    final t = Theme.of(context).textTheme;
-    showModalBottomSheet<void>(
+  Future<void> _showAbout() async {
+    const repoUrl = 'https://github.com/VladosFlexXx/imes_app';
+    final repoUri = Uri.parse(repoUrl);
+    final version = _versionText.trim().isEmpty ? '—' : _versionText.trim();
+
+    if (!mounted) return;
+
+    showAboutDialog(
       context: context,
-      showDragHandle: true,
-      builder: (context) {
-        return SafeArea(
-          child: Padding(
-            padding: const EdgeInsets.fromLTRB(20, 6, 20, 24),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  'О приложении',
-                  style: t.titleLarge?.copyWith(fontWeight: FontWeight.w900),
-                ),
-                const SizedBox(height: 10),
-                Text(
-                  'Мой ИМЭС',
-                  style: t.titleMedium?.copyWith(fontWeight: FontWeight.w800),
-                ),
-                const SizedBox(height: 6),
-                Text(
-                  _versionText.isEmpty ? 'Версия: —' : 'Версия: $_versionText',
-                  style: t.bodyMedium,
-                ),
-              ],
+      applicationName: 'Мой ИМЭС',
+      applicationVersion: version,
+      applicationLegalese: 'Бета-версия.',
+      children: [
+        const SizedBox(height: 8),
+        Text('Версия: $version'),
+        const SizedBox(height: 8),
+        const Text('Репозиторий (GitHub):'),
+        const SizedBox(height: 4),
+        InkWell(
+          onTap: () async {
+            final ok = await launchUrl(
+              repoUri,
+              mode: LaunchMode.externalApplication,
+            );
+            if (!ok) {
+              await Clipboard.setData(const ClipboardData(text: repoUrl));
+              if (!context.mounted) return;
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(content: Text('Не удалось открыть ссылку. URL скопирован')),
+              );
+            }
+          },
+          child: Text(
+            repoUrl,
+            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+              decoration: TextDecoration.underline,
+              color: Theme.of(context).colorScheme.primary,
             ),
           ),
-        );
-      },
+        ),
+        const SizedBox(height: 8),
+        ListTile(
+          contentPadding: EdgeInsets.zero,
+          leading: const Icon(Icons.send_rounded, size: 22),
+          title: const Text('Telegram'),
+          subtitle: const Text('@t3w11'),
+          trailing: const Icon(Icons.open_in_new, size: 18),
+          onTap: () async {
+            final ok = await launchUrl(
+              _tgUri,
+              mode: LaunchMode.externalApplication,
+            );
+            if (!ok) {
+              await Clipboard.setData(
+                const ClipboardData(text: 'https://t.me/t3w11'),
+              );
+              if (!context.mounted) return;
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(
+                  content: Text(
+                    'Не удалось открыть Telegram. Ссылка скопирована',
+                  ),
+                ),
+              );
+            }
+          },
+        ),
+        const SizedBox(height: 8),
+        const Text('Credits'),
+        const SizedBox(height: 4),
+        const Text('Design & Development: Владислав Лобанов'),
+        const Text('AI copilot: Codex (GPT-5)'),
+        const SizedBox(height: 8),
+        Align(
+          alignment: Alignment.centerLeft,
+          child: OutlinedButton.icon(
+            onPressed: () async {
+              await Clipboard.setData(const ClipboardData(text: repoUrl));
+              if (!context.mounted) return;
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(content: Text('Ссылка на GitHub скопирована')),
+              );
+            },
+            icon: const Icon(Icons.copy),
+            label: const Text('Скопировать ссылку'),
+          ),
+        ),
+      ],
     );
   }
 

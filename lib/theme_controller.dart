@@ -9,9 +9,9 @@ class ThemeController extends ChangeNotifier {
   static const _key = 'theme_mode'; // light | dark | system
   static const _accentKey = 'theme_accent'; // blue | orange | purple | red
 
-  ThemeMode _mode = ThemeMode.system;
+  ThemeMode _mode = ThemeMode.dark;
   ThemeMode get mode => _mode;
-  AppAccent _accent = AppAccent.blue;
+  AppAccent _accent = AppAccent.orange;
   AppAccent get accent => _accent;
 
   Color get seedColor => switch (_accent) {
@@ -26,8 +26,8 @@ class ThemeController extends ChangeNotifier {
 
   Future<void> load() async {
     final prefs = await SharedPreferences.getInstance();
-    final v = prefs.getString(_key) ?? 'system';
-    final a = prefs.getString(_accentKey) ?? 'blue';
+    final v = prefs.getString(_key) ?? 'dark';
+    final a = prefs.getString(_accentKey) ?? 'orange';
 
     _mode = switch (v) {
       'light' => ThemeMode.light,

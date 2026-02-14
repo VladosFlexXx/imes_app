@@ -1,8 +1,6 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:flutter_inappwebview/flutter_inappwebview.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
-import 'package:package_info_plus/package_info_plus.dart';
 
 import '../../app.dart';
 import '../../core/auth/auth_settings.dart';
@@ -251,7 +249,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
     String? inlineMsg;
     bool inlineIsError = false;
 
-    Future<void> saveAndCheck(StateSetter setModalState) async {
+    Future<void> saveAndCheck(
+      BuildContext modalContext,
+      StateSetter setModalState,
+    ) async {
       final u = loginCtl.text.trim();
       final p = passCtl.text;
 
@@ -287,7 +288,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
           await Future.delayed(const Duration(milliseconds: 450));
           if (!mounted) return;
-          Navigator.of(context).pop();
+          if (modalContext.mounted) {
+            Navigator.of(modalContext).pop();
+          }
         } else {
           setState(() {
             _credsStatus = _CredsStatus.bad;
@@ -436,7 +439,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                           child: FilledButton.icon(
                             onPressed: _checkingCreds
                                 ? null
-                                : () => saveAndCheck(setModalState),
+                                : () => saveAndCheck(context, setModalState),
                             icon: _checkingCreds
                                 ? const SizedBox(
                                     width: 18,
@@ -708,52 +711,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
     );
   }
 
-  Future<void> _showAbout(BuildContext context) async {
-    const repoUrl = 'https://github.com/VladosFlexXx/eios';
-
-    String versionLine = 'Версия: —';
-    try {
-      final info = await PackageInfo.fromPlatform();
-      final v = info.version.trim();
-      final b = info.buildNumber.trim();
-      versionLine = (v.isNotEmpty && b.isNotEmpty)
-          ? 'Версия: $v+$b'
-          : (v.isNotEmpty ? 'Версия: $v' : 'Версия: —');
-    } catch (_) {}
-
-    if (!context.mounted) return;
-
-    showAboutDialog(
-      context: context,
-      applicationName: 'Мой ИМЭС',
-      applicationVersion: versionLine.replaceFirst('Версия: ', ''),
-      applicationLegalese: 'Бета-версия.',
-      children: [
-        const SizedBox(height: 8),
-        Text(versionLine),
-        const SizedBox(height: 8),
-        const Text('Репозиторий (GitHub):'),
-        const SizedBox(height: 4),
-        const SelectableText(repoUrl),
-        const SizedBox(height: 8),
-        Align(
-          alignment: Alignment.centerLeft,
-          child: OutlinedButton.icon(
-            onPressed: () async {
-              await Clipboard.setData(const ClipboardData(text: repoUrl));
-              if (!context.mounted) return;
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('Ссылка на GitHub скопирована')),
-              );
-            },
-            icon: const Icon(Icons.copy),
-            label: const Text('Скопировать ссылку'),
-          ),
-        ),
-      ],
-    );
-  }
-
   @override
   Widget build(BuildContext context) {
     final t = Theme.of(context).textTheme;
@@ -860,17 +817,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   ),
                   subtitle: const Text('Собрать отчёт'),
                   onTap: _openDiagnostics,
-                ),
-                const Divider(height: 1),
-                ListTile(
-                  leading: const Icon(Icons.info_outline),
-                  title: Text(
-                    'О приложении',
-                    style: t.titleMedium?.copyWith(fontWeight: FontWeight.w800),
-                  ),
-                  subtitle: const Text('Версия, репозиторий'),
-                  trailing: tileChevron,
-                  onTap: () => _showAbout(context),
                 ),
               ],
             ),
