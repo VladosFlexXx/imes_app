@@ -1,11 +1,13 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import '../../ui/app_theme.dart';
 import '../../ui/shimmer_skeleton.dart';
+import '../grades/course_report_screen.dart';
 import '../grades/models.dart';
 import '../grades/repository.dart';
+import '../notifications/notifications_center_screen.dart';
 
 import '../schedule/models.dart';
-import '../schedule/schedule_filter.dart' as rules_filter;
 import '../schedule/schedule_repository.dart';
 import '../schedule/schedule_rule.dart';
 import '../schedule/week_calendar_sheet.dart';
@@ -145,21 +147,11 @@ class _ScheduleTabState extends State<ScheduleTab>
   // Данные/фильтры
   // =========================
 
-  List<Lesson> _weekRelevantLessonsFor(DateTime anyDateInsideWeek) {
-    // референс на середину недели
-    final ref = anyDateInsideWeek.add(const Duration(days: 2));
-    return rules_filter.filterLessonsForCurrentWeek(
-      repo.lessons,
-      referenceDate: ref,
-    );
-  }
-
-  Map<int, List<Lesson>> _groupWeekByWeekday(List<Lesson> weekLessons) {
+  Map<int, List<Lesson>> _groupWeekByWeekday(DateTime weekStart) {
     final map = <int, List<Lesson>>{};
-    for (final l in weekLessons) {
-      final wd = _weekdayIndexFromLessonDay(l.day);
-      if (wd == null) continue;
-      map.putIfAbsent(wd, () => <Lesson>[]).add(l);
+    for (var i = 0; i < 7; i++) {
+      final day = weekStart.add(Duration(days: i));
+      map[day.weekday] = repo.lessonsForDate(day);
     }
     return map;
   }
@@ -526,8 +518,7 @@ class _ScheduleTabState extends State<ScheduleTab>
     final cs = Theme.of(context).colorScheme;
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final dayDate = _dateForSelected();
-    final weekLessons = _weekRelevantLessonsFor(_contentWeekStart);
-    final grouped = _groupWeekByWeekday(weekLessons);
+    final grouped = _groupWeekByWeekday(_contentWeekStart);
     final dayLessonsAll = grouped[dayDate.weekday] ?? const <Lesson>[];
     final dayLessonsFiltered = _applyUiFilter(dayLessonsAll);
     final dayLessonsCount = dayLessonsFiltered.length;
@@ -554,10 +545,103 @@ class _ScheduleTabState extends State<ScheduleTab>
         ? 'Пара идёт сейчас'
         : (_isPast(l, dayDate) ? 'Пара завершена' : 'Пара запланирована');
 
-    void toastSoon() {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(const SnackBar(content: Text('Скоро добавим функционал')));
+    void showInfoSnack(String text) {
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(text)));
+    }
+
+    Future<void> openCourseReport() async {
+      if (linkedCourse == null) {
+        showInfoSnack('По этой паре пока нет карточки дисциплины');
+        return;
+      }
+      await Navigator.of(context).push(
+        MaterialPageRoute(
+          builder: (_) => CourseGradeReportScreen(course: linkedCourse),
+        ),
+      );
+    }
+
+    Future<void> openDayLoadDetails(BuildContext sheetContext) async {
+      await showModalBottomSheet(
+        context: sheetContext,
+        showDragHandle: true,
+        builder: (ctx) {
+          return SafeArea(
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Нагрузка по дню',
+                    style: t.titleLarge?.copyWith(fontWeight: FontWeight.w900),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    '${_full[_selectedIndex]} · всего пар: $dayLessonsCount · изменений: $dayChangesCount',
+                    style: t.bodyMedium?.copyWith(color: cs.onSurfaceVariant),
+                  ),
+                  const SizedBox(height: 12),
+                  if (dayLessonsFiltered.isEmpty)
+                    const Text('В выбранном фильтре пары не найдены')
+                  else
+                    ...dayLessonsFiltered.map(
+                      (x) => Padding(
+                        padding: const EdgeInsets.only(bottom: 8),
+                        child: Row(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            SizedBox(
+                              width: 86,
+                              child: Text(
+                                x.time.replaceAll('.', ':'),
+                                style: t.bodyMedium?.copyWith(
+                                  fontWeight: FontWeight.w800,
+                                ),
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: Text(
+                                x.subject,
+                                style: t.bodyMedium?.copyWith(
+                                  fontWeight: FontWeight.w700,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                ],
+              ),
+            ),
+          );
+        },
+      );
+    }
+
+    Future<void> copyEmailDraft() async {
+      final teacher = l.teacher.trim().isEmpty
+          ? 'Преподаватель'
+          : l.teacher.trim();
+      final draft =
+          'Тема: Вопрос по дисциплине "${l.subject}"\n\n'
+          'Здравствуйте, $teacher!\n'
+          'Пишу по занятию ${l.day}, ${l.time.replaceAll('.', ':')}.\n\n'
+          'Вопрос:\n'
+          '- ...\n\n'
+          'С уважением,';
+      await Clipboard.setData(ClipboardData(text: draft));
+      if (!mounted) return;
+      showInfoSnack('Черновик письма скопирован в буфер');
+    }
+
+    Future<void> openNotificationsCenter() async {
+      await Navigator.of(context).push(
+        MaterialPageRoute(builder: (_) => const NotificationsCenterScreen()),
+      );
     }
 
     Widget statCard({
@@ -635,12 +719,13 @@ class _ScheduleTabState extends State<ScheduleTab>
       required Color iconBg,
       required String title,
       required String subtitle,
+      required VoidCallback onTap,
     }) {
       return Material(
         color: Colors.transparent,
         child: InkWell(
           borderRadius: BorderRadius.circular(12),
-          onTap: toastSoon,
+          onTap: onTap,
           child: Padding(
             padding: const EdgeInsets.symmetric(vertical: 10),
             child: Row(
@@ -852,6 +937,10 @@ class _ScheduleTabState extends State<ScheduleTab>
                             subtitle:
                                 linkedCourse?.courseName ??
                                 'Дисциплина из расписания',
+                            onTap: () {
+                              Navigator.of(ctx).pop();
+                              openCourseReport();
+                            },
                           ),
                           infoItem(
                             icon: Icons.event_note_outlined,
@@ -859,6 +948,7 @@ class _ScheduleTabState extends State<ScheduleTab>
                             title: 'Нагрузка по дню',
                             subtitle:
                                 '${_full[_selectedIndex]} · пар: $dayLessonsCount (макс $maxDayLoad), изм: $dayChangesCount',
+                            onTap: () => openDayLoadDetails(ctx),
                           ),
                           infoItem(
                             icon: Icons.auto_graph_outlined,
@@ -867,6 +957,10 @@ class _ScheduleTabState extends State<ScheduleTab>
                             subtitle: score == null
                                 ? 'Пока без данных по баллам'
                                 : 'Текущий балл: ${_fmtScore(score)}',
+                            onTap: () {
+                              Navigator.of(ctx).pop();
+                              openCourseReport();
+                            },
                           ),
                           const SizedBox(height: 12),
                           Text(
@@ -954,7 +1048,7 @@ class _ScheduleTabState extends State<ScheduleTab>
                             children: [
                               Expanded(
                                 child: OutlinedButton.icon(
-                                  onPressed: toastSoon,
+                                  onPressed: copyEmailDraft,
                                   icon: const Icon(Icons.email_outlined),
                                   label: const Text('Email'),
                                   style: OutlinedButton.styleFrom(
@@ -982,7 +1076,10 @@ class _ScheduleTabState extends State<ScheduleTab>
                               const SizedBox(width: 10),
                               Expanded(
                                 child: OutlinedButton.icon(
-                                  onPressed: toastSoon,
+                                  onPressed: () {
+                                    Navigator.of(ctx).pop();
+                                    openNotificationsCenter();
+                                  },
                                   icon: const Icon(Icons.chat_bubble_outline),
                                   label: const Text('Чат'),
                                   style: OutlinedButton.styleFrom(
@@ -1038,8 +1135,7 @@ class _ScheduleTabState extends State<ScheduleTab>
 
         final updatedAt = repo.updatedAt;
 
-        final contentWeekLessons = _weekRelevantLessonsFor(_contentWeekStart);
-        final contentGrouped = _groupWeekByWeekday(contentWeekLessons);
+        final contentGrouped = _groupWeekByWeekday(_contentWeekStart);
 
         final contentDate = _dateForSelected();
         final isToday = WeekUtils.isSameDay(contentDate, DateTime.now());

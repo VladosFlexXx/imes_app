@@ -1,6 +1,6 @@
 part of '../../home/tab_schedule.dart';
 
-class _TapPill extends StatelessWidget {
+class _TapPill extends StatefulWidget {
   final IconData icon;
   final String text;
   final bool active;
@@ -14,11 +14,19 @@ class _TapPill extends StatelessWidget {
   });
 
   @override
+  State<_TapPill> createState() => _TapPillState();
+}
+
+class _TapPillState extends State<_TapPill> {
+  bool _pressed = false;
+
+  @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
     final t = Theme.of(context).textTheme;
     final accent = _scheduleAccent(context);
 
+    final active = widget.active;
     final bg = active
         ? accent
         : cs.surfaceContainerHighest.withValues(alpha: 0.28);
@@ -27,28 +35,36 @@ class _TapPill extends StatelessWidget {
 
     return InkWell(
       borderRadius: BorderRadius.circular(999),
-      onTap: onTap,
-      child: Container(
-        height: 36,
-        padding: const EdgeInsets.symmetric(horizontal: 12),
-        decoration: BoxDecoration(
-          color: bg,
-          borderRadius: BorderRadius.circular(999),
-          border: Border.all(color: border),
-        ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(icon, size: 16, color: fg),
-            const SizedBox(width: 6),
-            Text(
-              text,
-              style: t.labelSmall?.copyWith(
-                fontWeight: FontWeight.w900,
-                color: fg,
+      onHighlightChanged: (v) => setState(() => _pressed = v),
+      onTap: widget.onTap,
+      child: AnimatedScale(
+        scale: _pressed ? 0.97 : 1.0,
+        duration: const Duration(milliseconds: 130),
+        curve: Curves.easeOutCubic,
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 160),
+          curve: Curves.easeOutCubic,
+          height: 36,
+          padding: const EdgeInsets.symmetric(horizontal: 12),
+          decoration: BoxDecoration(
+            color: bg,
+            borderRadius: BorderRadius.circular(999),
+            border: Border.all(color: border),
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(widget.icon, size: 16, color: fg),
+              const SizedBox(width: 6),
+              Text(
+                widget.text,
+                style: t.labelSmall?.copyWith(
+                  fontWeight: FontWeight.w900,
+                  color: fg,
+                ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );

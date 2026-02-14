@@ -1,26 +1,30 @@
 import 'dart:convert';
 
-import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../core/cache/cached_repository.dart';
+import '../../core/data_source/app_data_source.dart';
 import '../../core/demo/demo_data.dart';
 import '../../core/demo/demo_mode.dart';
-import '../schedule/schedule_service.dart';
+import 'data/api_study_plan_remote_source.dart';
+import 'data/study_plan_remote_source.dart';
+import 'data/web_study_plan_remote_source.dart';
 import 'models.dart';
-import 'parser.dart';
 
 const _kStudyPlanCacheKey = 'study_plan_cache_v1';
 const _kStudyPlanUpdatedKey = 'study_plan_cache_updated_v1';
 
-const _studyPlanUrl =
-    'https://eos.imes.su/local/cdo_education_plan/education_plan.php';
-
-List<StudyPlanItem> _parseStudyPlan(String html) => StudyPlanParser.parse(html);
-
 class StudyPlanRepository extends CachedRepository<List<StudyPlanItem>> {
-  StudyPlanRepository._()
-    : super(initialData: const [], ttl: const Duration(hours: 12));
+  final StudyPlanRemoteSource _remoteSource;
+
+  StudyPlanRepository._({StudyPlanRemoteSource? remoteSource})
+    : _remoteSource =
+          remoteSource ??
+          selectDataSource<StudyPlanRemoteSource>(
+            web: WebStudyPlanRemoteSource(),
+            api: ApiStudyPlanRemoteSource(),
+          ),
+      super(initialData: const [], ttl: const Duration(hours: 12));
 
   static final StudyPlanRepository instance = StudyPlanRepository._();
 
@@ -61,18 +65,7 @@ class StudyPlanRepository extends CachedRepository<List<StudyPlanItem>> {
     if (DemoMode.instance.enabled) {
       return DemoData.studyPlan();
     }
-
-    final service = ScheduleService();
-    final html = await service.loadPage(_studyPlanUrl);
-    final parsed = await compute(_parseStudyPlan, html);
-
-    parsed.sort((a, b) {
-      final s = a.semester.compareTo(b.semester);
-      if (s != 0) return s;
-      return a.name.toLowerCase().compareTo(b.name.toLowerCase());
-    });
-
-    return parsed;
+    return _remoteSource.fetchItems();
   }
 
   Map<String, dynamic> _toJson(StudyPlanItem i) => {

@@ -79,7 +79,7 @@ class _GradesTabState extends State<GradesTab>
     _tabController = TabController(
       length: 3,
       vsync: this,
-      animationDuration: const Duration(milliseconds: 220),
+      animationDuration: const Duration(milliseconds: 170),
     );
 
     _loadCap();
@@ -160,7 +160,7 @@ class _GradesTabState extends State<GradesTab>
           if (idx == _tabController.index) return;
           _tabController.animateTo(
             idx,
-            duration: const Duration(milliseconds: 220),
+            duration: const Duration(milliseconds: 170),
           );
         },
         tabs: const [
@@ -997,82 +997,81 @@ class _GradesTabState extends State<GradesTab>
     if (dir == 0) return;
     final next = (_tabController.index + dir).clamp(0, 2);
     if (next == _tabController.index) return;
-    _tabController.animateTo(next, duration: const Duration(milliseconds: 220));
+    _tabController.animateTo(next, duration: const Duration(milliseconds: 170));
   }
 
   @override
   Widget build(BuildContext context) {
-    return AnimatedBuilder(
-      animation: Listenable.merge([
-        gradesRepo,
-        scheduleRepo,
-        planRepo,
-        recordRepo,
-      ]),
-      builder: (context, _) {
-        return Scaffold(
-          body: SafeArea(
-            bottom: false,
-            child: Column(
-              children: [
-                const SizedBox(height: 8),
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 16),
-                  child: _sectionTabs(),
-                ),
-                const SizedBox(height: 8),
-                Expanded(
-                  child: GestureDetector(
-                    behavior: HitTestBehavior.opaque,
-                    onHorizontalDragEnd: (details) {
-                      final v = details.primaryVelocity ?? 0;
-                      if (v.abs() < 250) return;
-                      if (v < 0) {
-                        _swipeSection(1);
-                      } else {
-                        _swipeSection(-1);
-                      }
-                    },
-                    child: TabBarView(
-                      controller: _tabController,
-                      physics: const NeverScrollableScrollPhysics(),
-                      children: [
-                        RepaintBoundary(
-                          child: _sectionPage(
-                            StudySection.disciplines,
-                            KeyedSubtree(
-                              key: const ValueKey('disciplines'),
-                              child: _pageDisciplines(),
-                            ),
-                          ),
-                        ),
-                        RepaintBoundary(
-                          child: _sectionPage(
-                            StudySection.studyPlan,
-                            KeyedSubtree(
-                              key: const ValueKey('study_plan'),
-                              child: _pageStudyPlan(),
-                            ),
-                          ),
-                        ),
-                        RepaintBoundary(
-                          child: _sectionPage(
-                            StudySection.recordbook,
-                            KeyedSubtree(
-                              key: const ValueKey('recordbook'),
-                              child: _pageRecordbook(),
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-              ],
+    return Scaffold(
+      body: SafeArea(
+        bottom: false,
+        child: Column(
+          children: [
+            const SizedBox(height: 8),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16),
+              child: _sectionTabs(),
             ),
-          ),
-        );
-      },
+            const SizedBox(height: 8),
+            Expanded(
+              child: GestureDetector(
+                behavior: HitTestBehavior.opaque,
+                onHorizontalDragEnd: (details) {
+                  final v = details.primaryVelocity ?? 0;
+                  if (v.abs() < 250) return;
+                  if (v < 0) {
+                    _swipeSection(1);
+                  } else {
+                    _swipeSection(-1);
+                  }
+                },
+                child: TabBarView(
+                  controller: _tabController,
+                  physics: const NeverScrollableScrollPhysics(),
+                  children: [
+                    RepaintBoundary(
+                      child: AnimatedBuilder(
+                        animation: Listenable.merge([gradesRepo, scheduleRepo]),
+                        builder: (context, _) => _sectionPage(
+                          StudySection.disciplines,
+                          KeyedSubtree(
+                            key: const ValueKey('disciplines'),
+                            child: _pageDisciplines(),
+                          ),
+                        ),
+                      ),
+                    ),
+                    RepaintBoundary(
+                      child: AnimatedBuilder(
+                        animation: planRepo,
+                        builder: (context, _) => _sectionPage(
+                          StudySection.studyPlan,
+                          KeyedSubtree(
+                            key: const ValueKey('study_plan'),
+                            child: _pageStudyPlan(),
+                          ),
+                        ),
+                      ),
+                    ),
+                    RepaintBoundary(
+                      child: AnimatedBuilder(
+                        animation: recordRepo,
+                        builder: (context, _) => _sectionPage(
+                          StudySection.recordbook,
+                          KeyedSubtree(
+                            key: const ValueKey('recordbook'),
+                            child: _pageRecordbook(),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 }

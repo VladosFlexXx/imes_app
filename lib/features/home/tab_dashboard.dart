@@ -226,21 +226,24 @@ class DashboardTab extends StatelessWidget {
       ]),
       builder: (context, _) {
         final isIntroLoading = _dashboardIntroLoading.value;
-        final todayLessons = scheduleRepo.lessonsForDate(DateTime.now());
-        final next = _nextLessonUpcoming(scheduleRepo);
         final now = DateTime.now();
+        final todayLessons = scheduleRepo.lessonsForDate(now);
+        final next = _nextLessonUpcoming(scheduleRepo);
         final weekDays = _weekDays(now);
-        final lessonsByDay = <int, int>{
-          for (final day in weekDays)
-            day.weekday: scheduleRepo.lessonsForDate(day).length,
+        final weekLessons = <DateTime, List<Lesson>>{
+          for (final day in weekDays) day: scheduleRepo.lessonsForDate(day),
         };
-        final totalWeekLessons = weekDays.fold<int>(
+        final lessonsByDay = <int, int>{
+          for (final entry in weekLessons.entries)
+            entry.key.weekday: entry.value.length,
+        };
+        final totalWeekLessons = weekLessons.values.fold<int>(
           0,
-          (sum, day) => sum + scheduleRepo.lessonsForDate(day).length,
+          (sum, list) => sum + list.length,
         );
         final completedWeekLessons = weekDays.fold<int>(0, (sum, day) {
           var done = 0;
-          for (final l in scheduleRepo.lessonsForDate(day)) {
+          for (final l in (weekLessons[day] ?? const <Lesson>[])) {
             final end = _parseEndForDate(l.time, day);
             if (end != null && end.isBefore(now)) done++;
           }

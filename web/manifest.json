@@ -1,6 +1,6 @@
 {
-    "name": "vuz_app",
-    "short_name": "vuz_app",
+    "name": "Мой ИМЭС",
+    "short_name": "Мой ИМЭС",
     "start_url": ".",
     "display": "standalone",
     "background_color": "#0175C2",

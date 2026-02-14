@@ -14,7 +14,9 @@ import '../notifications/notification_service.dart';
 import '../notifications/inbox_repository.dart';
 import '../grades/repository.dart';
 import '../profile/repository.dart';
+import '../recordbook/repository.dart';
 import '../schedule/schedule_repository.dart';
+import '../study_plan/repository.dart';
 import 'tab_dashboard.dart';
 import 'tab_grades.dart';
 import 'tab_more.dart';
@@ -52,6 +54,7 @@ class _HomeScreenState extends State<HomeScreen>
   int _index = 0;
   DateTime? _lastBackPress;
   final Set<int> _visitedTabs = <int>{0};
+  final Set<int> _warmedTabs = <int>{};
   late final AnimationController _tabOverlayController;
   int _tabOverlayDir = 1;
 
@@ -63,6 +66,7 @@ class _HomeScreenState extends State<HomeScreen>
       _visitedTabs.add(i);
       _tabOverlayDir = i > old ? 1 : -1;
     });
+    _warmTabData(i);
     _tabOverlayController.forward(from: 0);
   }
 
@@ -106,14 +110,40 @@ class _HomeScreenState extends State<HomeScreen>
     // Сетевые refresh — только после завершения интро-анимации.
     _deferredRefreshTimer?.cancel();
     _deferredRefreshTimer = Timer(const Duration(milliseconds: 3400), () {
-      unawaited(ScheduleRepository.instance.refresh(force: false));
-      Future<void>.delayed(const Duration(milliseconds: 350), () {
-        unawaited(ProfileRepository.instance.refresh(force: false));
-      });
-      Future<void>.delayed(const Duration(milliseconds: 900), () {
-        unawaited(GradesRepository.instance.refresh(force: false));
-      });
+      _warmTabData(_index);
     });
+  }
+
+  void _warmTabData(int tabIndex) {
+    if (_warmedTabs.contains(tabIndex)) return;
+    _warmedTabs.add(tabIndex);
+
+    switch (tabIndex) {
+      case 0:
+        unawaited(ScheduleRepository.instance.refresh(force: false));
+        Future<void>.delayed(const Duration(milliseconds: 300), () {
+          unawaited(ProfileRepository.instance.refresh(force: false));
+        });
+        Future<void>.delayed(const Duration(milliseconds: 850), () {
+          unawaited(GradesRepository.instance.refresh(force: false));
+        });
+        break;
+      case 1:
+        unawaited(ScheduleRepository.instance.refresh(force: false));
+        break;
+      case 2:
+        unawaited(GradesRepository.instance.refresh(force: false));
+        Future<void>.delayed(const Duration(milliseconds: 420), () {
+          unawaited(StudyPlanRepository.instance.initAndRefresh(force: false));
+        });
+        Future<void>.delayed(const Duration(milliseconds: 900), () {
+          unawaited(RecordbookRepository.instance.initAndRefresh(force: false));
+        });
+        break;
+      case 3:
+        unawaited(ProfileRepository.instance.refresh(force: false));
+        break;
+    }
   }
 
   Widget _buildTab(int index) {

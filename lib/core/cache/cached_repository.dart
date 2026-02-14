@@ -20,6 +20,9 @@ abstract class CachedRepository<T> extends ChangeNotifier {
   DateTime? _updatedAt;
   bool _loading = false;
   Object? _lastError;
+  bool _cacheLoaded = false;
+  Future<void>? _initFuture;
+  Future<void>? _refreshFuture;
 
   T get data => _data;
   DateTime? get updatedAt => _updatedAt;
@@ -34,7 +37,18 @@ abstract class CachedRepository<T> extends ChangeNotifier {
   Future<T> fetchRemote();
 
   Future<void> init() async {
-    await _loadCacheOnly();
+    if (_cacheLoaded) return;
+    final inFlight = _initFuture;
+    if (inFlight != null) return inFlight;
+
+    final future = _loadCacheOnly();
+    _initFuture = future;
+    try {
+      await future;
+      _cacheLoaded = true;
+    } finally {
+      _initFuture = null;
+    }
   }
 
   Future<void> initAndRefresh({bool force = true}) async {
@@ -66,13 +80,24 @@ abstract class CachedRepository<T> extends ChangeNotifier {
   }
 
   Future<void> refresh({bool force = false}) async {
-    if (_loading) return;
+    final inFlight = _refreshFuture;
+    if (inFlight != null) return inFlight;
 
     if (!force && !_isStale()) {
       AppLogger.instance.i('[$debugName] refresh skipped (fresh)');
       return;
     }
 
+    final future = _refreshImpl(force: force);
+    _refreshFuture = future;
+    try {
+      await future;
+    } finally {
+      _refreshFuture = null;
+    }
+  }
+
+  Future<void> _refreshImpl({required bool force}) async {
     _loading = true;
     _lastError = null;
     notifyListeners();

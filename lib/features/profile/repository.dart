@@ -3,8 +3,10 @@ import 'dart:convert';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../core/cache/cached_repository.dart';
+import '../../core/data_source/app_data_source.dart';
 import '../../core/demo/demo_data.dart';
 import '../../core/demo/demo_mode.dart';
+import 'data/api_profile_remote_source.dart';
 import 'data/profile_remote_source.dart';
 import 'data/web_profile_remote_source.dart';
 import 'models.dart';
@@ -16,7 +18,12 @@ class ProfileRepository extends CachedRepository<UserProfile?> {
   final ProfileRemoteSource _remoteSource;
 
   ProfileRepository._({ProfileRemoteSource? remoteSource})
-    : _remoteSource = remoteSource ?? WebProfileRemoteSource(),
+    : _remoteSource =
+          remoteSource ??
+          selectDataSource<ProfileRemoteSource>(
+            web: WebProfileRemoteSource(),
+            api: ApiProfileRemoteSource(),
+          ),
       super(
         initialData: null,
         ttl: const Duration(hours: 2), // профиль редко меняется

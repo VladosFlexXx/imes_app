@@ -148,7 +148,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                         onPressed: () async {
                           await ShareHelper.shareFile(
                             file,
-                            text: 'Отчёт диагностики ЭИОС ИМЭС',
+                            text: 'Отчёт диагностики Мой ИМЭС',
                           );
                           if (!context.mounted) return;
                           Navigator.of(context).pop();
@@ -725,7 +725,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
     showAboutDialog(
       context: context,
-      applicationName: 'ЭИОС ИМЭС',
+      applicationName: 'Мой ИМЭС',
       applicationVersion: versionLine.replaceFirst('Версия: ', ''),
       applicationLegalese: 'Бета-версия.',
       children: [

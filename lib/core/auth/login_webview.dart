@@ -35,15 +35,21 @@ class _LoginWebViewScreenState extends State<LoginWebViewScreen> {
     // ✅ сбросить флаг "сессия умерла"
     SessionManager.instance.reset();
 
-    // ✅ форс-обновление после входа
-    unawaited(ScheduleRepository.instance.refresh(force: true));
-    unawaited(GradesRepository.instance.refresh(force: true));
-    unawaited(ProfileRepository.instance.refresh(force: true));
-
     if (!mounted) return;
     Navigator.of(context).pushReplacement(
       MaterialPageRoute(builder: (_) => const HomeScreen()),
     );
+
+    // Форс-обновление делаем после навигации, чтобы не давить анимацию входа.
+    Future<void>.delayed(const Duration(milliseconds: 250), () {
+      unawaited(ScheduleRepository.instance.refresh(force: true));
+      Future<void>.delayed(const Duration(milliseconds: 250), () {
+        unawaited(ProfileRepository.instance.refresh(force: true));
+      });
+      Future<void>.delayed(const Duration(milliseconds: 650), () {
+        unawaited(GradesRepository.instance.refresh(force: true));
+      });
+    });
   }
 
   Future<String> _buildCookieHeader() async {

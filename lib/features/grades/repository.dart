@@ -3,9 +3,11 @@ import 'dart:convert';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../core/cache/cached_repository.dart';
+import '../../core/data_source/app_data_source.dart';
 import '../../core/demo/demo_data.dart';
 import '../../core/demo/demo_mode.dart';
 import 'data/grades_remote_source.dart';
+import 'data/api_grades_remote_source.dart';
 import 'data/web_grades_remote_source.dart';
 import 'models.dart';
 
@@ -16,7 +18,12 @@ class GradesRepository extends CachedRepository<List<GradeCourse>> {
   final GradesRemoteSource _remoteSource;
 
   GradesRepository._({GradesRemoteSource? remoteSource})
-    : _remoteSource = remoteSource ?? WebGradesRemoteSource(),
+    : _remoteSource =
+          remoteSource ??
+          selectDataSource<GradesRemoteSource>(
+            web: WebGradesRemoteSource(),
+            api: ApiGradesRemoteSource(),
+          ),
       super(
         initialData: const [],
         ttl: const Duration(minutes: 15), // можно поменять как захочешь

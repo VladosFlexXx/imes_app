@@ -1,6 +1,6 @@
 part of '../../home/tab_schedule.dart';
 
-class _LessonCard extends StatelessWidget {
+class _LessonCard extends StatefulWidget {
   final Lesson lesson;
 
   final bool isToday;
@@ -20,14 +20,22 @@ class _LessonCard extends StatelessWidget {
   });
 
   @override
+  State<_LessonCard> createState() => _LessonCardState();
+}
+
+class _LessonCardState extends State<_LessonCard> {
+  bool _pressed = false;
+
+  @override
   Widget build(BuildContext context) {
     final t = Theme.of(context).textTheme;
     final cs = Theme.of(context).colorScheme;
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final accent = _scheduleAccent(context);
 
+    final lesson = widget.lesson;
     final isCancelled = lesson.status == LessonStatus.cancelled;
-    final isFinished = isPast;
+    final isFinished = widget.isPast;
 
     final opacity = 1.0;
 
@@ -58,7 +66,7 @@ class _LessonCard extends StatelessWidget {
       return raw.replaceAll('.', ':');
     }
 
-    final lineColor = isOngoing
+    final lineColor = widget.isOngoing
         ? const Color(0xFF00D04D)
         : (isFinished ? const Color(0xFF5B6070) : accent);
     final typeChipAccent = isFinished ? const Color(0xFF565D6A) : accent;
@@ -112,104 +120,110 @@ class _LessonCard extends StatelessWidget {
             ),
             child: InkWell(
               borderRadius: BorderRadius.circular(18),
-              onTap: onTap,
-              child: Padding(
-                padding: const EdgeInsets.fromLTRB(14, 14, 14, 14),
-                child: Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    SizedBox(
-                      width: 52,
-                      child: Column(
-                        children: [
-                          Text(startTime(), style: timeStyle),
-                          const SizedBox(height: 8),
-                          Container(
-                            width: 4,
-                            height: 62,
-                            decoration: BoxDecoration(
-                              color: lineColor,
-                              borderRadius: BorderRadius.circular(999),
-                            ),
-                          ),
-                          const SizedBox(height: 8),
-                          Text(
-                            endTime(),
-                            style: t.bodySmall?.copyWith(
-                              color: isDark
-                                  ? Colors.white.withValues(alpha: 0.52)
-                                  : cs.onSurface.withValues(alpha: 0.52),
-                              fontWeight: FontWeight.w700,
-                              fontSize: 15,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                    const SizedBox(width: 14),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Row(
-                            children: [
-                              Expanded(
-                                child: Text(
-                                  lesson.subject,
-                                  style: titleStyle?.copyWith(
-                                    color: subjectColor,
-                                  ),
-                                ),
+              onHighlightChanged: (v) => setState(() => _pressed = v),
+              onTap: widget.onTap,
+              child: AnimatedScale(
+                scale: _pressed ? 0.985 : 1.0,
+                duration: const Duration(milliseconds: 140),
+                curve: Curves.easeOutCubic,
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(14, 14, 14, 14),
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      SizedBox(
+                        width: 52,
+                        child: Column(
+                          children: [
+                            Text(startTime(), style: timeStyle),
+                            const SizedBox(height: 8),
+                            Container(
+                              width: 4,
+                              height: 62,
+                              decoration: BoxDecoration(
+                                color: lineColor,
+                                borderRadius: BorderRadius.circular(999),
                               ),
-                            ],
-                          ),
-                          const SizedBox(height: 10),
-                          Wrap(
-                            spacing: 10,
-                            runSpacing: 10,
-                            children: [
-                              if (lesson.type.trim().isNotEmpty)
-                                _InfoChip(
-                                  icon: Icons.circle,
-                                  text: lesson.type,
-                                  accentBlue: true,
-                                  accentColor: typeChipAccent,
-                                ),
-                              if (lesson.place.trim().isNotEmpty)
-                                _InfoChip(
-                                  icon: Icons.place_outlined,
-                                  text: lesson.place,
-                                ),
-                            ],
-                          ),
-                          if (lesson.teacher.trim().isNotEmpty) ...[
-                            const SizedBox(height: 12),
+                            ),
+                            const SizedBox(height: 8),
+                            Text(
+                              endTime(),
+                              style: t.bodySmall?.copyWith(
+                                color: isDark
+                                    ? Colors.white.withValues(alpha: 0.52)
+                                    : cs.onSurface.withValues(alpha: 0.52),
+                                fontWeight: FontWeight.w700,
+                                fontSize: 15,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(width: 14),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
                             Row(
                               children: [
-                                Icon(
-                                  Icons.person_outline,
-                                  size: 18,
-                                  color: isDark
-                                      ? Colors.white.withValues(alpha: 0.66)
-                                      : cs.onSurface.withValues(alpha: 0.56),
-                                ),
-                                const SizedBox(width: 8),
                                 Expanded(
                                   child: Text(
-                                    lesson.teacher,
-                                    style: t.bodyMedium?.copyWith(
-                                      color: teacherColor,
-                                      fontWeight: FontWeight.w600,
+                                    lesson.subject,
+                                    style: titleStyle?.copyWith(
+                                      color: subjectColor,
                                     ),
                                   ),
                                 ),
                               ],
                             ),
+                            const SizedBox(height: 10),
+                            Wrap(
+                              spacing: 10,
+                              runSpacing: 10,
+                              children: [
+                                if (lesson.type.trim().isNotEmpty)
+                                  _InfoChip(
+                                    icon: Icons.circle,
+                                    text: lesson.type,
+                                    accentBlue: true,
+                                    accentColor: typeChipAccent,
+                                  ),
+                                if (lesson.place.trim().isNotEmpty)
+                                  _InfoChip(
+                                    icon: Icons.place_outlined,
+                                    text: lesson.place,
+                                  ),
+                              ],
+                            ),
+                            if (lesson.teacher.trim().isNotEmpty) ...[
+                              const SizedBox(height: 12),
+                              Row(
+                                children: [
+                                  Icon(
+                                    Icons.person_outline,
+                                    size: 18,
+                                    color: isDark
+                                        ? Colors.white.withValues(alpha: 0.66)
+                                        : cs.onSurface.withValues(alpha: 0.56),
+                                  ),
+                                  const SizedBox(width: 8),
+                                  Expanded(
+                                    child: Text(
+                                      lesson.teacher,
+                                      style: t.bodyMedium?.copyWith(
+                                        color: teacherColor,
+                                        fontWeight: FontWeight.w600,
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ],
                           ],
-                        ],
+                        ),
                       ),
-                    ),
-                  ],
+                    ],
+                  ),
                 ),
               ),
             ),

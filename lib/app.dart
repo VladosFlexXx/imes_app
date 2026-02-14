@@ -115,7 +115,7 @@ class _VuzAppState extends State<VuzApp> {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'ЭИОС ИМЭС',
+      title: 'Мой ИМЭС',
       theme: AppTheme.light(seed: themeController.seedColor),
       darkTheme: AppTheme.dark(seed: themeController.seedColor),
       themeMode: themeController.mode,

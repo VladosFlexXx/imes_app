@@ -3,9 +3,11 @@ import 'dart:convert';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../core/cache/cached_repository.dart';
+import '../../core/data_source/app_data_source.dart';
 import '../../core/demo/demo_data.dart';
 import '../../core/demo/demo_mode.dart';
 import 'data/schedule_remote_source.dart';
+import 'data/api_schedule_remote_source.dart';
 import 'data/web_schedule_remote_source.dart';
 import 'models.dart';
 import 'schedule_rule.dart';
@@ -19,9 +21,16 @@ String _normDay(String s) => s.toUpperCase().trim();
 
 class ScheduleRepository extends CachedRepository<List<Lesson>> {
   final ScheduleRemoteSource _remoteSource;
+  final Map<int, List<Lesson>> _lessonsByDateCache = <int, List<Lesson>>{};
+  int _cacheSignature = 0;
 
   ScheduleRepository._({ScheduleRemoteSource? remoteSource})
-    : _remoteSource = remoteSource ?? WebScheduleRemoteSource(),
+    : _remoteSource =
+          remoteSource ??
+          selectDataSource<ScheduleRemoteSource>(
+            web: WebScheduleRemoteSource(),
+            api: ApiScheduleRemoteSource(),
+          ),
       super(initialData: const [], ttl: const Duration(minutes: 10));
 
   static final ScheduleRepository instance = ScheduleRepository._();
@@ -34,10 +43,20 @@ class ScheduleRepository extends CachedRepository<List<Lesson>> {
   /// - конкретных дат
   /// - дня недели
   List<Lesson> lessonsForDate(DateTime date) {
+    final signature = Object.hash(updatedAt?.microsecondsSinceEpoch ?? 0, lessons.length);
+    if (signature != _cacheSignature) {
+      _cacheSignature = signature;
+      _lessonsByDateCache.clear();
+    }
+
+    final dayKey = DateTime(date.year, date.month, date.day).millisecondsSinceEpoch;
+    final cached = _lessonsByDateCache[dayKey];
+    if (cached != null) return cached;
+
     final dayName = _weekdayRuUpper(date);
     final parity = WeekParityService.parityFor(date);
 
-    return lessons.where((l) {
+    final out = lessons.where((l) {
       if (_normDay(l.day) != dayName) return false;
 
       final rule = ScheduleRule.parseFromSubject(l.subject);
@@ -61,6 +80,9 @@ class ScheduleRepository extends CachedRepository<List<Lesson>> {
           });
       }
     }).toList()..sort((a, b) => _timeRank(a.time).compareTo(_timeRank(b.time)));
+
+    _lessonsByDateCache[dayKey] = out;
+    return out;
   }
 
   @override

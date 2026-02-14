@@ -68,7 +68,7 @@ class _MoreTabState extends State<MoreTab> {
                 ),
                 const SizedBox(height: 10),
                 Text(
-                  'ЭИОС ИМЭС',
+                  'Мой ИМЭС',
                   style: t.titleMedium?.copyWith(fontWeight: FontWeight.w800),
                 ),
                 const SizedBox(height: 6),
