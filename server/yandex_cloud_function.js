@@ -1,15 +1,10 @@
-/**
- * Yandex Cloud Function: Прокси и авторизация для ЭИОС ИМЭС (eos.imes.su)
- * Runtime: Node.js 18, 20 или 22
- */
-
-const EIOS_BASE = 'https://eos.imes.su';
+const EIOS_BASE = "https://eos.imes.su";
 
 const CORS_HEADERS = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Methods': '*',
-  'Access-Control-Allow-Headers': '*',
-  'Access-Control-Max-Age': '86400',
+  "Access-Control-Allow-Origin": "https://vladosflexxx.github.io",
+  "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
+  "Access-Control-Allow-Headers": "Content-Type, x-cookie-header, x-target-url, Accept",
+  "Access-Control-Max-Age": "86400",
 };
 
 class CookieJar {
@@ -19,15 +14,15 @@ class CookieJar {
 
   setFromHeaders(headers) {
     let setCookies = [];
-    if (typeof headers.getSetCookie === 'function') {
+    if (typeof headers.getSetCookie === "function") {
       setCookies = headers.getSetCookie();
     } else {
-      const raw = headers.get('set-cookie');
+      const raw = headers.get("set-cookie");
       if (raw) setCookies = [raw];
     }
     for (const sc of setCookies) {
-      const nameVal = sc.split(';')[0].trim();
-      const eqIdx = nameVal.indexOf('=');
+      const nameVal = sc.split(";")[0].trim();
+      const eqIdx = nameVal.indexOf("=");
       if (eqIdx > 0) {
         const name = nameVal.slice(0, eqIdx).trim();
         const val = nameVal.slice(eqIdx + 1).trim();
@@ -38,8 +33,8 @@ class CookieJar {
 
   toHeader() {
     return Array.from(this.cookies.entries())
-      .map(([k, v]) => `${k}=${v}`)
-      .join('; ');
+      .map(([k, v]) => k + "=" + v)
+      .join("; ");
   }
 
   get(name) {
@@ -49,7 +44,7 @@ class CookieJar {
 
 async function fetchWithRedirects(url, options = {}, jar = new CookieJar(), maxHops = 6) {
   let currentUrl = url;
-  let currentMethod = options.method || 'GET';
+  let currentMethod = options.method || "GET";
   let currentBody = options.body;
   const baseHeaders = options.headers || {};
 
@@ -57,14 +52,14 @@ async function fetchWithRedirects(url, options = {}, jar = new CookieJar(), maxH
     const headers = { ...baseHeaders };
     const cookieHeader = jar.toHeader();
     if (cookieHeader) {
-      headers['Cookie'] = cookieHeader;
+      headers["Cookie"] = cookieHeader;
     }
 
     const res = await fetch(currentUrl, {
       method: currentMethod,
       headers: headers,
-      body: currentMethod === 'POST' ? currentBody : undefined,
-      redirect: 'manual',
+      body: currentMethod === "POST" ? currentBody : undefined,
+      redirect: "manual",
     });
 
     jar.setFromHeaders(res.headers);
@@ -74,56 +69,57 @@ async function fetchWithRedirects(url, options = {}, jar = new CookieJar(), maxH
       return { response: res, finalUrl: currentUrl };
     }
 
-    const loc = res.headers.get('location');
+    const loc = res.headers.get("location");
     if (!loc) {
       return { response: res, finalUrl: currentUrl };
     }
 
     currentUrl = new URL(loc, currentUrl).toString();
-    if (res.status === 303 || (res.status === 302 && currentMethod === 'POST')) {
-      currentMethod = 'GET';
+    if (res.status === 303 || (res.status === 302 && currentMethod === "POST")) {
+      currentMethod = "GET";
       currentBody = undefined;
     }
   }
 
-  throw new Error('Too many redirects');
+  throw new Error("Too many redirects");
 }
 
 module.exports.handler = async function (event, context) {
-  const method = (event.httpMethod || 'GET').toUpperCase();
+  const method = (event.httpMethod || "GET").toUpperCase();
 
-  if (method === 'OPTIONS') {
-    return { statusCode: 200, headers: CORS_HEADERS, body: 'ok' };
+  const reqOrigin = (event.headers && (event.headers.origin || event.headers.Origin)) || "https://vladosflexxx.github.io";
+  const dynamicCors = {
+    ...CORS_HEADERS,
+    "Access-Control-Allow-Origin": reqOrigin,
+  };
+
+  if (method === "OPTIONS") {
+    return { statusCode: 200, headers: dynamicCors, body: "ok" };
   }
 
   try {
-    const path = event.path || event.url || '/';
+    const path = event.path || event.url || "/";
     const headers = event.headers || {};
     const query = event.queryStringParameters || {};
 
-    // 1. АВТОРИЗАЦИЯ
-    const isLogin = method === 'POST' || path.includes('login') || query.action === 'login';
+    const isLogin = method === "POST" || path.includes("login") || query.action === "login";
 
     if (isLogin) {
       let bodyData = {};
       try {
-        if (event.body && typeof event.body === 'object') {
+        if (event.body && typeof event.body === "object") {
           bodyData = event.body;
-        } else if (typeof event.body === 'string') {
+        } else if (typeof event.body === "string") {
           const raw = event.isBase64Encoded 
-            ? Buffer.from(event.body, 'base64').toString('utf-8')
+            ? Buffer.from(event.body, "base64").toString("utf-8")
             : event.body;
           bodyData = JSON.parse(raw);
         }
       } catch (e) {
-        console.error('[AUTH ERROR] JSON parse failed:', e.message);
         return {
           statusCode: 400,
-          headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' },
-          body: JSON.stringify({ 
-            error: 'Неверный формат JSON: ' + e.message, 
-            raw: String(event.body).substring(0, 60) 
-          }),
+          headers: { ...dynamicCors, "Content-Type": "application/json" },
+          body: JSON.stringify({ error: "Invalid JSON: " + e.message }),
         };
       }
 
@@ -133,95 +129,81 @@ module.exports.handler = async function (event, context) {
       if (!username || !password) {
         return {
           statusCode: 400,
-          headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' },
-          body: JSON.stringify({ 
-            error: 'Логин и пароль обязательны', 
-            receivedKeys: Object.keys(bodyData) 
-          }),
+          headers: { ...dynamicCors, "Content-Type": "application/json" },
+          body: JSON.stringify({ error: "Missing login credentials" }),
         };
       }
 
-      console.log(`[AUTH START] username: ${username.trim()}`);
       const jar = new CookieJar();
-
       const commonHeaders = {
-        'User-Agent': 'Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 Safari/604.1',
-        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+        "User-Agent": "Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 Safari/604.1",
+        "Accept": "text/html,application/xhtml+xml,application/xml",
       };
 
-      // Шаг 1: GET страницы входа (CSRF токен logintoken + первая кука)
       const { response: getLoginRes } = await fetchWithRedirects(
-        `${EIOS_BASE}/login/index.php`,
-        { method: 'GET', headers: commonHeaders },
+        EIOS_BASE + "/login/index.php",
+        { method: "GET", headers: commonHeaders },
         jar
       );
 
       const loginPageHtml = await getLoginRes.text();
       const tokenMatch = loginPageHtml.match(/name="logintoken"\s+value="([^"]+)"/i);
-      const logintoken = tokenMatch ? tokenMatch[1] : '';
+      const logintoken = tokenMatch ? tokenMatch[1] : "";
 
-      console.log(`[AUTH STEP 1] token: ${logintoken ? 'FOUND' : 'MISSING'}, cookies: ${jar.toHeader()}`);
-
-      // Шаг 2: POST формы входа со следованием цепочке редиректов (включая testsession)
       const formParams = new URLSearchParams();
-      formParams.append('username', username.trim());
-      formParams.append('password', password);
-      formParams.append('anchor', '');
+      formParams.append("username", username.trim());
+      formParams.append("password", password);
+      formParams.append("anchor", "");
       if (logintoken) {
-        formParams.append('logintoken', logintoken);
+        formParams.append("logintoken", logintoken);
       }
 
       const postHeaders = {
         ...commonHeaders,
-        'Content-Type': 'application/x-www-form-urlencoded',
-        'Referer': `${EIOS_BASE}/login/index.php`,
-        'Origin': EIOS_BASE,
+        "Content-Type": "application/x-www-form-urlencoded",
+        "Referer": EIOS_BASE + "/login/index.php",
+        "Origin": EIOS_BASE,
       };
 
       const { response: postRes, finalUrl: postFinalUrl } = await fetchWithRedirects(
-        `${EIOS_BASE}/login/index.php`,
+        EIOS_BASE + "/login/index.php",
         {
-          method: 'POST',
+          method: "POST",
           headers: postHeaders,
           body: formParams.toString(),
         },
         jar
       );
 
-      console.log(`[AUTH STEP 2] finalUrl: ${postFinalUrl}, HTTP ${postRes.status}, cookies: ${jar.toHeader()}`);
-
-      // Шаг 3: Проверка авторизации через GET /my/
       const { response: myRes, finalUrl: myFinalUrl } = await fetchWithRedirects(
-        `${EIOS_BASE}/my/`,
-        { method: 'GET', headers: commonHeaders },
+        EIOS_BASE + "/my/",
+        { method: "GET", headers: commonHeaders },
         jar
       );
 
       const myHtml = await myRes.text();
       const lower = myHtml.toLowerCase();
-      const isLoginPage = myFinalUrl.includes('/login') || 
-                          lower.includes('loginfailed') || 
-                          lower.includes('неверный логин') || 
-                          (lower.includes('вход в систему') && !lower.includes('личный кабинет'));
+      const isLoginPage = myFinalUrl.includes("/login") || 
+                          lower.includes("loginfailed") || 
+                          lower.includes("неверный логин") || 
+                          (lower.includes("вход в систему") && !lower.includes("личный кабинет"));
 
       if (isLoginPage) {
-        console.warn(`[AUTH FAILED] still on login page. URL: ${myFinalUrl}`);
         return {
           statusCode: 401,
-          headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' },
+          headers: { ...dynamicCors, "Content-Type": "application/json" },
           body: JSON.stringify({ 
             success: false, 
-            error: 'Неверный логин или пароль от ЭИОС',
-            debug: { postFinalUrl, myFinalUrl, moodleCookie: jar.get('MoodleSession') ? 'present' : 'missing' }
+            error: "Неверный логин или пароль от ЭИОС",
+            debug: { postFinalUrl, myFinalUrl, moodleCookie: jar.get("MoodleSession") ? "present" : "missing" }
           }),
         };
       }
 
       const finalCookie = jar.toHeader();
-      console.log('[AUTH SUCCESS] Сессия подтверждена /my/, отдаём cookies');
       return {
         statusCode: 200,
-        headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' },
+        headers: { ...dynamicCors, "Content-Type": "application/json" },
         body: JSON.stringify({
           success: true,
           cookie: finalCookie,
@@ -229,60 +211,57 @@ module.exports.handler = async function (event, context) {
       };
     }
 
-    // 2. ПРОКСИ ДАННЫХ: GET /proxy?url=...
-    const targetUrl = headers['x-target-url'] || query.url;
-    const cookieHeader = headers['x-cookie-header'] || query.cookie || '';
+    const targetUrl = headers["x-target-url"] || query.url;
+    const cookieHeader = headers["x-cookie-header"] || query.cookie || "";
 
     if (!targetUrl) {
       return {
         statusCode: 200,
-        headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' },
-        body: JSON.stringify({ status: 'ok', service: 'MyIMES Proxy', time: new Date().toISOString() }),
+        headers: { ...dynamicCors, "Content-Type": "application/json" },
+        body: JSON.stringify({ status: "ok", service: "MyIMES Proxy", time: new Date().toISOString() }),
       };
     }
 
-    // Защита: разрешаем проксировать только запросы к eos.imes.su
     if (!targetUrl.startsWith(EIOS_BASE)) {
       return {
         statusCode: 403,
-        headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' },
-        body: JSON.stringify({ error: 'Доступ разрешён только к домену eos.imes.su' }),
+        headers: { ...dynamicCors, "Content-Type": "application/json" },
+        body: JSON.stringify({ error: "Доступ разрешен только к eos.imes.su" }),
       };
     }
 
     const proxyHeaders = {
-      'User-Agent': 'Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 Safari/604.1',
-      'Accept': headers['accept'] || 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+      "User-Agent": "Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 Safari/604.1",
+      "Accept": headers["accept"] || "text/html,application/xhtml+xml,application/xml",
     };
     if (cookieHeader) {
-      proxyHeaders['Cookie'] = cookieHeader;
+      proxyHeaders["Cookie"] = cookieHeader;
     }
 
     const upstreamRes = await fetch(targetUrl, {
       method: method,
       headers: proxyHeaders,
-      redirect: 'follow',
+      redirect: "follow",
     });
 
     const responseBody = await upstreamRes.text();
-    const contentType = upstreamRes.headers.get('content-type') || 'text/html; charset=utf-8';
+    const contentType = upstreamRes.headers.get("content-type") || "text/html; charset=utf-8";
 
     return {
       statusCode: upstreamRes.status,
       headers: {
-        ...CORS_HEADERS,
-        'Content-Type': contentType,
+        ...dynamicCors,
+        "Content-Type": contentType,
       },
       body: responseBody,
     };
 
   } catch (err) {
-    console.error('[UNHANDLED PROXY ERROR]:', err);
     return {
       statusCode: 500,
-      headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' },
+      headers: { ...dynamicCors, "Content-Type": "application/json" },
       body: JSON.stringify({
-        error: 'Ошибка прокси-сервера: ' + err.message,
+        error: "Ошибка прокси: " + err.message,
         stack: err.stack,
       }),
     };
