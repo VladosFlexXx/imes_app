@@ -15,7 +15,9 @@ import '../schedule/week_parity.dart';
 import '../schedule/week_parity_service.dart';
 import '../schedule/week_utils.dart';
 import '../schedule/lesson_live_status.dart';
+import '../schedule/schedule_search_screen.dart';
 import '../schedule/ui_parts/lesson_details_sheet.dart';
+import '../schedule/ui_parts/schedule_share_sheet.dart';
 
 part '../schedule/ui_parts/unified_header_card.dart';
 part '../schedule/ui_parts/week_dots_row_animated.dart';
@@ -545,6 +547,32 @@ class _ScheduleTabState extends State<ScheduleTab>
     );
   }
 
+  void _openShareSchedule() {
+    final selectedDate = _dateForSelected();
+    final contentGrouped = _groupWeekByWeekday(_contentWeekStart);
+    final weekday = _selectedIndex + 1;
+    final dayLessons = contentGrouped[weekday] ?? const <Lesson>[];
+    final parity = WeekParityService.parityFor(_contentWeekStart);
+
+    showScheduleShareSheet(
+      context,
+      selectedDate: selectedDate,
+      selectedDayLessons: dayLessons,
+      weekStart: _contentWeekStart,
+      weekLessons: contentGrouped,
+      parity: parity,
+    );
+  }
+
+  void _openSearchSchedule() {
+    AppHaptics.lightImpact();
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => const ScheduleSearchScreen(),
+      ),
+    );
+  }
+
   // =========================
   // Build
   // =========================
@@ -637,6 +665,8 @@ class _ScheduleTabState extends State<ScheduleTab>
                     changesOnly: _filter == ScheduleUiFilter.changes,
                     onToggleChangesOnly: _toggleChangesOnly,
                     onOpenWeekPicker: _openWeekPicker,
+                    onShareTap: _openShareSchedule,
+                    onSearchTap: _openSearchSchedule,
                   ),
                 ),
                 const SizedBox(height: 12),

@@ -15,6 +15,8 @@ class _UnifiedHeaderCard extends StatelessWidget {
   final bool changesOnly;
   final VoidCallback onToggleChangesOnly;
   final VoidCallback onOpenWeekPicker;
+  final VoidCallback onShareTap;
+  final VoidCallback onSearchTap;
 
   const _UnifiedHeaderCard({
     required this.parityText,
@@ -27,6 +29,8 @@ class _UnifiedHeaderCard extends StatelessWidget {
     required this.changesOnly,
     required this.onToggleChangesOnly,
     required this.onOpenWeekPicker,
+    required this.onShareTap,
+    required this.onSearchTap,
   });
 
   @override
@@ -115,7 +119,24 @@ class _UnifiedHeaderCard extends StatelessWidget {
                     ],
                   ),
                 ),
-                const SizedBox(width: 10),
+                Material(
+                  color: Colors.transparent,
+                  child: InkWell(
+                    borderRadius: BorderRadius.circular(10),
+                    onTap: onSearchTap,
+                    child: Padding(
+                      padding: const EdgeInsets.all(5),
+                      child: Icon(
+                        Icons.search_rounded,
+                        size: 20,
+                        color: isDark
+                            ? Colors.white.withValues(alpha: 0.82)
+                            : cs.onSurface.withValues(alpha: 0.80),
+                      ),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 8),
                 Icon(
                   Icons.sync,
                   size: 16,
@@ -198,6 +219,12 @@ class _UnifiedHeaderCard extends StatelessWidget {
                   text: 'Изм. $dayChanges',
                   active: changesOnly,
                   onTap: onToggleChangesOnly,
+                ),
+                _TapPill(
+                  icon: Icons.share_rounded,
+                  text: 'Поделиться',
+                  active: false,
+                  onTap: onShareTap,
                 ),
               ],
             ),

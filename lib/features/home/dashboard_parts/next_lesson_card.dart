@@ -6,6 +6,9 @@ class _NextLessonCard extends StatelessWidget {
   final String? subtitle;
   final VoidCallback onOpenSchedule;
   final bool skeletonize;
+  final bool areTodayLessonsDone;
+  final List<Lesson> tomorrowLessons;
+  final DateTime? tomorrowDate;
 
   const _NextLessonCard({
     required this.lesson,
@@ -13,6 +16,9 @@ class _NextLessonCard extends StatelessWidget {
     required this.subtitle,
     required this.onOpenSchedule,
     required this.skeletonize,
+    this.areTodayLessonsDone = false,
+    this.tomorrowLessons = const [],
+    this.tomorrowDate,
   });
 
   @override
@@ -44,6 +50,21 @@ class _NextLessonCard extends StatelessWidget {
     final statusChipText = isOngoing
         ? const Color(0xFF22C55E)
         : (isDark ? const Color(0xFF74FFB6) : const Color(0xFF0B8F4B));
+
+    if (areTodayLessonsDone && !skeletonize) {
+      return _buildEveningCard(
+        context,
+        theme,
+        accent,
+        isDark,
+        isAmoled,
+        density,
+        cardBg,
+        innerBg,
+        mainText,
+        subText,
+      );
+    }
 
     if (lesson == null) {
       return Card(
@@ -430,6 +451,318 @@ class _NextLessonCard extends StatelessWidget {
       ),
     ),
   );
+  }
+
+  String _pairWord(int count) {
+    if (count % 10 == 1 && count % 100 != 11) return 'пара';
+    if ([2, 3, 4].contains(count % 10) && ![12, 13, 14].contains(count % 100)) {
+      return 'пары';
+    }
+    return 'пар';
+  }
+
+  Widget _buildEveningCard(
+    BuildContext context,
+    ThemeData theme,
+    Color accent,
+    bool isDark,
+    bool isAmoled,
+    AppDensityMetrics density,
+    Color cardBg,
+    Color innerBg,
+    Color mainText,
+    Color subText,
+  ) {
+    final t = theme.textTheme;
+    final hasTomorrowLessons = tomorrowLessons.isNotEmpty;
+
+    String startStr = '';
+    String endStr = '';
+    if (hasTomorrowLessons) {
+      startStr = tomorrowLessons.first.time.split('-').first.trim().replaceAll('.', ':');
+      final lastTime = tomorrowLessons.last.time;
+      final pieces = lastTime.split('-');
+      endStr = pieces.length > 1 ? pieces[1].trim().replaceAll('.', ':') : lastTime;
+    }
+
+    final cardBorder = isAmoled
+        ? accent.withValues(alpha: 0.35)
+        : (isDark
+            ? Colors.white.withValues(alpha: 0.08)
+            : Colors.black.withValues(alpha: 0.08));
+
+    return Card(
+      elevation: 0,
+      clipBehavior: Clip.antiAlias,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+      color: cardBg,
+      child: Container(
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(24),
+          border: Border.all(
+            color: cardBorder,
+            width: isAmoled ? 1.2 : 1.0,
+          ),
+        ),
+        padding: EdgeInsets.all(density.cardPadding),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Icon(
+                  hasTomorrowLessons
+                      ? Icons.nightlight_round
+                      : Icons.weekend_outlined,
+                  color: accent,
+                  size: 22,
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    hasTomorrowLessons
+                        ? 'Пары на сегодня всё 🎉'
+                        : 'Завтра выходной 🏖',
+                    style: t.titleMedium?.copyWith(
+                      fontWeight: FontWeight.w900,
+                      color: mainText,
+                      letterSpacing: -0.2,
+                    ),
+                  ),
+                ),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(999),
+                    color: accent.withValues(alpha: isDark ? 0.20 : 0.12),
+                    border: Border.all(
+                      color: accent.withValues(alpha: 0.40),
+                    ),
+                  ),
+                  child: Text(
+                    hasTomorrowLessons ? 'Завтра к $startStr' : 'Отдых',
+                    style: TextStyle(
+                      fontWeight: FontWeight.w900,
+                      fontSize: 12,
+                      color: accent,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 10),
+
+            if (hasTomorrowLessons) ...[
+              Wrap(
+                spacing: 8,
+                runSpacing: 6,
+                children: [
+                  _TomorrowChip(
+                    icon: Icons.auto_stories_outlined,
+                    label: '${tomorrowLessons.length} ${_pairWord(tomorrowLessons.length)}',
+                    isDark: isDark,
+                  ),
+                  _TomorrowChip(
+                    icon: Icons.alarm_rounded,
+                    label: 'Начало в $startStr',
+                    isDark: isDark,
+                  ),
+                  _TomorrowChip(
+                    icon: Icons.flag_outlined,
+                    label: 'Домой в $endStr',
+                    isDark: isDark,
+                  ),
+                ],
+              ),
+              const SizedBox(height: 12),
+
+              Container(
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(16),
+                  color: innerBg,
+                  border: Border.all(
+                    color: isDark
+                        ? Colors.white.withValues(alpha: 0.08)
+                        : Colors.black.withValues(alpha: 0.06),
+                  ),
+                ),
+                padding: const EdgeInsets.all(8),
+                child: Column(
+                  children: [
+                    for (int i = 0; i < tomorrowLessons.length; i++) ...[
+                      Material(
+                        color: Colors.transparent,
+                        child: InkWell(
+                          borderRadius: BorderRadius.circular(10),
+                          onTap: () {
+                            AppHaptics.lightImpact();
+                            showLessonDetailsSheet(
+                              context,
+                              lesson: tomorrowLessons[i],
+                              lessonDate: tomorrowDate ??
+                                  DateTime.now().add(const Duration(days: 1)),
+                            );
+                          },
+                          child: Padding(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 8,
+                              vertical: 8,
+                            ),
+                            child: Row(
+                              children: [
+                                Container(
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 6,
+                                    vertical: 3,
+                                  ),
+                                  decoration: BoxDecoration(
+                                    borderRadius: BorderRadius.circular(6),
+                                    color: accent.withValues(
+                                      alpha: isDark ? 0.20 : 0.12,
+                                    ),
+                                  ),
+                                  child: Text(
+                                    tomorrowLessons[i].time.replaceAll('.', ':'),
+                                    style: TextStyle(
+                                      fontWeight: FontWeight.w900,
+                                      fontSize: 11,
+                                      color: accent,
+                                    ),
+                                  ),
+                                ),
+                                const SizedBox(width: 8),
+                                Expanded(
+                                  child: Text(
+                                    tomorrowLessons[i].subject,
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: t.bodySmall?.copyWith(
+                                      fontWeight: FontWeight.w800,
+                                      color: mainText,
+                                    ),
+                                  ),
+                                ),
+                                if (tomorrowLessons[i].place.trim().isNotEmpty) ...[
+                                  const SizedBox(width: 6),
+                                  Text(
+                                    tomorrowLessons[i].place.trim(),
+                                    style: t.bodySmall?.copyWith(
+                                      color: subText,
+                                      fontWeight: FontWeight.w700,
+                                      fontSize: 11,
+                                    ),
+                                  ),
+                                ],
+                              ],
+                            ),
+                          ),
+                        ),
+                      ),
+                      if (i < tomorrowLessons.length - 1)
+                        Divider(
+                          height: 1,
+                          color: isDark
+                              ? Colors.white.withValues(alpha: 0.06)
+                              : Colors.black.withValues(alpha: 0.06),
+                        ),
+                    ],
+                  ],
+                ),
+              ),
+              const SizedBox(height: 12),
+              SizedBox(
+                width: double.infinity,
+                child: OutlinedButton.icon(
+                  onPressed: onOpenSchedule,
+                  icon: const Icon(Icons.calendar_today_rounded, size: 16),
+                  label: const Text(
+                    'Расписание на завтра',
+                    style: TextStyle(fontWeight: FontWeight.w800),
+                  ),
+                  style: OutlinedButton.styleFrom(
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(14),
+                    ),
+                    side: BorderSide(
+                      color: isDark
+                          ? Colors.white.withValues(alpha: 0.14)
+                          : Colors.black.withValues(alpha: 0.12),
+                    ),
+                  ),
+                ),
+              ),
+            ] else ...[
+              Text(
+                'Завтра пар нет — отличный повод выспаться, отдохнуть или закрыть долги по учебе!',
+                style: t.bodyMedium?.copyWith(color: subText),
+              ),
+              const SizedBox(height: 12),
+              SizedBox(
+                width: double.infinity,
+                child: FilledButton.icon(
+                  onPressed: onOpenSchedule,
+                  icon: const Icon(Icons.calendar_today_rounded, size: 18),
+                  label: const Text('Посмотреть расписание'),
+                  style: FilledButton.styleFrom(
+                    backgroundColor: accent,
+                    foregroundColor: Colors.white,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(14),
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _TomorrowChip extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final bool isDark;
+
+  const _TomorrowChip({
+    required this.icon,
+    required this.label,
+    required this.isDark,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(8),
+        color: isDark ? const Color(0xFF22262E) : const Color(0xFFE2E6EE),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(
+            icon,
+            size: 13,
+            color: isDark
+                ? Colors.white.withValues(alpha: 0.70)
+                : Colors.black.withValues(alpha: 0.65),
+          ),
+          const SizedBox(width: 4),
+          Text(
+            label,
+            style: TextStyle(
+              fontSize: 11,
+              fontWeight: FontWeight.w700,
+              color: isDark
+                  ? Colors.white.withValues(alpha: 0.85)
+                  : Colors.black87,
+            ),
+          ),
+        ],
+      ),
+    );
   }
 }
 

@@ -27,6 +27,8 @@ Schedule • Grades • Home • Notifications
 <td width="50%">
 
 ### 📅 **Smart Schedule**
+- ✅ Fast search across 45 days by subject, classroom, and teacher
+- ✅ Export & share schedule (day / week) tailored for Telegram and messengers
 - ✅ Automatic odd/even week detection
 - ✅ Filtering by dates and week types
 - ✅ Only relevant classes and schedules
@@ -48,6 +50,7 @@ Schedule • Grades • Home • Notifications
 
 ### 🏠 **Home Dashboard**
 - ✅ Real-time upcoming class widget
+- ✅ Smart evening mode ("All done for today 🎉", finish times and tomorrow overview)
 - ✅ Quick jump to schedule and grades
 - ✅ Semester progress and status overview
 - ✅ Responsive dynamic cards

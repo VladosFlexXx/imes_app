@@ -211,6 +211,20 @@ class DashboardTab extends StatelessWidget {
         final now = DateTime.now();
         final todayLessons = scheduleRepo.lessonsForDate(now);
         final next = _nextLessonUpcoming(scheduleRepo);
+
+        var areTodayLessonsDone = false;
+        if (todayLessons.isEmpty) {
+          areTodayLessonsDone = true;
+        } else {
+          areTodayLessonsDone = todayLessons.every((l) {
+            final end = _parseEndForDate(l.time, now);
+            return end != null && end.isBefore(now);
+          });
+        }
+
+        final tomorrowDate = DateTime(now.year, now.month, now.day).add(const Duration(days: 1));
+        final tomorrowLessons = scheduleRepo.lessonsForDate(tomorrowDate);
+
         final weekDays = _weekDays(now);
         final weekLessons = <DateTime, List<Lesson>>{
           for (final day in weekDays) day: scheduleRepo.lessonsForDate(day),
@@ -288,6 +302,9 @@ class DashboardTab extends StatelessWidget {
           lessonsByDay: lessonsByDay,
           skeletonize: isLoading,
           animateEntrance: animateEntrance && !DashboardTab.hasPlayedEntrance,
+          areTodayLessonsDone: areTodayLessonsDone,
+          tomorrowLessons: tomorrowLessons,
+          tomorrowDate: tomorrowDate,
         );
 
         return Scaffold(
@@ -340,6 +357,9 @@ class _DashboardContent extends StatelessWidget {
   final Map<int, int> lessonsByDay;
   final bool skeletonize;
   final bool animateEntrance;
+  final bool areTodayLessonsDone;
+  final List<Lesson> tomorrowLessons;
+  final DateTime tomorrowDate;
 
   const _DashboardContent({
     super.key,
@@ -365,6 +385,9 @@ class _DashboardContent extends StatelessWidget {
     required this.lessonsByDay,
     required this.skeletonize,
     required this.animateEntrance,
+    required this.areTodayLessonsDone,
+    required this.tomorrowLessons,
+    required this.tomorrowDate,
   });
 
   @override
@@ -402,9 +425,11 @@ class _DashboardContent extends StatelessWidget {
             switchOutCurve: Curves.easeInCubic,
             child: KeyedSubtree(
               key: ValueKey(
-                next == null
-                    ? 'no-next'
-                    : '${next!.lesson.subject}-${next!.lesson.time}-${next!.day.toIso8601String()}',
+                areTodayLessonsDone
+                    ? 'evening-tomorrow-${tomorrowLessons.length}-${tomorrowDate.toIso8601String()}'
+                    : (next == null
+                        ? 'no-next'
+                        : '${next!.lesson.subject}-${next!.lesson.time}-${next!.day.toIso8601String()}'),
               ),
               child: _NextLessonCard(
                 lesson: next?.lesson,
@@ -412,6 +437,9 @@ class _DashboardContent extends StatelessWidget {
                 subtitle: next == null ? null : subtitleBuilder(next!),
                 onOpenSchedule: onOpenSchedule,
                 skeletonize: skeletonize,
+                areTodayLessonsDone: areTodayLessonsDone,
+                tomorrowLessons: tomorrowLessons,
+                tomorrowDate: tomorrowDate,
               ),
             ),
           ),
