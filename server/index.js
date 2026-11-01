@@ -7,8 +7,8 @@ const EIOS_BASE = 'https://eos.imes.su';
 
 const CORS_HEADERS = {
   'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
-  'Access-Control-Allow-Headers': 'Content-Type, x-cookie-header, x-target-url',
+  'Access-Control-Allow-Methods': '*',
+  'Access-Control-Allow-Headers': '*',
   'Access-Control-Max-Age': '86400',
 };
 
@@ -94,7 +94,7 @@ module.exports.handler = async function (event, context) {
   const method = (event.httpMethod || 'GET').toUpperCase();
 
   if (method === 'OPTIONS') {
-    return { statusCode: 204, headers: CORS_HEADERS, body: '' };
+    return { statusCode: 200, headers: CORS_HEADERS, body: 'ok' };
   }
 
   try {
@@ -232,7 +232,7 @@ module.exports.handler = async function (event, context) {
 
     // 2. ПРОКСИ ДАННЫХ: GET /proxy?url=...
     const targetUrl = headers['x-target-url'] || query.url;
-    const cookieHeader = headers['x-cookie-header'] || '';
+    const cookieHeader = headers['x-cookie-header'] || query.cookie || '';
 
     if (!targetUrl) {
       return {

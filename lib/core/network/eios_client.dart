@@ -192,7 +192,7 @@ class EiosClient {
           final res = await _client
               .post(
                 Uri.parse(kWebProxyUrl),
-                headers: {'Content-Type': 'application/json'},
+                headers: {'Content-Type': 'text/plain'},
                 body: jsonEncode({'username': u, 'password': password}),
               )
               .timeout(const Duration(seconds: 25));
@@ -352,12 +352,14 @@ class EiosClient {
 
     Future<http.Response> doRequest(String cookieHeader) {
       if (kIsWeb) {
+        final uri = Uri.parse(kWebProxyUrl).replace(queryParameters: {
+          'url': url,
+          if (cookieHeader.isNotEmpty) 'cookie': cookieHeader,
+        });
         return _client
             .get(
-              Uri.parse(kWebProxyUrl),
+              uri,
               headers: {
-                'x-target-url': url,
-                'x-cookie-header': cookieHeader,
                 'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
               },
             )

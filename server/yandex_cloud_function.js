@@ -7,8 +7,8 @@ const EIOS_BASE = 'https://eos.imes.su';
 
 const CORS_HEADERS = {
   'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
-  'Access-Control-Allow-Headers': 'Content-Type, x-cookie-header, x-target-url',
+  'Access-Control-Allow-Methods': '*',
+  'Access-Control-Allow-Headers': '*',
   'Access-Control-Max-Age': '86400',
 };
 
@@ -80,7 +80,6 @@ async function fetchWithRedirects(url, options = {}, jar = new CookieJar(), maxH
     }
 
     currentUrl = new URL(loc, currentUrl).toString();
-    // 303 или 302 после POST -> следующий запрос GET
     if (res.status === 303 || (res.status === 302 && currentMethod === 'POST')) {
       currentMethod = 'GET';
       currentBody = undefined;
@@ -94,7 +93,7 @@ module.exports.handler = async function (event, context) {
   const method = (event.httpMethod || 'GET').toUpperCase();
 
   if (method === 'OPTIONS') {
-    return { statusCode: 204, headers: CORS_HEADERS, body: '' };
+    return { statusCode: 200, headers: CORS_HEADERS, body: 'ok' };
   }
 
   try {
@@ -145,12 +144,12 @@ module.exports.handler = async function (event, context) {
       console.log(`[AUTH START] username: ${username.trim()}`);
       const jar = new CookieJar();
 
-      // Шаг 1: GET страницы входа (получаем logintoken и начальную куку)
       const commonHeaders = {
         'User-Agent': 'Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 Safari/604.1',
         'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
       };
 
+      // Шаг 1: GET страницы входа (CSRF токен logintoken + первая кука)
       const { response: getLoginRes } = await fetchWithRedirects(
         `${EIOS_BASE}/login/index.php`,
         { method: 'GET', headers: commonHeaders },
@@ -163,7 +162,7 @@ module.exports.handler = async function (event, context) {
 
       console.log(`[AUTH STEP 1] token: ${logintoken ? 'FOUND' : 'MISSING'}, cookies: ${jar.toHeader()}`);
 
-      // Шаг 2: POST формы входа с полным прохождением цепочки редиректов (включая testsession)
+      // Шаг 2: POST формы входа со следованием цепочке редиректов (включая testsession)
       const formParams = new URLSearchParams();
       formParams.append('username', username.trim());
       formParams.append('password', password);
@@ -203,7 +202,7 @@ module.exports.handler = async function (event, context) {
       const isLoginPage = myFinalUrl.includes('/login') || 
                           lower.includes('loginfailed') || 
                           lower.includes('неверный логин') || 
-                          lower.includes('вход в систему') && !lower.includes('личный кабинет');
+                          (lower.includes('вход в систему') && !lower.includes('личный кабинет'));
 
       if (isLoginPage) {
         console.warn(`[AUTH FAILED] still on login page. URL: ${myFinalUrl}`);
@@ -232,7 +231,7 @@ module.exports.handler = async function (event, context) {
 
     // 2. ПРОКСИ ДАННЫХ: GET /proxy?url=...
     const targetUrl = headers['x-target-url'] || query.url;
-    const cookieHeader = headers['x-cookie-header'] || '';
+    const cookieHeader = headers['x-cookie-header'] || query.cookie || '';
 
     if (!targetUrl) {
       return {
