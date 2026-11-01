@@ -100,14 +100,14 @@ class _GreetingHero extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final mq = MediaQuery.of(context);
-    final baseScale = MediaQuery.textScalerOf(context).scale(1.0);
-    final targetScale = (baseScale * 0.94).clamp(0.75, 1.0).toDouble();
     final now = DateTime.now();
     final name = _firstName(fullName);
     final greeting = _greetingForNow();
     final accent = _dashboardAccent(context);
     final isDark = Theme.of(context).brightness == Brightness.dark;
+    final isAmoled = isDark && themeController.amoledBlack;
+    final density = appDensityOf(context);
+    final avatarSize = density.avatarSize;
 
     final title =
         '${_weekdayRu(now.weekday)}, ${now.day} ${_monthRu(now.month)}';
@@ -117,36 +117,41 @@ class _GreetingHero extends StatelessWidget {
       if (level != null && level!.trim().isNotEmpty) level!.trim(),
     ].join(' · ');
 
-    return MediaQuery(
-      data: mq.copyWith(textScaler: TextScaler.linear(targetScale)),
-      child: Container(
+    return Container(
         clipBehavior: Clip.antiAlias,
         decoration: BoxDecoration(
           borderRadius: BorderRadius.circular(28),
           gradient: LinearGradient(
             begin: Alignment.topLeft,
             end: Alignment.bottomRight,
-            colors: isDark
-                ? const [Color(0xFF1A1A1D), Color(0xFF242426)]
-                : [
-                    accent.withValues(alpha: 0.92),
-                    accent.withValues(alpha: 0.84),
-                  ],
+            colors: isAmoled
+                ? const [Colors.black, Colors.black]
+                : (isDark
+                    ? const [Color(0xFF1A1A1D), Color(0xFF242426)]
+                    : [
+                        accent.withValues(alpha: 0.92),
+                        accent.withValues(alpha: 0.84),
+                      ]),
           ),
           border: Border.all(
-            color: isDark
-                ? Colors.white.withValues(alpha: 0.12)
-                : Colors.white.withValues(alpha: 0.34),
+            color: isAmoled
+                ? accent.withValues(alpha: 0.35)
+                : (isDark
+                    ? Colors.white.withValues(alpha: 0.12)
+                    : Colors.white.withValues(alpha: 0.34)),
+            width: isAmoled ? 1.2 : 1.0,
           ),
-          boxShadow: [
-            BoxShadow(
-              color: isDark
-                  ? Colors.black.withValues(alpha: 0.25)
-                  : accent.withValues(alpha: 0.22),
-              blurRadius: isDark ? 22 : 16,
-              offset: const Offset(0, 8),
-            ),
-          ],
+          boxShadow: isAmoled
+              ? []
+              : [
+                  BoxShadow(
+                    color: isDark
+                        ? Colors.black.withValues(alpha: 0.25)
+                        : accent.withValues(alpha: 0.22),
+                    blurRadius: isDark ? 22 : 16,
+                    offset: const Offset(0, 8),
+                  ),
+                ],
         ),
         child: Stack(
           children: [
@@ -163,7 +168,7 @@ class _GreetingHero extends StatelessWidget {
               ),
             ),
             Padding(
-              padding: const EdgeInsets.fromLTRB(14, 14, 14, 14),
+              padding: EdgeInsets.all(density.cardPadding),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
@@ -175,8 +180,8 @@ class _GreetingHero extends StatelessWidget {
                           onTap: onOpenProfile,
                           customBorder: const CircleBorder(),
                           child: Container(
-                            width: 66,
-                            height: 66,
+                            width: avatarSize,
+                            height: avatarSize,
                             decoration: BoxDecoration(
                               shape: BoxShape.circle,
                               border: Border.all(
@@ -186,13 +191,13 @@ class _GreetingHero extends StatelessWidget {
                             child: ClipOval(
                               child: AuthAvatar(
                                 avatarUrl: avatarUrl,
-                                radius: 33,
+                                radius: avatarSize / 2,
                               ),
                             ),
                           ),
                         ),
                       ),
-                      const SizedBox(width: 12),
+                      SizedBox(width: (12 * density.scale).clamp(6.0, 16.0)),
                       Expanded(
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
@@ -277,9 +282,12 @@ class _GreetingHero extends StatelessWidget {
                       ),
                     ],
                   ),
-                  const SizedBox(height: 14),
+                  SizedBox(height: (14 * density.scale).clamp(6.0, 18.0)),
                   Container(
-                    padding: const EdgeInsets.fromLTRB(14, 14, 14, 12),
+                    padding: EdgeInsets.symmetric(
+                      horizontal: (14 * density.scale).clamp(8.0, 16.0),
+                      vertical: (12 * density.scale).clamp(6.0, 14.0),
+                    ),
                     decoration: BoxDecoration(
                       borderRadius: BorderRadius.circular(18),
                       color: Colors.white.withValues(alpha: 0.04),
@@ -390,8 +398,7 @@ class _GreetingHero extends StatelessWidget {
             ),
           ],
         ),
-      ),
-    );
+      );
   }
 }
 
@@ -413,9 +420,13 @@ class _StatBox extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
+    final density = appDensityOf(context);
     return Expanded(
       child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 12),
+        padding: EdgeInsets.symmetric(
+          horizontal: (8 * density.scale).clamp(4.0, 12.0),
+          vertical: (12 * density.scale).clamp(6.0, 16.0),
+        ),
         decoration: BoxDecoration(
           borderRadius: BorderRadius.circular(16),
           color: Colors.white.withValues(alpha: isDark ? 0.06 : 0.16),

@@ -1,14 +1,15 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 import 'package:url_launcher/url_launcher.dart';
 
-import 'package:vuz_app/core/auth/session_manager.dart';
-import 'package:vuz_app/core/demo/demo_mode.dart';
-import 'package:vuz_app/core/network/eios_client.dart';
-import 'package:vuz_app/features/auth/login_webview.dart';
+import 'package:vuz_app/features/campus/contacts_screen.dart';
+import 'package:vuz_app/features/campus/floor_plan_screen.dart';
+import 'package:vuz_app/features/homework/homework_screen.dart';
 import 'package:vuz_app/features/settings/settings_screen.dart';
+import 'package:vuz_app/ui/app_haptics.dart';
+import 'package:vuz_app/ui/app_theme.dart';
+import 'package:vuz_app/app.dart';
 
 class MoreTab extends StatefulWidget {
   const MoreTab({super.key});
@@ -18,7 +19,6 @@ class MoreTab extends StatefulWidget {
 }
 
 class _MoreTabState extends State<MoreTab> {
-  static const _storage = FlutterSecureStorage();
   static final Uri _tgUri = Uri.parse('https://t.me/t3w11');
   String _versionText = '';
 
@@ -37,18 +37,6 @@ class _MoreTabState extends State<MoreTab> {
         _versionText = v;
       });
     } catch (_) {}
-  }
-
-  Future<void> _logout() async {
-    await _storage.delete(key: 'cookie_header');
-    await DemoMode.instance.setEnabled(false);
-    EiosClient.instance.invalidateCookieCache();
-    SessionManager.instance.reset();
-    if (!mounted) return;
-    Navigator.of(context).pushAndRemoveUntil(
-      MaterialPageRoute(builder: (_) => const LoginWebViewScreen()),
-      (_) => false,
-    );
   }
 
   Future<void> _showAbout() async {
@@ -147,6 +135,8 @@ class _MoreTabState extends State<MoreTab> {
     final t = Theme.of(context).textTheme;
     final cs = Theme.of(context).colorScheme;
     final isDark = Theme.of(context).brightness == Brightness.dark;
+    final isAmoled = isDark && themeController.amoledBlack;
+    final accent = appAccentOf(context);
 
     final cardGradient = LinearGradient(
       begin: Alignment.topLeft,
@@ -155,6 +145,26 @@ class _MoreTabState extends State<MoreTab> {
           ? const [Color(0xFF1A1E23), Color(0xFF171B21)]
           : const [Color(0xFFF1F3F7), Color(0xFFE9EDF4)],
     );
+
+    final cardDecoration = BoxDecoration(
+      borderRadius: BorderRadius.circular(24),
+      color: isAmoled ? Colors.black : null,
+      gradient: isAmoled ? null : cardGradient,
+      border: Border.all(
+        color: isAmoled
+            ? accent.withValues(alpha: 0.35)
+            : (isDark
+                ? Colors.white.withValues(alpha: 0.08)
+                : Colors.black.withValues(alpha: 0.08)),
+        width: isAmoled ? 1.2 : 1.0,
+      ),
+    );
+
+    final dividerColor = isAmoled
+        ? Colors.black
+        : (isDark
+            ? Colors.white.withValues(alpha: 0.12)
+            : Colors.black.withValues(alpha: 0.08));
 
     return Scaffold(
       body: SafeArea(
@@ -165,16 +175,94 @@ class _MoreTabState extends State<MoreTab> {
             Text('Еще', style: t.titleLarge?.copyWith(fontWeight: FontWeight.w900)),
             const SizedBox(height: 12),
             Container(
-              decoration: BoxDecoration(
-                borderRadius: BorderRadius.circular(24),
-                gradient: cardGradient,
-                border: Border.all(
-                  color: isDark
-                      ? Colors.white.withValues(alpha: 0.08)
-                      : Colors.black.withValues(alpha: 0.08),
-                ),
+              decoration: cardDecoration,
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(23),
+                child: Material(
+                  color: Colors.transparent,
+                  child: Column(
+                children: [
+                  ListTile(
+                    leading: const Icon(Icons.contacts_outlined),
+                    title: Text(
+                      'Контакты ИМЭС',
+                      style: t.titleSmall?.copyWith(fontWeight: FontWeight.w800),
+                    ),
+                    subtitle: const Text('Деканат, кафедры, часы работы'),
+                    trailing: Icon(
+                      Icons.chevron_right,
+                      color: isDark
+                          ? Colors.white.withValues(alpha: 0.74)
+                          : cs.onSurface.withValues(alpha: 0.72),
+                    ),
+                    onTap: () {
+                      AppHaptics.lightImpact();
+                      Navigator.of(context).push(
+                        MaterialPageRoute(builder: (_) => const CampusContactsScreen()),
+                      );
+                    },
+                  ),
+                  Divider(
+                    height: 1,
+                    color: dividerColor,
+                  ),
+                  ListTile(
+                    leading: const Icon(Icons.map_outlined),
+                    title: Text(
+                      'Навигатор по корпусу',
+                      style: t.titleSmall?.copyWith(fontWeight: FontWeight.w800),
+                    ),
+                    subtitle: const Text('Поиск аудиторий и схема этажей'),
+                    trailing: Icon(
+                      Icons.chevron_right,
+                      color: isDark
+                          ? Colors.white.withValues(alpha: 0.74)
+                          : cs.onSurface.withValues(alpha: 0.72),
+                    ),
+                    onTap: () {
+                      AppHaptics.lightImpact();
+                      Navigator.of(context).push(
+                        MaterialPageRoute(builder: (_) => const CampusFloorPlanScreen()),
+                      );
+                    },
+                  ),
+                  Divider(
+                    height: 1,
+                    color: dividerColor,
+                  ),
+                  ListTile(
+                    leading: const Icon(Icons.assignment_outlined),
+                    title: Text(
+                      'Дедлайны и ДЗ',
+                      style: t.titleSmall?.copyWith(fontWeight: FontWeight.w800),
+                    ),
+                    subtitle: const Text('Список задач, домашка и сроки сдачи'),
+                    trailing: Icon(
+                      Icons.chevron_right,
+                      color: isDark
+                          ? Colors.white.withValues(alpha: 0.74)
+                          : cs.onSurface.withValues(alpha: 0.72),
+                    ),
+                    onTap: () {
+                      AppHaptics.lightImpact();
+                      Navigator.of(context).push(
+                        MaterialPageRoute(builder: (_) => const HomeworkScreen()),
+                      );
+                    },
+                  ),
+                ],
               ),
-              child: Column(
+            ),
+          ),
+        ),
+            const SizedBox(height: 12),
+            Container(
+              decoration: cardDecoration,
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(23),
+                child: Material(
+                  color: Colors.transparent,
+                  child: Column(
                 children: [
                   ListTile(
                     leading: const Icon(Icons.settings_outlined),
@@ -197,9 +285,7 @@ class _MoreTabState extends State<MoreTab> {
                   ),
                   Divider(
                     height: 1,
-                    color: isDark
-                        ? Colors.white.withValues(alpha: 0.12)
-                        : Colors.black.withValues(alpha: 0.08),
+                    color: dividerColor,
                   ),
                   ListTile(
                     leading: const Icon(Icons.info_outline_rounded),
@@ -221,18 +307,16 @@ class _MoreTabState extends State<MoreTab> {
                 ],
               ),
             ),
+          ),
+        ),
             const SizedBox(height: 14),
             Container(
-              decoration: BoxDecoration(
-                borderRadius: BorderRadius.circular(24),
-                gradient: cardGradient,
-                border: Border.all(
-                  color: isDark
-                      ? Colors.white.withValues(alpha: 0.08)
-                      : Colors.black.withValues(alpha: 0.08),
-                ),
-              ),
-              child: Padding(
+              decoration: cardDecoration,
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(23),
+                child: Material(
+                  color: Colors.transparent,
+                  child: Padding(
                 padding: const EdgeInsets.fromLTRB(14, 14, 14, 14),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -268,27 +352,9 @@ class _MoreTabState extends State<MoreTab> {
                 ),
               ),
             ),
-            const SizedBox(height: 18),
-            OutlinedButton(
-              onPressed: _logout,
-              style: OutlinedButton.styleFrom(
-                foregroundColor: const Color(0xFFFF5C5C),
-                side: const BorderSide(color: Color(0xFF5A1313), width: 1.2),
-                backgroundColor:
-                    isDark ? const Color(0xFF1C0707) : const Color(0xFFFFEAEA),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(16),
-                ),
-                padding: const EdgeInsets.symmetric(vertical: 16),
-              ),
-              child: Text(
-                'Выйти из аккаунта',
-                style: t.titleSmall?.copyWith(
-                  color: const Color(0xFFFF5C5C),
-                  fontWeight: FontWeight.w900,
-                ),
-              ),
-            ),
+          ),
+        ),
+
           ],
         ),
       ),

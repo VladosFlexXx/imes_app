@@ -104,16 +104,22 @@ class _ProfileInfoCard extends StatelessWidget {
               : Colors.black.withValues(alpha: 0.08),
         ),
       ),
-      child: Column(
-        children: [
-          ..._withDividers(
-            items,
-            Divider(
-              color: cs.outlineVariant.withValues(alpha: 0.28),
-              height: 1,
-            ),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(23),
+        child: Material(
+          color: Colors.transparent,
+          child: Column(
+            children: [
+              ..._withDividers(
+                items,
+                Divider(
+                  color: cs.outlineVariant.withValues(alpha: 0.28),
+                  height: 1,
+                ),
+              ),
+            ],
           ),
-        ],
+        ),
       ),
     );
   }

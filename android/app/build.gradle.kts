@@ -30,7 +30,7 @@ android {
 
     defaultConfig {
         applicationId = "com.example.vuz_app"
-        minSdk = flutter.minSdkVersion
+        minSdk = 26
         targetSdk = flutter.targetSdkVersion
         versionCode = flutter.versionCode
         versionName = flutter.versionName
@@ -39,7 +39,12 @@ android {
     signingConfigs {
         if (keystorePropsFile.exists()) {
             create("release") {
-                storeFile = file(keystoreProps["storeFile"] as String)
+                val keystorePath = keystoreProps["storeFile"] as String
+                storeFile = if (file(keystorePath).exists()) {
+                    file(keystorePath)
+                } else {
+                    rootProject.file(keystorePath)
+                }
                 storePassword = keystoreProps["storePassword"] as String
                 keyAlias = keystoreProps["keyAlias"] as String
                 keyPassword = keystoreProps["keyPassword"] as String

@@ -1,4 +1,4 @@
-﻿part of '../../home/tab_schedule.dart';
+part of '../../home/tab_schedule.dart';
 
 class _WeekDotsRowAnimated extends StatelessWidget {
   final DateTime weekStart;

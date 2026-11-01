@@ -83,4 +83,14 @@ class ProfileRepository extends CachedRepository<UserProfile?> {
     }
     return _remoteSource.fetchProfile();
   }
+
+  @override
+  Future<void> clearCache() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.remove(_kProfileCacheKey);
+      await prefs.remove(_kProfileUpdatedKey);
+    } catch (_) {}
+    await resetState();
+  }
 }

@@ -3,7 +3,12 @@ import 'package:flutter_inappwebview/flutter_inappwebview.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 
 import '../../app.dart';
+import '../../ui/app_theme.dart';
+import '../../core/auth/app_security_service.dart';
 import '../../core/auth/auth_settings.dart';
+import '../../core/auth/biometric_service.dart';
+import '../../core/auth/pin_code_service.dart';
+import '../auth/pin_code_screen.dart';
 import '../../core/demo/demo_mode.dart';
 import '../../core/network/eios_client.dart';
 import '../../core/network/eios_endpoints.dart';
@@ -16,7 +21,16 @@ import '../../core/logging/share_helper.dart';
 import '../debug/debug_report.dart';
 
 import '../auth/login_webview.dart';
+import '../grades/repository.dart';
+import '../profile/repository.dart';
+import '../recordbook/repository.dart';
+import '../schedule/schedule_repository.dart';
+import '../study_plan/repository.dart';
 import '../notifications/notification_service.dart';
+import '../schedule/lesson_reminder_service.dart';
+import '../../core/app_icon_service.dart';
+import '../../core/updater/app_update_service.dart';
+import '../../ui/app_haptics.dart';
 
 part 'settings_parts/push_card.dart';
 
@@ -37,22 +51,77 @@ class _SettingsScreenState extends State<SettingsScreen> {
   String _credsHint = 'Не настроено';
   bool _checkingCreds = false;
 
+  bool _biometricSupported = false;
+  bool _biometricEnabled = false;
+  bool _pinEnabled = false;
+  bool _screenProtectionEnabled = false;
+  bool _remindersEnabled = false;
+  int _remindersMinutes = 15;
+  bool _hapticEnabled = true;
+  bool _reduceEffects = false;
+  bool _reduceAnimations = false;
+  bool _materialYou = false;
+  bool _amoledBlack = false;
+  bool _appearanceExpanded = false;
+  bool _notificationsExpanded = false;
+  bool _securityExpanded = false;
+  AppIconVariant _currentAppIcon = AppIconVariant.light;
+
   @override
   void initState() {
     super.initState();
     _auth.addListener(_onAuthChanged);
+    themeController.addListener(_onThemeChanged);
     _primeCredsStatus();
+    _loadExtraSettings();
+  }
+
+  Future<void> _loadExtraSettings() async {
+    await AppHaptics.init();
+    await AppIconService.instance.init();
+    final bioSup = await BiometricService.instance.isSupported();
+    final bioEn = await BiometricService.instance.isEnabled();
+    final pinEn = await PinCodeService.instance.isEnabled();
+    final secEn = AppSecurityService.instance.isScreenProtectionEnabled;
+    final remEn = await LessonReminderService.instance.isEnabled();
+    final remMin = await LessonReminderService.instance.getMinutesBefore();
+    if (!mounted) return;
+    setState(() {
+      _hapticEnabled = AppHaptics.enabled;
+      _reduceEffects = themeController.reduceEffects;
+      _reduceAnimations = themeController.reduceAnimations;
+      _materialYou = themeController.materialYou;
+      _amoledBlack = themeController.amoledBlack;
+      _currentAppIcon = AppIconService.instance.current;
+      _biometricSupported = bioSup;
+      _biometricEnabled = bioEn;
+      _pinEnabled = pinEn;
+      _screenProtectionEnabled = secEn;
+      _remindersEnabled = remEn;
+      _remindersMinutes = remMin;
+    });
   }
 
   @override
   void dispose() {
     _auth.removeListener(_onAuthChanged);
+    themeController.removeListener(_onThemeChanged);
     super.dispose();
   }
 
   void _onAuthChanged() {
     if (!mounted) return;
     setState(() {});
+  }
+
+  void _onThemeChanged() {
+    if (!mounted) return;
+    setState(() {
+      _reduceEffects = themeController.reduceEffects;
+      _reduceAnimations = themeController.reduceAnimations;
+      _materialYou = themeController.materialYou;
+      _amoledBlack = themeController.amoledBlack;
+    });
   }
 
   Future<void> _primeCredsStatus() async {
@@ -80,9 +149,18 @@ class _SettingsScreenState extends State<SettingsScreen> {
       await CookieManager.instance().deleteAllCookies();
     } catch (_) {}
 
+    await Future.wait([
+      ProfileRepository.instance.clearCache(),
+      ScheduleRepository.instance.clearCache(),
+      GradesRepository.instance.clearCache(),
+      RecordbookRepository.instance.clearCache(),
+      StudyPlanRepository.instance.clearCache(),
+    ]);
+
     if (!context.mounted) return;
-    Navigator.of(context).pushReplacement(
+    Navigator.of(context).pushAndRemoveUntil(
       MaterialPageRoute(builder: (_) => const LoginWebViewScreen()),
+      (route) => false,
     );
   }
 
@@ -195,7 +273,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
         text = 'Неверный логин/пароль';
         break;
       case _CredsStatus.none:
-      default:
         icon = Icons.info_outline;
         bg = cs.surfaceVariant.withOpacity(0.6);
         fg = cs.onSurfaceVariant;
@@ -480,98 +557,132 @@ class _SettingsScreenState extends State<SettingsScreen> {
     passCtl.dispose();
   }
 
-  Widget _buildAuthReloginCard() {
-    final t = Theme.of(context).textTheme;
+  Widget _buildCardContainer({required Widget child}) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
+    final isAmoled = isDark && themeController.amoledBlack;
+    final accent = appAccentOf(context);
 
     return Container(
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(24),
-        gradient: LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: isDark
-              ? const [Color(0xFF1A1E23), Color(0xFF171B21)]
-              : const [Color(0xFFF1F3F7), Color(0xFFE9EDF4)],
-        ),
+        color: isAmoled ? Colors.black : null,
+        gradient: isAmoled
+            ? null
+            : LinearGradient(
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+                colors: isDark
+                    ? const [Color(0xFF1A1E23), Color(0xFF171B21)]
+                    : const [Color(0xFFF1F3F7), Color(0xFFE9EDF4)],
+              ),
         border: Border.all(
-          color: isDark
-              ? Colors.white.withValues(alpha: 0.08)
-              : Colors.black.withValues(alpha: 0.08),
+          color: isAmoled
+              ? accent.withValues(alpha: 0.35)
+              : (isDark
+                  ? Colors.white.withValues(alpha: 0.08)
+                  : Colors.black.withValues(alpha: 0.08)),
+          width: isAmoled ? 1.2 : 1.0,
         ),
       ),
-      child: Padding(
-        padding: const EdgeInsets.symmetric(vertical: 8),
-        child: Column(
-          children: [
-            RadioListTile<AuthReloginMode>(
-              value: AuthReloginMode.safeUiLogin,
-              groupValue: _auth.mode,
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(23),
+        child: Material(
+          color: Colors.transparent,
+          child: child,
+        ),
+      ),
+    );
+  }
+
+  Widget _buildAuthReloginContent() {
+    final t = Theme.of(context).textTheme;
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 4),
+      child: Column(
+        children: [
+          RadioListTile<AuthReloginMode>(
+            value: AuthReloginMode.safeUiLogin,
+            groupValue: _auth.mode,
+            title: Text(
+              'Без хранения пароля',
+              style: t.titleMedium?.copyWith(fontWeight: FontWeight.w800),
+            ),
+            subtitle: const Text(
+              'Если сессия истекла — откроем окно входа, после входа данные обновятся.',
+            ),
+            onChanged: (v) {
+              if (v != null) {
+                AppHaptics.selectionClick();
+                _auth.setMode(v);
+              }
+            },
+          ),
+          const Divider(height: 1),
+          RadioListTile<AuthReloginMode>(
+            value: AuthReloginMode.silentWithCredentials,
+            groupValue: _auth.mode,
+            title: Text(
+              'Тихий авторелогин (удобно)',
+              style: t.titleMedium?.copyWith(fontWeight: FontWeight.w800),
+            ),
+            subtitle: const Text(
+              'Сохраняет логин/пароль (Secure Storage) и перелогинивается в фоне.',
+            ),
+            onChanged: (v) {
+              if (v != null) {
+                AppHaptics.selectionClick();
+                _auth.setMode(v);
+              }
+            },
+          ),
+          if (_auth.mode == AuthReloginMode.silentWithCredentials) ...[
+            const Divider(height: 1),
+            SwitchListTile(
+              secondary: const Icon(Icons.lock_outline),
               title: Text(
-                'Без хранения пароля',
+                'Разрешить хранение логина/пароля',
                 style: t.titleMedium?.copyWith(fontWeight: FontWeight.w800),
               ),
-              subtitle: const Text(
-                'Если сессия истекла — автоматически откроем вход, после входа всё обновится.',
-              ),
-              onChanged: (v) => v == null ? null : _auth.setMode(v),
+              subtitle: const Text('Без этого тихий авторелогин не работает'),
+              value: _auth.credsEnabled,
+              activeThumbColor: Colors.white,
+              activeTrackColor: Theme.of(context).colorScheme.primary,
+              onChanged: (v) async {
+                AppHaptics.selectionClick();
+                await _auth.setCredsEnabled(v);
+                if (!mounted) return;
+                setState(() {
+                  if (!v) {
+                    _credsStatus = _CredsStatus.none;
+                    _credsHint = 'Хранение выключено';
+                  } else {
+                    if (_credsHint == 'Хранение выключено') {
+                      _credsHint = 'Не настроено';
+                    }
+                  }
+                });
+              },
             ),
             const Divider(height: 1),
-            RadioListTile<AuthReloginMode>(
-              value: AuthReloginMode.silentWithCredentials,
-              groupValue: _auth.mode,
+            ListTile(
+              leading: const Icon(Icons.settings_outlined),
               title: Text(
-                'Тихий авторелогин (удобно)',
+                'Настроить логин/пароль',
                 style: t.titleMedium?.copyWith(fontWeight: FontWeight.w800),
               ),
-              subtitle: const Text(
-                'Сохраняет логин/пароль (Secure Storage) и при протухшей сессии попробует перелогиниться в фоне.',
-              ),
-              onChanged: (v) => v == null ? null : _auth.setMode(v),
-            ),
-            if (_auth.mode == AuthReloginMode.silentWithCredentials) ...[
-              const Divider(height: 1),
-              SwitchListTile(
-                secondary: const Icon(Icons.lock_outline),
-                title: Text(
-                  'Разрешить хранение логина/пароля',
-                  style: t.titleMedium?.copyWith(fontWeight: FontWeight.w800),
-                ),
-                subtitle: const Text('Без этого тихий авторелогин не работает'),
-                value: _auth.credsEnabled,
-                activeThumbColor: Colors.white,
-                activeTrackColor: Theme.of(context).colorScheme.primary,
-                onChanged: (v) async {
-                  await _auth.setCredsEnabled(v);
-                  if (!mounted) return;
-                  setState(() {
-                    if (!v) {
-                      _credsStatus = _CredsStatus.none;
-                      _credsHint = 'Хранение выключено';
-                    } else {
-                      if (_credsHint == 'Хранение выключено')
-                        _credsHint = 'Не настроено';
+              subtitle: _statusChip(),
+              trailing: const Icon(Icons.chevron_right),
+              enabled: _auth.credsEnabled && !_checkingCreds,
+              onTap: (_auth.credsEnabled && !_checkingCreds)
+                  ? () {
+                      AppHaptics.selectionClick();
+                      _openCredsSettingsSheet();
                     }
-                  });
-                },
-              ),
-              const Divider(height: 1),
-              ListTile(
-                leading: const Icon(Icons.settings_outlined),
-                title: Text(
-                  'Настроить логин/пароль',
-                  style: t.titleMedium?.copyWith(fontWeight: FontWeight.w800),
-                ),
-                subtitle: _statusChip(),
-                trailing: const Icon(Icons.chevron_right),
-                enabled: _auth.credsEnabled && !_checkingCreds,
-                onTap: (_auth.credsEnabled && !_checkingCreds)
-                    ? _openCredsSettingsSheet
-                    : null,
-              ),
-            ],
+                  : null,
+            ),
           ],
-        ),
+        ],
       ),
     );
   }
@@ -583,7 +694,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
       case ThemeMode.dark:
         return 'Тёмная';
       case ThemeMode.system:
-      default:
         return 'Системная';
     }
   }
@@ -614,108 +724,1183 @@ class _SettingsScreenState extends State<SettingsScreen> {
     }
   }
 
-  static void _showThemePicker(BuildContext context) {
+  static void _showAppearanceDialog(BuildContext context) {
     showModalBottomSheet(
       context: context,
+      isScrollControlled: true,
       showDragHandle: true,
-      builder: (_) {
-        return SafeArea(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              const Padding(
-                padding: EdgeInsets.fromLTRB(16, 8, 16, 8),
-                child: Align(
-                  alignment: Alignment.centerLeft,
-                  child: Text(
-                    'Тема',
-                    style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800),
-                  ),
+      builder: (bottomSheetContext) {
+        ThemeMode tempMode = themeController.mode;
+        AppAccent tempAccent = themeController.accent;
+        double tempScale = themeController.uiScale;
+        AppIconVariant tempIcon = AppIconService.instance.current;
+        bool tempReduceEffects = themeController.reduceEffects;
+        bool tempMaterialYou = themeController.materialYou;
+        bool tempAmoledBlack = themeController.amoledBlack;
+
+        return StatefulBuilder(
+          builder: (context, setModalState) {
+            final cs = Theme.of(context).colorScheme;
+            final t = Theme.of(context).textTheme;
+            final isDark = Theme.of(context).brightness == Brightness.dark;
+            final percent = (tempScale * 100).round();
+
+            return SafeArea(
+              child: SingleChildScrollView(
+                padding: const EdgeInsets.fromLTRB(20, 8, 20, 24),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Оформление и тема',
+                      style: t.titleLarge?.copyWith(fontWeight: FontWeight.w900),
+                    ),
+                    const SizedBox(height: 6),
+                    Text(
+                      'Настройте тему, акцентный цвет и масштаб интерфейса под ваш экран.',
+                      style: TextStyle(color: cs.onSurfaceVariant, fontSize: 13),
+                    ),
+                    const SizedBox(height: 20),
+
+                    // 1. ТЕМА
+                    Text(
+                      'Тема оформления',
+                      style: t.titleSmall?.copyWith(fontWeight: FontWeight.w800),
+                    ),
+                    const SizedBox(height: 10),
+                    Row(
+                      children: [
+                        _buildThemeOption(
+                          context: context,
+                          label: 'Системная',
+                          icon: Icons.brightness_auto_rounded,
+                          selected: tempMode == ThemeMode.system,
+                          onTap: () => setModalState(() => tempMode = ThemeMode.system),
+                        ),
+                        const SizedBox(width: 8),
+                        _buildThemeOption(
+                          context: context,
+                          label: 'Светлая',
+                          icon: Icons.light_mode_rounded,
+                          selected: tempMode == ThemeMode.light,
+                          onTap: () => setModalState(() => tempMode = ThemeMode.light),
+                        ),
+                        const SizedBox(width: 8),
+                        _buildThemeOption(
+                          context: context,
+                          label: 'Тёмная',
+                          icon: Icons.dark_mode_rounded,
+                          selected: tempMode == ThemeMode.dark,
+                          onTap: () => setModalState(() => tempMode = ThemeMode.dark),
+                        ),
+                      ],
+                    ),
+
+                    const SizedBox(height: 24),
+
+                    // 2. АКЦЕНТНЫЙ ЦВЕТ
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Text(
+                          'Акцентный цвет',
+                          style: t.titleSmall?.copyWith(fontWeight: FontWeight.w800),
+                        ),
+                        if (tempMaterialYou)
+                          Text(
+                            'Цвета обоев (Material You)',
+                            style: TextStyle(
+                              color: cs.primary,
+                              fontSize: 12,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                      ],
+                    ),
+                    const SizedBox(height: 10),
+                    Opacity(
+                      opacity: tempMaterialYou ? 0.38 : 1.0,
+                      child: IgnorePointer(
+                        ignoring: tempMaterialYou,
+                        child: SingleChildScrollView(
+                          scrollDirection: Axis.horizontal,
+                          physics: const BouncingScrollPhysics(),
+                          child: Row(
+                            children: [
+                              for (final acc in AppAccent.values) ...[
+                                InkWell(
+                                  borderRadius: BorderRadius.circular(16),
+                                  onTap: () => setModalState(() => tempAccent = acc),
+                                  child: AnimatedContainer(
+                                    duration: const Duration(milliseconds: 200),
+                                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                                    decoration: BoxDecoration(
+                                      color: tempAccent == acc
+                                          ? _accentColor(acc).withValues(alpha: 0.16)
+                                          : (isDark
+                                              ? Colors.white.withValues(alpha: 0.05)
+                                              : cs.surfaceContainerHighest.withValues(alpha: 0.5)),
+                                      borderRadius: BorderRadius.circular(16),
+                                      border: Border.all(
+                                        color: tempAccent == acc
+                                            ? _accentColor(acc)
+                                            : Colors.transparent,
+                                        width: 2,
+                                      ),
+                                    ),
+                                    child: Row(
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: [
+                                        Container(
+                                          width: 14,
+                                          height: 14,
+                                          decoration: BoxDecoration(
+                                            color: _accentColor(acc),
+                                            shape: BoxShape.circle,
+                                          ),
+                                        ),
+                                        const SizedBox(width: 8),
+                                        Text(
+                                          _accentLabel(acc),
+                                          style: TextStyle(
+                                            fontWeight: tempAccent == acc
+                                                ? FontWeight.w800
+                                                : FontWeight.w600,
+                                            fontSize: 13,
+                                            color: tempAccent == acc
+                                                ? _accentColor(acc)
+                                                : cs.onSurface,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                ),
+                                if (acc != AppAccent.values.last)
+                                  const SizedBox(width: 8),
+                              ],
+                            ],
+                          ),
+                        ),
+                      ),
+                    ),
+
+                    const SizedBox(height: 24),
+
+                    // 3. МАСШТАБ ИНТЕРФЕЙСА (50% - 150%)
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Text(
+                          'Масштаб интерфейса',
+                          style: t.titleSmall?.copyWith(fontWeight: FontWeight.w800),
+                        ),
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 10,
+                            vertical: 4,
+                          ),
+                          decoration: BoxDecoration(
+                            color: cs.primaryContainer,
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: Text(
+                            '$percent%',
+                            style: TextStyle(
+                              color: cs.onPrimaryContainer,
+                              fontWeight: FontWeight.w800,
+                              fontSize: 13,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 8),
+                    Row(
+                      children: [
+                        const Icon(Icons.text_fields_rounded, size: 16),
+                        Expanded(
+                          child: Slider(
+                            value: tempScale.clamp(0.5, 1.5),
+                            min: 0.5,
+                            max: 1.5,
+                            divisions: 10, // 50%, 60%, 70%, 80%, 90%, 100%, 110%, 120%, 130%, 140%, 150%
+                            label: '$percent%',
+                            onChanged: (val) {
+                              final rounded = (val * 10).round() / 10.0;
+                              setModalState(() => tempScale = rounded);
+                            },
+                          ),
+                        ),
+                        const Icon(Icons.text_fields_rounded, size: 28),
+                      ],
+                    ),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Text('50%', style: TextStyle(color: cs.onSurfaceVariant, fontSize: 11)),
+                        Text('100% (стандарт)', style: TextStyle(color: cs.onSurfaceVariant, fontSize: 11, fontWeight: FontWeight.bold)),
+                        Text('150%', style: TextStyle(color: cs.onSurfaceVariant, fontSize: 11)),
+                      ],
+                    ),
+
+                    const SizedBox(height: 24),
+
+                    // 4. ИКОНКА ПРИЛОЖЕНИЯ
+                    Text(
+                      'Иконка приложения',
+                      style: t.titleSmall?.copyWith(fontWeight: FontWeight.w800),
+                    ),
+                    const SizedBox(height: 10),
+                    _buildIconSelectorRow(
+                      context: context,
+                      selected: tempIcon,
+                      onSelect: (variant) {
+                        AppHaptics.selectionClick();
+                        setModalState(() => tempIcon = variant);
+                      },
+                    ),
+
+                    const SizedBox(height: 20),
+
+                    // 5. ДОПОЛНИТЕЛЬНО
+                    Text(
+                      'Дополнительно',
+                      style: t.titleSmall?.copyWith(fontWeight: FontWeight.w800),
+                    ),
+                    const SizedBox(height: 8),
+                    SwitchListTile.adaptive(
+                      contentPadding: EdgeInsets.zero,
+                      secondary: const Icon(Icons.auto_awesome_rounded),
+                      title: Text(
+                        'Material You',
+                        style: t.titleSmall?.copyWith(fontWeight: FontWeight.w800),
+                      ),
+                      subtitle: Text(
+                        'Использовать цвета обоев системы',
+                        style: TextStyle(color: cs.onSurfaceVariant, fontSize: 12),
+                      ),
+                      value: tempMaterialYou,
+                      onChanged: (val) {
+                        AppHaptics.selectionClick();
+                        setModalState(() => tempMaterialYou = val);
+                      },
+                    ),
+                    SwitchListTile.adaptive(
+                      contentPadding: EdgeInsets.zero,
+                      secondary: const Icon(Icons.contrast_rounded),
+                      title: Text(
+                        'AMOLED чёрный',
+                        style: t.titleSmall?.copyWith(fontWeight: FontWeight.w800),
+                      ),
+                      subtitle: Text(
+                        'Чистый чёрный фон — экономит заряд на OLED',
+                        style: TextStyle(color: cs.onSurfaceVariant, fontSize: 12),
+                      ),
+                      value: tempAmoledBlack,
+                      onChanged: (val) {
+                        AppHaptics.selectionClick();
+                        setModalState(() => tempAmoledBlack = val);
+                      },
+                    ),
+                    SwitchListTile.adaptive(
+                      contentPadding: EdgeInsets.zero,
+                      secondary: const Icon(Icons.blur_on_rounded),
+                      title: Text(
+                        'Размытие и стекло (Liquid Glass)',
+                        style: t.titleSmall?.copyWith(fontWeight: FontWeight.w800),
+                      ),
+                      subtitle: Text(
+                        'Отключите на слабых устройствах для экономии заряда и максимальной плавности 60/120 FPS',
+                        style: TextStyle(color: cs.onSurfaceVariant, fontSize: 12),
+                      ),
+                      value: !tempReduceEffects,
+                      onChanged: (val) {
+                        AppHaptics.selectionClick();
+                        setModalState(() => tempReduceEffects = !val);
+                      },
+                    ),
+
+                    const SizedBox(height: 24),
+
+                    // КНОПКИ ДЕЙСТВИЙ
+                    Row(
+                      children: [
+                        if ((tempScale - 1.0).abs() >= 0.01) ...[
+                          OutlinedButton(
+                            onPressed: () {
+                              setModalState(() => tempScale = 1.0);
+                            },
+                            child: const Text('Сброс 100%'),
+                          ),
+                          const SizedBox(width: 10),
+                        ],
+                        Expanded(
+                          child: FilledButton.icon(
+                            onPressed: () async {
+                              await themeController.setAppearance(
+                                mode: tempMode,
+                                accent: tempAccent,
+                                uiScale: tempScale,
+                                materialYou: tempMaterialYou,
+                                amoledBlack: tempAmoledBlack,
+                              );
+                              await themeController.setReduceEffects(tempReduceEffects);
+                              if (tempIcon != AppIconService.instance.current) {
+                                await AppIconService.instance.setIcon(tempIcon);
+                              }
+                              if (context.mounted) {
+                                Navigator.of(context).pop();
+                              }
+                            },
+                            icon: const Icon(Icons.check_rounded),
+                            label: const Text('Применить изменения'),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
                 ),
               ),
-              ListTile(
-                leading: const Icon(Icons.light_mode_outlined),
-                title: const Text('Светлая'),
-                onTap: () {
-                  themeController.setMode(ThemeMode.light);
-                  Navigator.pop(context);
-                },
-              ),
-              ListTile(
-                leading: const Icon(Icons.dark_mode_outlined),
-                title: const Text('Тёмная'),
-                onTap: () {
-                  themeController.setMode(ThemeMode.dark);
-                  Navigator.pop(context);
-                },
-              ),
-              ListTile(
-                leading: const Icon(Icons.settings_outlined),
-                title: const Text('Системная'),
-                onTap: () {
-                  themeController.setMode(ThemeMode.system);
-                  Navigator.pop(context);
-                },
-              ),
-              const SizedBox(height: 10),
-            ],
-          ),
+            );
+          },
         );
       },
     );
   }
 
-  static void _showAccentPicker(BuildContext context) {
-    showModalBottomSheet(
-      context: context,
-      showDragHandle: true,
-      builder: (_) {
-        return SafeArea(
+  static Widget _buildThemeOption({
+    required BuildContext context,
+    required String label,
+    required IconData icon,
+    required bool selected,
+    required VoidCallback onTap,
+  }) {
+    final cs = Theme.of(context).colorScheme;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
+    return Expanded(
+      child: InkWell(
+        borderRadius: BorderRadius.circular(16),
+        onTap: onTap,
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 200),
+          padding: const EdgeInsets.symmetric(vertical: 12),
+          decoration: BoxDecoration(
+            color: selected
+                ? cs.primary.withValues(alpha: 0.16)
+                : (isDark
+                    ? Colors.white.withValues(alpha: 0.05)
+                    : cs.surfaceContainerHighest.withValues(alpha: 0.5)),
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(
+              color: selected ? cs.primary : Colors.transparent,
+              width: 2,
+            ),
+          ),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              const Padding(
-                padding: EdgeInsets.fromLTRB(16, 8, 16, 8),
-                child: Align(
-                  alignment: Alignment.centerLeft,
-                  child: Text(
-                    'Акцентный цвет',
-                    style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800),
-                  ),
+              Icon(
+                icon,
+                size: 22,
+                color: selected ? cs.primary : cs.onSurfaceVariant,
+              ),
+              const SizedBox(height: 6),
+              Text(
+                label,
+                style: TextStyle(
+                  fontWeight: selected ? FontWeight.w800 : FontWeight.w600,
+                  fontSize: 12,
+                  color: selected ? cs.primary : cs.onSurface,
                 ),
               ),
-              for (final accent in AppAccent.values)
-                ListTile(
-                  leading: Container(
-                    width: 18,
-                    height: 18,
-                    decoration: BoxDecoration(
-                      color: _accentColor(accent),
-                      shape: BoxShape.circle,
-                    ),
-                  ),
-                  title: Text(_accentLabel(accent)),
-                  trailing: themeController.accent == accent
-                      ? Icon(Icons.check_rounded, color: _accentColor(accent))
-                      : null,
-                  onTap: () {
-                    themeController.setAccent(accent);
-                    Navigator.pop(context);
-                  },
-                ),
-              const SizedBox(height: 10),
             ],
           ),
+        ),
+      ),
+    );
+  }
+
+  static Widget _buildIconSelectorRow({
+    required BuildContext context,
+    required AppIconVariant selected,
+    required ValueChanged<AppIconVariant> onSelect,
+  }) {
+    return Row(
+      children: [
+        for (final variant in AppIconVariant.values) ...[
+          Expanded(
+            child: _buildAppIconCard(
+              context: context,
+              variant: variant,
+              isSelected: selected == variant,
+              onTap: () => onSelect(variant),
+            ),
+          ),
+          if (variant != AppIconVariant.values.last) const SizedBox(width: 14),
+        ],
+      ],
+    );
+  }
+
+  static Widget _buildAppIconCard({
+    required BuildContext context,
+    required AppIconVariant variant,
+    required bool isSelected,
+    required VoidCallback onTap,
+  }) {
+    final cs = Theme.of(context).colorScheme;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final accent = cs.primary;
+
+    return InkWell(
+      borderRadius: BorderRadius.circular(20),
+      onTap: onTap,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 200),
+        padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 12),
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(20),
+          color: isSelected
+              ? accent.withValues(alpha: isDark ? 0.18 : 0.12)
+              : (isDark
+                  ? Colors.white.withValues(alpha: 0.04)
+                  : cs.surfaceContainerHighest.withValues(alpha: 0.4)),
+          border: Border.all(
+            color: isSelected
+                ? accent
+                : (isDark
+                    ? Colors.white.withValues(alpha: 0.10)
+                    : cs.outlineVariant.withValues(alpha: 0.6)),
+            width: isSelected ? 2.2 : 1.2,
+          ),
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              width: 70,
+              height: 70,
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(18),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withValues(alpha: isDark ? 0.35 : 0.15),
+                    blurRadius: 10,
+                    offset: const Offset(0, 4),
+                  ),
+                ],
+              ),
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(18),
+                child: Image.asset(
+                  variant.assetPath,
+                  width: 70,
+                  height: 70,
+                  fit: BoxFit.cover,
+                ),
+              ),
+            ),
+            const SizedBox(height: 12),
+            Text(
+              variant.title,
+              style: TextStyle(
+                fontWeight: isSelected ? FontWeight.w900 : FontWeight.w700,
+                fontSize: 15,
+                color: isSelected ? accent : cs.onSurface,
+              ),
+            ),
+            const SizedBox(height: 2),
+            Text(
+              variant.subtitle,
+              style: TextStyle(
+                fontSize: 12,
+                color: cs.onSurfaceVariant,
+                fontWeight: FontWeight.w500,
+              ),
+            ),
+            const SizedBox(height: 10),
+            Icon(
+              isSelected
+                  ? Icons.check_circle_rounded
+                  : Icons.radio_button_unchecked_rounded,
+              size: 22,
+              color: isSelected
+                  ? accent
+                  : cs.onSurfaceVariant.withValues(alpha: 0.6),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _showIconPickerDialog(BuildContext context) {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      showDragHandle: true,
+      builder: (bottomSheetContext) {
+        AppIconVariant selected = _currentAppIcon;
+
+        return StatefulBuilder(
+          builder: (context, setModalState) {
+            final cs = Theme.of(context).colorScheme;
+            final t = Theme.of(context).textTheme;
+
+            return SafeArea(
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(20, 8, 20, 24),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Иконка приложения',
+                      style: t.titleLarge?.copyWith(fontWeight: FontWeight.w900),
+                    ),
+                    const SizedBox(height: 6),
+                    Text(
+                      'Выберите стиль иконки на рабочем столе смартфона.',
+                      style: TextStyle(color: cs.onSurfaceVariant, fontSize: 13),
+                    ),
+                    const SizedBox(height: 20),
+                    _buildIconSelectorRow(
+                      context: context,
+                      selected: selected,
+                      onSelect: (variant) async {
+                        AppHaptics.selectionClick();
+                        setModalState(() => selected = variant);
+                        setState(() => _currentAppIcon = variant);
+                        await AppIconService.instance.setIcon(variant);
+                        if (context.mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(
+                              content: Text(
+                                'Иконка изменена на "${variant.title}". На рабочем столе обновится в течение нескольких секунд.',
+                              ),
+                              duration: const Duration(seconds: 3),
+                              behavior: SnackBarBehavior.floating,
+                            ),
+                          );
+                        }
+                      },
+                    ),
+                    const SizedBox(height: 16),
+                  ],
+                ),
+              ),
+            );
+          },
         );
       },
     );
+  }
+
+  Widget _buildAccordionCard({
+    required IconData icon,
+    required String title,
+    required String subtitle,
+    required bool isExpanded,
+    required VoidCallback onToggle,
+    required Widget content,
+  }) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final isAmoled = isDark && themeController.amoledBlack;
+    final accent = appAccentOf(context);
+    final t = Theme.of(context).textTheme;
+    final cs = Theme.of(context).colorScheme;
+
+    return Container(
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(24),
+        color: isAmoled ? Colors.black : null,
+        gradient: isAmoled
+            ? null
+            : LinearGradient(
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+                colors: isDark
+                    ? const [Color(0xFF1A1E23), Color(0xFF171B21)]
+                    : const [Color(0xFFF1F3F7), Color(0xFFE9EDF4)],
+              ),
+        border: Border.all(
+          color: isAmoled
+              ? accent.withValues(alpha: 0.35)
+              : (isDark
+                  ? Colors.white.withValues(alpha: 0.08)
+                  : Colors.black.withValues(alpha: 0.08)),
+          width: isAmoled ? 1.2 : 1.0,
+        ),
+      ),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(23),
+        child: Material(
+          color: Colors.transparent,
+          child: Column(
+        children: [
+          InkWell(
+            borderRadius: BorderRadius.circular(24),
+            onTap: () {
+              AppHaptics.selectionClick();
+              onToggle();
+            },
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+              child: Row(
+                children: [
+                  Container(
+                    width: 42,
+                    height: 42,
+                    decoration: BoxDecoration(
+                      color: cs.primary.withValues(alpha: isDark ? 0.16 : 0.10),
+                      borderRadius: BorderRadius.circular(14),
+                    ),
+                    child: Icon(icon, color: cs.primary, size: 22),
+                  ),
+                  const SizedBox(width: 14),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          title,
+                          style: t.titleMedium?.copyWith(
+                            fontWeight: FontWeight.w900,
+                            letterSpacing: -0.2,
+                          ),
+                        ),
+                        const SizedBox(height: 2),
+                        Text(
+                          subtitle,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: t.bodySmall?.copyWith(
+                            color: isDark
+                                ? Colors.white.withValues(alpha: 0.60)
+                                : cs.onSurface.withValues(alpha: 0.60),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  AnimatedRotation(
+                    turns: isExpanded ? 0.5 : 0.0,
+                    duration: const Duration(milliseconds: 240),
+                    curve: Curves.easeOutCubic,
+                    child: Icon(
+                      Icons.keyboard_arrow_down_rounded,
+                      color: isDark
+                          ? Colors.white.withValues(alpha: 0.65)
+                          : cs.onSurface.withValues(alpha: 0.65),
+                      size: 26,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+          AnimatedCrossFade(
+            firstChild: const SizedBox(width: double.infinity, height: 0),
+            secondChild: Column(
+              children: [
+                Divider(
+                  height: 1,
+                  color: isAmoled ? Colors.black : null,
+                ),
+                content,
+              ],
+            ),
+            crossFadeState: isExpanded
+                ? CrossFadeState.showSecond
+                : CrossFadeState.showFirst,
+            duration: const Duration(milliseconds: 260),
+            firstCurve: Curves.easeOutCubic,
+            secondCurve: Curves.easeOutCubic,
+            sizeCurve: Curves.easeOutCubic,
+          ),
+        ],
+      ),
+    ),
+  ),
+);
+  }
+
+  Widget _buildAppearanceSection(
+    TextTheme t,
+    ThemeData theme,
+    Icon tileChevron,
+  ) {
+    final accentPart = _materialYou ? 'Material You' : _accentLabel(themeController.accent);
+    final amoledPart = _amoledBlack ? ' · AMOLED' : '';
+    final glassPart = _reduceEffects ? 'Без стекла' : 'Стекло';
+    final status = '${_themeLabel(themeController.mode)} · $accentPart$amoledPart · $glassPart';
+
+    return _buildAccordionCard(
+      icon: Icons.palette_outlined,
+      title: 'Внешний вид и интерфейс',
+      subtitle: status,
+      isExpanded: _appearanceExpanded,
+      onToggle: () => setState(() => _appearanceExpanded = !_appearanceExpanded),
+      content: Column(
+        children: [
+          ListTile(
+            leading: const Icon(Icons.palette_outlined),
+            title: Text(
+              'Оформление и тема',
+              style: t.titleMedium?.copyWith(fontWeight: FontWeight.w800),
+            ),
+            subtitle: Text(
+              '${_themeLabel(themeController.mode)}, $accentPart, ${(themeController.uiScale * 100).round()}%',
+            ),
+            trailing: tileChevron,
+            onTap: () {
+              AppHaptics.selectionClick();
+              _showAppearanceDialog(context);
+            },
+          ),
+          const Divider(height: 1),
+          ListTile(
+            leading: Container(
+              width: 32,
+              height: 32,
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(8),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withValues(alpha: 0.14),
+                    blurRadius: 4,
+                    offset: const Offset(0, 2),
+                  ),
+                ],
+              ),
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(8),
+                child: Image.asset(
+                  _currentAppIcon.assetPath,
+                  width: 32,
+                  height: 32,
+                  fit: BoxFit.cover,
+                ),
+              ),
+            ),
+            title: Text(
+              'Иконка приложения',
+              style: t.titleMedium?.copyWith(fontWeight: FontWeight.w800),
+            ),
+            subtitle: Text(
+              '${_currentAppIcon.title} (${_currentAppIcon.subtitle})',
+            ),
+            trailing: tileChevron,
+            onTap: () {
+              AppHaptics.selectionClick();
+              _showIconPickerDialog(context);
+            },
+          ),
+          const Divider(height: 1),
+          SwitchListTile(
+            secondary: const Icon(Icons.auto_awesome_rounded),
+            title: Text(
+              'Material You',
+              style: t.titleMedium?.copyWith(fontWeight: FontWeight.w800),
+            ),
+            subtitle: const Text('Использовать цвета обоев системы'),
+            value: _materialYou,
+            onChanged: (val) async {
+              AppHaptics.selectionClick();
+              setState(() => _materialYou = val);
+              await themeController.setMaterialYou(val);
+            },
+          ),
+          const Divider(height: 1),
+          SwitchListTile(
+            secondary: const Icon(Icons.contrast_rounded),
+            title: Text(
+              'AMOLED чёрный',
+              style: t.titleMedium?.copyWith(fontWeight: FontWeight.w800),
+            ),
+            subtitle: const Text('Чистый чёрный фон — экономит заряд на OLED'),
+            value: _amoledBlack,
+            onChanged: (val) async {
+              AppHaptics.selectionClick();
+              setState(() => _amoledBlack = val);
+              await themeController.setAmoledBlack(val);
+            },
+          ),
+          const Divider(height: 1),
+          SwitchListTile(
+            secondary: const Icon(Icons.vibration_rounded),
+            title: Text(
+              'Тактильный отклик (Haptic)',
+              style: t.titleMedium?.copyWith(fontWeight: FontWeight.w800),
+            ),
+            subtitle: const Text('Вибрация при тапах и переключениях'),
+            value: _hapticEnabled,
+            onChanged: (val) async {
+              setState(() => _hapticEnabled = val);
+              await AppHaptics.setEnabled(val);
+              if (val) AppHaptics.mediumImpact();
+            },
+          ),
+          const Divider(height: 1),
+          SwitchListTile(
+            secondary: const Icon(Icons.blur_on_rounded),
+            title: Text(
+              'Размытие и стекло (Liquid Glass)',
+              style: t.titleMedium?.copyWith(fontWeight: FontWeight.w800),
+            ),
+            subtitle: const Text('Эффект матового стекла на панелях'),
+            value: !_reduceEffects,
+            onChanged: (val) async {
+              AppHaptics.selectionClick();
+              setState(() => _reduceEffects = !val);
+              await themeController.setReduceEffects(!val);
+            },
+          ),
+          const Divider(height: 1),
+          SwitchListTile(
+            secondary: const Icon(Icons.bolt_rounded),
+            title: Text(
+              'Упрощённые анимации',
+              style: t.titleMedium?.copyWith(fontWeight: FontWeight.w800),
+            ),
+            subtitle: const Text('Мгновенные переходы и отключение эффектов'),
+            value: _reduceAnimations,
+            onChanged: (val) async {
+              AppHaptics.selectionClick();
+              setState(() => _reduceAnimations = val);
+              await themeController.setReduceAnimations(val);
+            },
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildNotificationsSection(
+    TextTheme t,
+    ThemeData theme,
+    Icon tileChevron,
+  ) {
+    final pushOn = NotificationService.instance.enabled.value;
+    final status =
+        '${_remindersEnabled ? "Пары за $_remindersMinutes мин" : "Без напоминаний"} · ${pushOn ? "Пуши вкл" : "Пуши выкл"}';
+
+    return _buildAccordionCard(
+      icon: Icons.notifications_active_outlined,
+      title: 'Уведомления',
+      subtitle: status,
+      isExpanded: _notificationsExpanded,
+      onToggle: () => setState(() => _notificationsExpanded = !_notificationsExpanded),
+      content: Column(
+        children: [
+          SwitchListTile(
+            secondary: const Icon(Icons.notifications_active_outlined),
+            title: Text(
+              'Напоминать о парах',
+              style: t.titleMedium?.copyWith(fontWeight: FontWeight.w800),
+            ),
+            subtitle: Text(
+              _remindersEnabled
+                  ? 'За $_remindersMinutes минут до начала пары'
+                  : 'Отключено',
+            ),
+            value: _remindersEnabled,
+            onChanged: (val) async {
+              AppHaptics.selectionClick();
+              setState(() => _remindersEnabled = val);
+              await LessonReminderService.instance.setEnabled(val);
+            },
+          ),
+          if (_remindersEnabled) ...[
+            Padding(
+              padding: const EdgeInsets.fromLTRB(68, 0, 16, 10),
+              child: Row(
+                children: [
+                  Text('Время: ', style: t.bodySmall),
+                  ChoiceChip(
+                    label: const Text('За 15 мин'),
+                    selected: _remindersMinutes == 15,
+                    onSelected: (s) async {
+                      if (!s) return;
+                      AppHaptics.selectionClick();
+                      setState(() => _remindersMinutes = 15);
+                      await LessonReminderService.instance.setMinutesBefore(15);
+                    },
+                  ),
+                  const SizedBox(width: 8),
+                  ChoiceChip(
+                    label: const Text('За 30 мин'),
+                    selected: _remindersMinutes == 30,
+                    onSelected: (s) async {
+                      if (!s) return;
+                      AppHaptics.selectionClick();
+                      setState(() => _remindersMinutes = 30);
+                      await LessonReminderService.instance.setMinutesBefore(30);
+                    },
+                  ),
+                ],
+              ),
+            ),
+          ],
+          const Divider(height: 1),
+          const _PushCard(embedded: true),
+          const Divider(height: 1),
+          ListTile(
+            leading: const Icon(Icons.volume_up_outlined),
+            title: Text(
+              'Звуки и оповещения',
+              style: t.titleMedium?.copyWith(fontWeight: FontWeight.w800),
+            ),
+            subtitle: const Text('Настройка тональностей сигналов'),
+            trailing: const _SoonBadge(),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildSecuritySection(
+    TextTheme t,
+    ThemeData theme,
+    Icon tileChevron,
+  ) {
+    final bioText = _biometricSupported
+        ? (_biometricEnabled ? 'Биометрия вкл' : 'Биометрия выкл')
+        : 'Биометрия недоступна';
+    final pinText = _pinEnabled ? 'PIN вкл' : 'PIN выкл';
+    final reloginText = _auth.mode == AuthReloginMode.silentWithCredentials
+        ? 'Тихий вход'
+        : 'Без пароля';
+    final status = '$bioText · $pinText · $reloginText';
+
+    return _buildAccordionCard(
+      icon: Icons.shield_outlined,
+      title: 'Безопасность',
+      subtitle: status,
+      isExpanded: _securityExpanded,
+      onToggle: () => setState(() => _securityExpanded = !_securityExpanded),
+      content: Column(
+        children: [
+          if (_biometricSupported) ...[
+            SwitchListTile(
+              secondary: const Icon(Icons.fingerprint_rounded),
+              title: Text(
+                'Вход по биометрии',
+                style: t.titleMedium?.copyWith(fontWeight: FontWeight.w800),
+              ),
+              subtitle: const Text('Отпечаток пальца / Face ID'),
+              value: _biometricEnabled,
+              onChanged: (val) async {
+                AppHaptics.selectionClick();
+                if (val) {
+                  final ok = await BiometricService.instance.authenticate(
+                    reason: 'Подтвердите включение биометрии',
+                  );
+                  if (!ok) return;
+                }
+                setState(() => _biometricEnabled = val);
+                await BiometricService.instance.setEnabled(val);
+              },
+            ),
+            const Divider(height: 1),
+          ],
+          SwitchListTile(
+            secondary: const Icon(Icons.pin_outlined),
+            title: Text(
+              'PIN-код для входа',
+              style: t.titleMedium?.copyWith(fontWeight: FontWeight.w800),
+            ),
+            subtitle: Text(
+              _pinEnabled
+                  ? 'Код установлен (4 цифры)'
+                  : 'Быстрый доступ и защита данных',
+            ),
+            value: _pinEnabled,
+            onChanged: (val) async {
+              AppHaptics.selectionClick();
+              if (val) {
+                final created = await Navigator.of(context).push<bool>(
+                  MaterialPageRoute(
+                    builder: (_) => const PinCodeScreen(
+                      mode: PinScreenMode.create,
+                    ),
+                  ),
+                );
+                if (created == true && mounted) {
+                  setState(() => _pinEnabled = true);
+                }
+              } else {
+                final verified = await Navigator.of(context).push<bool>(
+                  MaterialPageRoute(
+                    builder: (_) => const PinCodeScreen(
+                      mode: PinScreenMode.verify,
+                    ),
+                  ),
+                );
+                if (verified == true) {
+                  await PinCodeService.instance.removePin();
+                  if (mounted) {
+                    setState(() => _pinEnabled = false);
+                  }
+                }
+              }
+            },
+          ),
+          if (_pinEnabled) ...[
+            ListTile(
+              contentPadding: const EdgeInsets.only(left: 72, right: 16),
+              title: Text(
+                'Сменить PIN-код',
+                style: t.bodyMedium?.copyWith(
+                  color: theme.colorScheme.primary,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+              trailing: tileChevron,
+              onTap: () async {
+                AppHaptics.selectionClick();
+                await Navigator.of(context).push(
+                  MaterialPageRoute(
+                    builder: (_) => const PinCodeScreen(
+                      mode: PinScreenMode.change,
+                    ),
+                  ),
+                );
+              },
+            ),
+          ],
+          const Divider(height: 1),
+          SwitchListTile(
+            secondary: const Icon(Icons.visibility_off_outlined),
+            title: Text(
+              'Защита от подглядывания',
+              style: t.titleMedium?.copyWith(fontWeight: FontWeight.w800),
+            ),
+            subtitle: const Text(
+              'Скрывать экран в недавних задачах и блокировать скриншоты',
+            ),
+            value: _screenProtectionEnabled,
+            onChanged: (val) async {
+              AppHaptics.selectionClick();
+              await AppSecurityService.instance.setScreenProtection(val);
+              setState(() => _screenProtectionEnabled = val);
+            },
+          ),
+          const Divider(height: 1),
+          _buildAuthReloginContent(),
+          const Divider(height: 1),
+          ListTile(
+            leading: const Icon(Icons.devices_other_outlined),
+            title: Text(
+              'Управление сессиями',
+              style: t.titleMedium?.copyWith(fontWeight: FontWeight.w800),
+            ),
+            subtitle: const Text('Активные входы на устройствах'),
+            trailing: const _SoonBadge(),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildServiceSection(
+    TextTheme t,
+    ThemeData theme,
+    Icon tileChevron,
+  ) {
+    return _buildCardContainer(
+      child: Column(
+        children: [
+          ListTile(
+            leading: const Icon(Icons.system_update_rounded),
+            title: Text(
+              'Проверить обновления',
+              style: t.titleMedium?.copyWith(fontWeight: FontWeight.w800),
+            ),
+            subtitle: const Text('Сравнить с последним релизом на GitHub'),
+            trailing: tileChevron,
+            onTap: () {
+              AppHaptics.selectionClick();
+              AppUpdateService.instance.checkAndPrompt(context, force: true);
+            },
+          ),
+          const Divider(height: 1),
+          ListTile(
+            leading: const Icon(Icons.public_outlined),
+            title: Text(
+              'Открыть ЭИОС (Web)',
+              style: t.titleMedium?.copyWith(fontWeight: FontWeight.w800),
+            ),
+            subtitle: const Text('Открыть my/ в WebView'),
+            trailing: tileChevron,
+            onTap: () {
+              AppHaptics.selectionClick();
+              Navigator.of(context).push(
+                MaterialPageRoute(
+                  builder: (_) => const EiosWebViewScreen(),
+                ),
+              );
+            },
+          ),
+          const Divider(height: 1),
+          ListTile(
+            leading: const Icon(Icons.bug_report_outlined),
+            title: Text(
+              'Диагностика',
+              style: t.titleMedium?.copyWith(fontWeight: FontWeight.w800),
+            ),
+            subtitle: const Text('Собрать отчёт логов'),
+            trailing: tileChevron,
+            onTap: () {
+              AppHaptics.selectionClick();
+              _openDiagnostics();
+            },
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _confirmLogout(BuildContext context) async {
+    AppHaptics.selectionClick();
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Выйти из аккаунта?'),
+        content: const Text(
+          'Вы выйдете из текущей сессии. Для повторного входа потребуется авторизоваться заново.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(false),
+            child: const Text('Отмена'),
+          ),
+          FilledButton(
+            style: FilledButton.styleFrom(
+              backgroundColor: const Color(0xFFFF5C5C),
+              foregroundColor: Colors.white,
+            ),
+            onPressed: () => Navigator.of(ctx).pop(true),
+            child: const Text('Выйти'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed == true && context.mounted) {
+      await _logout(context);
+    }
   }
 
   @override
   Widget build(BuildContext context) {
     final t = Theme.of(context).textTheme;
     final cs = Theme.of(context).colorScheme;
-    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
     final tileChevron = Icon(
       Icons.chevron_right,
       color: isDark
@@ -726,110 +1911,23 @@ class _SettingsScreenState extends State<SettingsScreen> {
     return Scaffold(
       appBar: AppBar(title: const Text('Настройки')),
       body: ListView(
-        padding: const EdgeInsets.fromLTRB(16, 12, 16, 18),
+        padding: const EdgeInsets.fromLTRB(16, 12, 16, 28),
         children: [
+          _buildAppearanceSection(t, theme, tileChevron),
+          const SizedBox(height: 12),
+          _buildNotificationsSection(t, theme, tileChevron),
+          const SizedBox(height: 12),
+          _buildSecuritySection(t, theme, tileChevron),
+          const SizedBox(height: 20),
           Text(
-            'Авторелогин',
+            'Сервис',
             style: t.titleMedium?.copyWith(fontWeight: FontWeight.w900),
           ),
           const SizedBox(height: 10),
-          _buildAuthReloginCard(),
-
-          const SizedBox(height: 18),
-          Text(
-            'Уведомления',
-            style: t.titleMedium?.copyWith(fontWeight: FontWeight.w900),
-          ),
-          const SizedBox(height: 10),
-          const _PushCard(),
-
-          const SizedBox(height: 18),
-          Text(
-            'Приложение',
-            style: t.titleMedium?.copyWith(fontWeight: FontWeight.w900),
-          ),
-          const SizedBox(height: 10),
-          Container(
-            decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(24),
-              gradient: LinearGradient(
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-                colors: isDark
-                    ? const [Color(0xFF1A1E23), Color(0xFF171B21)]
-                    : const [Color(0xFFF1F3F7), Color(0xFFE9EDF4)],
-              ),
-              border: Border.all(
-                color: isDark
-                    ? Colors.white.withValues(alpha: 0.08)
-                    : Colors.black.withValues(alpha: 0.08),
-              ),
-            ),
-            child: Column(
-              children: [
-                ListTile(
-                  leading: const Icon(Icons.public_outlined),
-                  title: Text(
-                    'Открыть ЭИОС (Web)',
-                    style: t.titleMedium?.copyWith(fontWeight: FontWeight.w800),
-                  ),
-                  subtitle: const Text('Открыть my/ в WebView'),
-                  trailing: tileChevron,
-                  onTap: () {
-                    Navigator.of(context).push(
-                      MaterialPageRoute(
-                        builder: (_) => const EiosWebViewScreen(),
-                      ),
-                    );
-                  },
-                ),
-                const Divider(height: 1),
-                ListTile(
-                  leading: const Icon(Icons.palette_outlined),
-                  title: Text(
-                    'Тема',
-                    style: t.titleMedium?.copyWith(fontWeight: FontWeight.w800),
-                  ),
-                  subtitle: Text(_themeLabel(themeController.mode)),
-                  trailing: tileChevron,
-                  onTap: () => _showThemePicker(context),
-                ),
-                const Divider(height: 1),
-                ListTile(
-                  leading: Icon(
-                    Icons.color_lens_outlined,
-                    color: _accentColor(themeController.accent),
-                  ),
-                  title: Text(
-                    'Акцент',
-                    style: t.titleMedium?.copyWith(fontWeight: FontWeight.w800),
-                  ),
-                  subtitle: Text(_accentLabel(themeController.accent)),
-                  trailing: tileChevron,
-                  onTap: () => _showAccentPicker(context),
-                ),
-                const Divider(height: 1),
-                ListTile(
-                  leading: const Icon(Icons.bug_report_outlined),
-                  title: Text(
-                    'Диагностика',
-                    style: t.titleMedium?.copyWith(fontWeight: FontWeight.w800),
-                  ),
-                  subtitle: const Text('Собрать отчёт'),
-                  onTap: _openDiagnostics,
-                ),
-              ],
-            ),
-          ),
-
-          const SizedBox(height: 18),
-          Text(
-            'Аккаунт',
-            style: t.titleMedium?.copyWith(fontWeight: FontWeight.w900),
-          ),
-          const SizedBox(height: 10),
+          _buildServiceSection(t, theme, tileChevron),
+          const SizedBox(height: 24),
           OutlinedButton(
-            onPressed: () => _logout(context),
+            onPressed: () => _confirmLogout(context),
             style: OutlinedButton.styleFrom(
               foregroundColor: const Color(0xFFFF5C5C),
               side: const BorderSide(color: Color(0xFF5A1313), width: 1.2),
@@ -850,6 +1948,40 @@ class _SettingsScreenState extends State<SettingsScreen> {
             ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+class _SoonBadge extends StatelessWidget {
+  const _SoonBadge();
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      decoration: BoxDecoration(
+        color: isDark
+            ? Colors.white.withValues(alpha: 0.08)
+            : Colors.black.withValues(alpha: 0.06),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(
+          color: isDark
+              ? Colors.white.withValues(alpha: 0.12)
+              : Colors.black.withValues(alpha: 0.08),
+        ),
+      ),
+      child: Text(
+        'Скоро',
+        style: Theme.of(context).textTheme.labelSmall?.copyWith(
+              color: isDark
+                  ? Colors.white.withValues(alpha: 0.65)
+                  : cs.onSurface.withValues(alpha: 0.65),
+              fontWeight: FontWeight.w700,
+            ),
       ),
     );
   }

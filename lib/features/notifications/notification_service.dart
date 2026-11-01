@@ -534,14 +534,25 @@ class NotificationService {
   }
 
   Future<void> _handlePayloadString(String payload) async {
-    final decoded = jsonDecode(payload);
-    if (decoded is Map) {
-      await _maybeApplyRemoteServerConfigFromData(
-        decoded.map((k, v) => MapEntry(k.toString(), v)),
+    try {
+      final decoded = jsonDecode(payload);
+      if (decoded is Map) {
+        await _maybeApplyRemoteServerConfigFromData(
+          decoded.map((k, v) => MapEntry(k.toString(), v)),
+        );
+        final data = <String, String>{};
+        decoded.forEach((k, v) => data[k.toString()] = v.toString());
+        action.value = NotificationAction(_targetFromData(data), data);
+        return;
+      }
+    } catch (_) {}
+
+    final rawTarget = payload.trim();
+    if (rawTarget.isNotEmpty) {
+      action.value = NotificationAction(
+        _targetFromData({'target': rawTarget}),
+        {'target': rawTarget},
       );
-      final data = <String, String>{};
-      decoded.forEach((k, v) => data[k.toString()] = v.toString());
-      action.value = NotificationAction(_targetFromData(data), data);
     }
   }
 }

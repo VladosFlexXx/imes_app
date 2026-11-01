@@ -14,8 +14,8 @@ import 'schedule_rule.dart';
 import 'week_parity.dart';
 import 'week_parity_service.dart';
 
-const _kCacheKey = 'schedule_cache_v3';
-const _kCacheUpdatedKey = 'schedule_cache_updated_v3';
+const _kCacheKey = 'schedule_cache_v4';
+const _kCacheUpdatedKey = 'schedule_cache_updated_v4';
 
 String _normDay(String s) => s.toUpperCase().trim();
 
@@ -121,6 +121,16 @@ class ScheduleRepository extends CachedRepository<List<Lesson>> {
     return _remoteSource.fetchLessons();
   }
 
+  @override
+  Future<void> clearCache() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.remove(_kCacheKey);
+      await prefs.remove(_kCacheUpdatedKey);
+    } catch (_) {}
+    await resetState();
+  }
+
   Map<String, dynamic> _lessonToJson(Lesson l) => {
     'day': l.day,
     'time': l.time,
@@ -129,6 +139,7 @@ class ScheduleRepository extends CachedRepository<List<Lesson>> {
     'type': l.type,
     'teacher': l.teacher,
     'status': l.status.name,
+    'url': l.url,
   };
 
   Lesson _lessonFromJson(Map<String, dynamic> j) => Lesson(
@@ -142,6 +153,7 @@ class ScheduleRepository extends CachedRepository<List<Lesson>> {
       (e) => e.name == j['status'],
       orElse: () => LessonStatus.normal,
     ),
+    url: j['url'] as String?,
   );
 }
 

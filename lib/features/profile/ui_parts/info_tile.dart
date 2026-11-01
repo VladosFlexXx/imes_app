@@ -1,4 +1,4 @@
-﻿part of '../../home/tab_profile.dart';
+part of '../../home/tab_profile.dart';
 
 class _InfoTile extends StatelessWidget {
   final IconData icon;

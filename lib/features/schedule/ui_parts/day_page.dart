@@ -45,6 +45,7 @@ class _DayPage extends StatelessWidget {
         for (int i = 0; i < lessons.length; i++) ...[
           _LessonCard(
             lesson: lessons[i],
+            date: date,
             isToday: WeekUtils.isSameDay(date, DateTime.now()),
             isOngoing: isOngoing(lessons[i]),
             isNext:

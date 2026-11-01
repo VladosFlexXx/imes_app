@@ -11,9 +11,11 @@ abstract class CachedRepository<T> extends ChangeNotifier {
   CachedRepository({
     required T initialData,
     required Duration ttl,
-  })  : _data = initialData,
+  })  : _initialData = initialData,
+        _data = initialData,
         _ttl = ttl;
 
+  final T _initialData;
   final Duration _ttl;
 
   T _data;
@@ -35,6 +37,16 @@ abstract class CachedRepository<T> extends ChangeNotifier {
   Future<T?> readCache();
   Future<void> writeCache(T data, DateTime updatedAt);
   Future<T> fetchRemote();
+  Future<void> clearCache();
+
+  @protected
+  Future<void> resetState() async {
+    _data = _initialData;
+    _updatedAt = null;
+    _lastError = null;
+    _cacheLoaded = false;
+    notifyListeners();
+  }
 
   Future<void> init() async {
     if (_cacheLoaded) return;

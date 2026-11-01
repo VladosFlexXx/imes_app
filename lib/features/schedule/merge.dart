@@ -78,6 +78,7 @@ List<Lesson> mergeSchedule({
           type: b.type,
           teacher: b.teacher,
           status: LessonStatus.cancelled,
+          url: b.url ?? c.url,
         );
       } else {
         out[k] = Lesson(
@@ -88,6 +89,7 @@ List<Lesson> mergeSchedule({
           type: c.type,
           teacher: c.teacher,
           status: LessonStatus.cancelled,
+          url: c.url,
         );
       }
       continue;
@@ -104,6 +106,7 @@ List<Lesson> mergeSchedule({
         type: c.type.isNotEmpty ? c.type : b.type,
         teacher: c.teacher.isNotEmpty ? c.teacher : b.teacher,
         status: same ? b.status : LessonStatus.changed,
+        url: c.url ?? b.url,
       );
     } else {
       out[k] = Lesson(
@@ -114,6 +117,7 @@ List<Lesson> mergeSchedule({
         type: c.type,
         teacher: c.teacher,
         status: LessonStatus.changed,
+        url: c.url,
       );
     }
   }

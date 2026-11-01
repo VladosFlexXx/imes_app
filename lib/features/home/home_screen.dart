@@ -4,11 +4,15 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 
+import 'package:vuz_app/app.dart';
+
 import 'package:vuz_app/core/auth/session_manager.dart';
 import 'package:vuz_app/core/demo/demo_mode.dart';
 import 'package:vuz_app/core/network/eios_client.dart';
 import 'package:vuz_app/features/auth/login_webview.dart';
+import 'package:vuz_app/ui/app_haptics.dart';
 import 'package:vuz_app/ui/app_theme.dart';
+import 'package:vuz_app/core/updater/app_update_service.dart';
 
 import '../notifications/notification_service.dart';
 import '../notifications/inbox_repository.dart';
@@ -23,7 +27,9 @@ import 'tab_more.dart';
 import 'tab_schedule.dart';
 
 class HomeScreen extends StatefulWidget {
-  const HomeScreen({super.key});
+  const HomeScreen({super.key, this.initialDataReady = false});
+
+  final bool initialDataReady;
 
   @override
   State<HomeScreen> createState() => _HomeScreenState();
@@ -52,22 +58,35 @@ class _HomeScreenState extends State<HomeScreen>
   }
 
   int _index = 0;
+  int _previousIndex = 0;
+  int _slideDirection = 1;
   DateTime? _lastBackPress;
   final Set<int> _visitedTabs = <int>{0};
   final Set<int> _warmedTabs = <int>{};
-  late final AnimationController _tabOverlayController;
-  int _tabOverlayDir = 1;
+  late final AnimationController _tabTransitionController;
+  late final CurvedAnimation _tabAnimation;
+  bool _dashboardEntranceDone = false;
+  final Map<int, Widget> _tabsCache = <int, Widget>{};
 
   void _navigateTo(int i) {
     if (i == _index) return;
-    final old = _index;
+    AppHaptics.selectionClick();
+    final oldIndex = _index;
+    final isReduced = themeController.reduceAnimations;
+
     setState(() {
+      _slideDirection = i > oldIndex ? 1 : -1;
+      _previousIndex = isReduced ? i : oldIndex;
       _index = i;
       _visitedTabs.add(i);
-      _tabOverlayDir = i > old ? 1 : -1;
     });
     _warmTabData(i);
-    _tabOverlayController.forward(from: 0);
+
+    if (isReduced) {
+      _tabTransitionController.reset();
+    } else {
+      _tabTransitionController.forward(from: 0.0);
+    }
   }
 
   final _notif = NotificationService.instance;
@@ -76,12 +95,27 @@ class _HomeScreenState extends State<HomeScreen>
   @override
   void initState() {
     super.initState();
-    _tabOverlayController = AnimationController(
+    _tabTransitionController = AnimationController(
       vsync: this,
-      duration: const Duration(milliseconds: 260),
+      duration: const Duration(milliseconds: 280),
     );
+    _tabAnimation = CurvedAnimation(
+      parent: _tabTransitionController,
+      curve: Curves.easeOutCubic,
+    );
+    _tabTransitionController.addStatusListener((status) {
+      if (status == AnimationStatus.completed) {
+        setState(() {
+          _previousIndex = _index;
+        });
+      }
+    });
 
-    _warmupCoreData();
+    if (widget.initialDataReady) {
+      _warmedTabs.add(0);
+    } else {
+      _warmupCoreData();
+    }
     if (DemoMode.instance.enabled) {
       unawaited(NotificationInboxRepository.instance.seedDemoItems());
     }
@@ -95,6 +129,13 @@ class _HomeScreenState extends State<HomeScreen>
       }
     };
     SessionManager.instance.expired.addListener(_sessionListener);
+
+    // Background check for releases
+    Future.delayed(const Duration(seconds: 3), () {
+      if (mounted) {
+        AppUpdateService.instance.checkAndPrompt(context);
+      }
+    });
   }
 
   Future<void> _warmupCoreData() async {
@@ -146,22 +187,35 @@ class _HomeScreenState extends State<HomeScreen>
     }
   }
 
-  Widget _buildTab(int index) {
-    if (!_visitedTabs.contains(index)) {
-      return const SizedBox.shrink();
-    }
-    switch (index) {
-      case 0:
-        return DashboardTab(onNavigate: _navigateTo);
-      case 1:
-        return const ScheduleTab();
-      case 2:
-        return const GradesTab();
-      case 3:
-        return const MoreTab();
-      default:
-        return const SizedBox.shrink();
-    }
+  Widget _getTab(int index) {
+    return _tabsCache.putIfAbsent(index, () {
+      Widget content;
+      switch (index) {
+        case 0:
+          content = DashboardTab(
+            onNavigate: _navigateTo,
+            animateEntrance: !_dashboardEntranceDone,
+          );
+          _dashboardEntranceDone = true;
+          break;
+        case 1:
+          content = const ScheduleTab();
+          break;
+        case 2:
+          content = const GradesTab();
+          break;
+        case 3:
+          content = const MoreTab();
+          break;
+        default:
+          content = const SizedBox.shrink();
+          break;
+      }
+      return KeyedSubtree(
+        key: ValueKey<int>(index),
+        child: content,
+      );
+    });
   }
 
   void _onNotificationAction() {
@@ -192,7 +246,7 @@ class _HomeScreenState extends State<HomeScreen>
     _deferredRefreshTimer?.cancel();
     _notif.action.removeListener(_onNotificationAction);
     SessionManager.instance.expired.removeListener(_sessionListener);
-    _tabOverlayController.dispose();
+    _tabTransitionController.dispose();
     super.dispose();
   }
 
@@ -229,7 +283,6 @@ class _HomeScreenState extends State<HomeScreen>
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final accent = appAccentOf(context);
 
     return PopScope(
       canPop: false,
@@ -243,45 +296,42 @@ class _HomeScreenState extends State<HomeScreen>
         body: SafeArea(
           child: Stack(
             children: [
-              IndexedStack(
-                index: _index,
-                children: List<Widget>.generate(4, _buildTab),
-              ),
-              Positioned.fill(
-                child: IgnorePointer(
-                  child: AnimatedBuilder(
-                    animation: _tabOverlayController,
-                    builder: (context, _) {
-                      final v = _tabOverlayController.value;
-                      if (v <= 0 || v >= 1) return const SizedBox.shrink();
-                      final dir = _tabOverlayDir;
-                      final dx = (1 - v) * 120 * (dir > 0 ? -1 : 1);
-                      return Opacity(
-                        opacity: (1 - v) * 0.18,
-                        child: Transform.translate(
-                          offset: Offset(dx, 0),
-                          child: DecoratedBox(
-                            decoration: BoxDecoration(
-                              gradient: LinearGradient(
-                                begin: dir > 0
-                                    ? Alignment.centerRight
-                                    : Alignment.centerLeft,
-                                end: dir > 0
-                                    ? Alignment.centerLeft
-                                    : Alignment.centerRight,
-                                colors: [
-                                  accent.withValues(alpha: 0.42),
-                                  accent.withValues(alpha: 0.08),
-                                  Colors.transparent,
-                                ],
-                              ),
-                            ),
-                          ),
+              AnimatedBuilder(
+                animation: _tabAnimation,
+                builder: (context, _) {
+                  final isTransitioning =
+                      !themeController.reduceAnimations &&
+                          _tabTransitionController.isAnimating &&
+                          _previousIndex != _index;
+                  return Stack(
+                    fit: StackFit.expand,
+                    clipBehavior: Clip.hardEdge,
+                    children: List<Widget>.generate(4, (i) {
+                      if (!_visitedTabs.contains(i)) {
+                        return const SizedBox.shrink();
+                      }
+                      final isCurrent = i == _index;
+                      final isPrevious = i == _previousIndex && isTransitioning;
+
+                      final offset = isTransitioning
+                          ? (isCurrent
+                              ? Offset(
+                                  _slideDirection * (1.0 - _tabAnimation.value),
+                                  0,
+                                )
+                              : Offset(-_slideDirection * _tabAnimation.value, 0))
+                          : Offset.zero;
+
+                      return Offstage(
+                        offstage: !isCurrent && !isPrevious,
+                        child: FractionalTranslation(
+                          translation: offset,
+                          child: _getTab(i),
                         ),
                       );
-                    },
-                  ),
-                ),
+                    }),
+                  );
+                },
               ),
               Positioned(
                 left: 28,
@@ -291,6 +341,7 @@ class _HomeScreenState extends State<HomeScreen>
                   index: _index,
                   onTap: _navigateTo,
                   theme: theme,
+                  reduceEffects: themeController.reduceEffects,
                 ),
               ),
             ],
@@ -305,18 +356,23 @@ class _GlassBottomNav extends StatelessWidget {
   final int index;
   final ValueChanged<int> onTap;
   final ThemeData theme;
+  final bool reduceEffects;
 
   const _GlassBottomNav({
     required this.index,
     required this.onTap,
     required this.theme,
+    this.reduceEffects = false,
   });
 
   @override
   Widget build(BuildContext context) {
     final cs = theme.colorScheme;
     final isDark = theme.brightness == Brightness.dark;
+    final isAmoled = isDark && themeController.amoledBlack;
     final accent = appAccentOf(context);
+    final density = appDensityOf(context);
+    final barHeight = density.navBarHeight;
     final items = const <({String label, IconData icon, IconData activeIcon})>[
       (label: 'Главная', icon: Icons.home_outlined, activeIcon: Icons.home),
       (
@@ -332,16 +388,19 @@ class _GlassBottomNav extends StatelessWidget {
       ),
     ];
 
-    return SizedBox(
-      height: 66,
-      child: ClipRRect(
+    final navContainer = Container(
+      decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(24),
-        child: BackdropFilter(
-          filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
-          child: Container(
-            decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(24),
-              gradient: LinearGradient(
+        color: isAmoled
+            ? (reduceEffects
+                ? Colors.black
+                : Colors.black.withValues(alpha: 0.20))
+            : (reduceEffects
+                ? (isDark ? const Color(0xFF1B2027) : const Color(0xFFF1F5FB))
+                : null),
+        gradient: (isAmoled || reduceEffects)
+            ? null
+            : LinearGradient(
                 begin: Alignment.topLeft,
                 end: Alignment.bottomRight,
                 colors: isDark
@@ -356,71 +415,99 @@ class _GlassBottomNav extends StatelessWidget {
                         const Color(0xFFF1F5FF).withValues(alpha: 0.82),
                       ],
               ),
-              border: Border.all(
-                color: isDark
-                    ? Colors.white.withValues(alpha: 0.14)
-                    : cs.outlineVariant.withValues(alpha: 0.24),
-              ),
-              boxShadow: [
+        border: Border.all(
+          color: isAmoled
+              ? accent.withValues(alpha: 0.35)
+              : (isDark
+                  ? Colors.white.withValues(alpha: reduceEffects ? 0.12 : 0.14)
+                  : cs.outlineVariant.withValues(alpha: reduceEffects ? 0.35 : 0.24)),
+          width: isAmoled ? 1.2 : 1.0,
+        ),
+        boxShadow: isAmoled
+            ? []
+            : [
                 BoxShadow(
                   color: isDark
-                      ? Colors.black.withValues(alpha: 0.22)
-                      : cs.shadow.withValues(alpha: 0.06),
-                  blurRadius: isDark ? 20 : 10,
-                  offset: const Offset(0, 6),
+                      ? Colors.black.withValues(alpha: reduceEffects ? 0.28 : 0.22)
+                      : cs.shadow.withValues(alpha: reduceEffects ? 0.08 : 0.06),
+                  blurRadius: isDark
+                      ? (reduceEffects ? 12 : 20)
+                      : (reduceEffects ? 8 : 10),
+                  offset: const Offset(0, 4),
                 ),
               ],
-            ),
-            child: LayoutBuilder(
-              builder: (context, constraints) {
-                final width = constraints.maxWidth / items.length;
-                final left = width * index;
-                return Stack(
+      ),
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          final width = constraints.maxWidth / items.length;
+          final left = width * index;
+          final glowSize = (constraints.maxHeight - 8).clamp(36.0, 58.0);
+          final glowTop = (constraints.maxHeight - glowSize) / 2;
+
+          return Stack(
+            children: [
+              AnimatedPositioned(
+                duration: const Duration(milliseconds: 200),
+                curve: Curves.easeOutCubic,
+                left: left + (width - glowSize) / 2,
+                top: glowTop,
+                child: Container(
+                  width: glowSize,
+                  height: glowSize,
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(20),
+                    gradient: RadialGradient(
+                      colors: [
+                        accent.withValues(alpha: 0.56),
+                        accent.withValues(alpha: 0.26),
+                        Colors.transparent,
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+              Positioned.fill(
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
-                    AnimatedPositioned(
-                      duration: const Duration(milliseconds: 200),
-                      curve: Curves.easeOutCubic,
-                      left: left + (width - 58) / 2,
-                      top: 4,
-                      child: Container(
-                        width: 58,
-                        height: 58,
-                        decoration: BoxDecoration(
-                          borderRadius: BorderRadius.circular(20),
-                          gradient: RadialGradient(
-                            colors: [
-                              accent.withValues(alpha: 0.56),
-                              accent.withValues(alpha: 0.26),
-                              Colors.transparent,
-                            ],
+                    for (var i = 0; i < items.length; i++)
+                      Expanded(
+                        child: InkWell(
+                          borderRadius: BorderRadius.circular(24),
+                          onTap: () {
+                            AppHaptics.selectionClick();
+                            onTap(i);
+                          },
+                          child: Center(
+                            child: _GlassNavItem(
+                              label: items[i].label,
+                              icon: i == index
+                                  ? items[i].activeIcon
+                                  : items[i].icon,
+                              selected: i == index,
+                            ),
                           ),
                         ),
                       ),
-                    ),
-                    Row(
-                      children: [
-                        for (var i = 0; i < items.length; i++)
-                          Expanded(
-                            child: InkWell(
-                              borderRadius: BorderRadius.circular(24),
-                              onTap: () => onTap(i),
-                              child: _GlassNavItem(
-                                label: items[i].label,
-                                icon: i == index
-                                    ? items[i].activeIcon
-                                    : items[i].icon,
-                                selected: i == index,
-                              ),
-                            ),
-                          ),
-                      ],
-                    ),
                   ],
-                );
-              },
-            ),
-          ),
-        ),
+                ),
+              ),
+            ],
+          );
+        },
+      ),
+    );
+
+    return SizedBox(
+      height: barHeight,
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(24),
+        child: reduceEffects
+            ? navContainer
+            : BackdropFilter(
+                filter: ImageFilter.blur(sigmaX: 20, sigmaY: 20),
+                child: navContainer,
+              ),
       ),
     );
   }
@@ -442,30 +529,35 @@ class _GlassNavItem extends StatelessWidget {
     final cs = Theme.of(context).colorScheme;
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final accent = appAccentOf(context);
+    final density = appDensityOf(context);
     final color = selected
         ? accent
         : (isDark
               ? Colors.white.withValues(alpha: 0.78)
               : cs.onSurface.withValues(alpha: 0.72));
 
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 7),
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Icon(icon, color: color, size: selected ? 24 : 22),
-          const SizedBox(height: 1),
-          Text(
+    final iconSize = (selected ? 24.0 : 22.0) * density.scale.clamp(0.85, 1.15);
+
+    return Column(
+      mainAxisAlignment: MainAxisAlignment.center,
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Icon(icon, color: color, size: iconSize),
+        const SizedBox(height: 2),
+        FittedBox(
+          fit: BoxFit.scaleDown,
+          child: Text(
             label,
             maxLines: 1,
-            overflow: TextOverflow.ellipsis,
             style: Theme.of(context).textTheme.labelLarge?.copyWith(
               color: color,
               fontWeight: selected ? FontWeight.w800 : FontWeight.w600,
             ),
           ),
-        ],
-      ),
+        ),
+      ],
     );
   }
 }
+
+

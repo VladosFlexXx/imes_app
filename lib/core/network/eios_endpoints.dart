@@ -7,6 +7,7 @@ class EiosEndpoints {
   static const String userEdit = '$base/user/edit.php';
 
   static const String scheduleBase = '$base/mod/page/view.php?id=41428';
+  static const String scheduleCourse = '$base/course/view.php?id=54';
   static const String scheduleChanges = '$base/mod/page/view.php?id=56446';
 
   static const String gradesOverview = '$base/grade/report/overview/index.php';

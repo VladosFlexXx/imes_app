@@ -43,29 +43,49 @@ class _UnifiedHeaderCard extends StatelessWidget {
           : cs.onSurface.withValues(alpha: 0.72),
     );
 
+    final isAmoled = isDark && themeController.amoledBlack;
+    final accent = _scheduleAccent(context);
+
     return Container(
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(24),
-        gradient: LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: isDark
-              ? const [Color(0xFF1A1E23), Color(0xFF1A1E23)]
-              : const [Color(0xFFF1F3F7), Color(0xFFE9EDF4)],
+        color: isAmoled ? Colors.black : null,
+        gradient: isAmoled
+            ? null
+            : LinearGradient(
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+                colors: isDark
+                    ? const [Color(0xFF1A1E23), Color(0xFF1A1E23)]
+                    : const [Color(0xFFF1F3F7), Color(0xFFE9EDF4)],
+              ),
+        border: Border.all(
+          color: isAmoled
+              ? accent.withValues(alpha: 0.35)
+              : (isDark
+                  ? Colors.white.withValues(alpha: 0.08)
+                  : Colors.black.withValues(alpha: 0.08)),
+          width: isAmoled ? 1.2 : 1.0,
         ),
-        boxShadow: [
-          BoxShadow(
-            color: isDark
-                ? Colors.black.withValues(alpha: 0.2)
-                : Colors.black.withValues(alpha: 0.08),
-            blurRadius: 14,
-            offset: const Offset(0, 8),
-          ),
-        ],
+        boxShadow: isAmoled
+            ? []
+            : [
+                BoxShadow(
+                  color: isDark
+                      ? Colors.black.withValues(alpha: 0.2)
+                      : Colors.black.withValues(alpha: 0.08),
+                  blurRadius: 14,
+                  offset: const Offset(0, 8),
+                ),
+              ],
       ),
-      child: Padding(
-        padding: const EdgeInsets.all(14),
-        child: Column(
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(23),
+        child: Material(
+          color: Colors.transparent,
+          child: Padding(
+            padding: const EdgeInsets.all(14),
+            child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Row(
@@ -184,6 +204,8 @@ class _UnifiedHeaderCard extends StatelessWidget {
           ],
         ),
       ),
-    );
+    ),
+  ),
+);
   }
 }

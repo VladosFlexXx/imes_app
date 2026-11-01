@@ -71,6 +71,16 @@ class RecordbookRepository extends CachedRepository<List<RecordbookGradebook>> {
     return _remoteSource.fetchGradebooks();
   }
 
+  @override
+  Future<void> clearCache() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.remove(_kRecordbookCacheKey);
+      await prefs.remove(_kRecordbookUpdatedKey);
+    } catch (_) {}
+    await resetState();
+  }
+
   Map<String, dynamic> _toJsonGradebook(RecordbookGradebook g) => {
     'number': g.number,
     'semesters': g.semesters

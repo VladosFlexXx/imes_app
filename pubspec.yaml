@@ -3,7 +3,7 @@ description: "A new Flutter project."
 
 publish_to: 'none' 
 
-version: 0.3.6+24
+version: 0.4.0+25
 
 environment:
   sdk: ^3.10.7
@@ -28,9 +28,14 @@ dependencies:
   share_plus: ^10.0.0
   http: ^1.2.2
   url_launcher: ^6.3.0
+  path_provider: ^2.1.5
+  dynamic_color: ^1.7.0
 
   cupertino_icons: ^1.0.8
   flutter_launcher_icons: ^0.14.4
+  local_auth: ^3.0.2
+  crypto: ^3.0.6
+  timezone: ^0.10.1
 
 dev_dependencies:
   flutter_test:
@@ -43,10 +48,5 @@ flutter:
   assets:
     - assets/splash/logo_big.png
     - assets/splash/logo_header.gif
-
-flutter_icons:
-  android: true
-  ios: false
-  image_path: "assets/icon/icon.png"
-  adaptive_icon_background: "#FF8C00"
-  adaptive_icon_foreground: "assets/icon/icon.png"
+    - assets/icon/icon_light.png
+    - assets/icon/icon_dark.png

@@ -39,7 +39,9 @@ class ScheduleParser {
         currentDay = _clean(cells[0].text);
         final time = _clean(cells[1].text);
         final subject = _clean(cells[2].text);
-        final place = _clean(cells[3].text);
+        final placeCell = cells[3];
+        final place = _clean(placeCell.text);
+        final link = placeCell.querySelector('a')?.attributes['href']?.trim();
         final type = _clean(cells[4].text);
         final teacher = _clean(cells[5].text);
 
@@ -51,12 +53,15 @@ class ScheduleParser {
             place: place,
             type: type,
             teacher: teacher,
+            url: link != null && link.isNotEmpty ? link : null,
           ));
         }
       } else if (cells.length == 5) {
         final time = _clean(cells[0].text);
         final subject = _clean(cells[1].text);
-        final place = _clean(cells[2].text);
+        final placeCell = cells[2];
+        final place = _clean(placeCell.text);
+        final link = placeCell.querySelector('a')?.attributes['href']?.trim();
         final type = _clean(cells[3].text);
         final teacher = _clean(cells[4].text);
 
@@ -68,6 +73,7 @@ class ScheduleParser {
             place: place,
             type: type,
             teacher: teacher,
+            url: link != null && link.isNotEmpty ? link : null,
           ));
         }
       }

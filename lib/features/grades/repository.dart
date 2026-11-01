@@ -77,6 +77,16 @@ class GradesRepository extends CachedRepository<List<GradeCourse>> {
     return _remoteSource.fetchCourseReport(course);
   }
 
+  @override
+  Future<void> clearCache() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.remove(_kGradesCacheKey);
+      await prefs.remove(_kGradesUpdatedKey);
+    } catch (_) {}
+    await resetState();
+  }
+
   Map<String, dynamic> _toJson(GradeCourse c) => {
     'courseName': c.courseName,
     'courseUrl': c.courseUrl,

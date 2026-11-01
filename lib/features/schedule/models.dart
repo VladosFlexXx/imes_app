@@ -13,6 +13,7 @@ class Lesson {
   final String teacher;
 
   final LessonStatus status;
+  final String? url;
 
   const Lesson({
     required this.day,
@@ -22,6 +23,7 @@ class Lesson {
     required this.type,
     required this.teacher,
     this.status = LessonStatus.normal,
+    this.url,
   });
 
   Lesson copyWith({
@@ -32,6 +34,7 @@ class Lesson {
     String? type,
     String? teacher,
     LessonStatus? status,
+    String? url,
   }) {
     return Lesson(
       day: day ?? this.day,
@@ -41,10 +44,11 @@ class Lesson {
       type: type ?? this.type,
       teacher: teacher ?? this.teacher,
       status: status ?? this.status,
+      url: url ?? this.url,
     );
   }
 
   @override
   String toString() =>
-      '$day | $time | $subject | $place | $type | $teacher | $status';
+      '$day | $time | $subject | $place | $type | $teacher | $status | $url';
 }

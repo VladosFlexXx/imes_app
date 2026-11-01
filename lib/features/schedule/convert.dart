@@ -15,6 +15,7 @@ List<Lesson> lessonsFromHtml(String htmlText) {
   String currentTime = '';
   String currentSubject = '';
   String currentPlace = '';
+  String? currentPlaceUrl;
 
   final rows = table.querySelectorAll('tr');
 
@@ -54,9 +55,11 @@ List<Lesson> lessonsFromHtml(String htmlText) {
     // D) subject+place отсутствуют (редко): type, teacher (2) — пропускаем
 
     final remaining = texts.sublist(idx);
+    final remainingCells = cells.sublist(idx);
 
     String subject = '';
     String place = '';
+    String? placeUrl;
     String type = '';
     String teacher = '';
 
@@ -67,14 +70,17 @@ List<Lesson> lessonsFromHtml(String htmlText) {
       // Нормальный полный ряд: subject/place/type/teacher
       subject = remaining[0];
       place = remaining[1];
+      placeUrl = remainingCells[1].querySelector('a')?.attributes['href']?.trim();
       type = remaining[2];
       teacher = remaining[3];
 
       if (subject.isNotEmpty) currentSubject = subject;
       if (place.isNotEmpty) currentPlace = place;
+      if (placeUrl != null && placeUrl.isNotEmpty) currentPlaceUrl = placeUrl;
     } else if (remaining.length == 3) {
       // Укороченный ряд: place/type/teacher, subject наследуем
       place = remaining[0];
+      placeUrl = remainingCells[0].querySelector('a')?.attributes['href']?.trim();
       type = remaining[1];
       teacher = remaining[2];
 
@@ -83,6 +89,8 @@ List<Lesson> lessonsFromHtml(String htmlText) {
 
       if (place.isNotEmpty) currentPlace = place;
       if (place.isEmpty) place = currentPlace;
+      if (placeUrl != null && placeUrl.isNotEmpty) currentPlaceUrl = placeUrl;
+      if (placeUrl == null || placeUrl.isEmpty) placeUrl = currentPlaceUrl;
     } else {
       continue;
     }
@@ -98,6 +106,7 @@ List<Lesson> lessonsFromHtml(String htmlText) {
       type: type,
       teacher: teacher,
       status: LessonStatus.normal,
+      url: (placeUrl != null && placeUrl.isNotEmpty) ? placeUrl : null,
     );
 
     // === FIX ДУБЛЕЙ ИЗ-ЗА ROWSPAN (подгруппы) ===
@@ -122,6 +131,7 @@ List<Lesson> lessonsFromHtml(String htmlText) {
           final mergedTeacher = t1.isEmpty ? t2 : '$t1\n$t2';
           lessons[lessons.length - 1] = last.copyWith(
             teacher: mergedTeacher,
+            url: last.url ?? newLesson.url,
             // place оставляем как у последнего/первого — обычно одинаковый (Live Digital)
           );
         }

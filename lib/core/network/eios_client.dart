@@ -161,11 +161,6 @@ class EiosClient {
       final nextReq = http.Request(method, nextUri);
       nextReq.headers.addAll(current.headers);
 
-      // если это POST->GET, то тело уже не нужно
-      if (method != 'GET' && current is http.Request) {
-        // на всякий случай — но у нас метод либо GET либо POST без повторов
-      }
-
       // Referer полезен для Moodle
       nextReq.headers['Referer'] = current.url.toString();
 
@@ -309,15 +304,21 @@ class EiosClient {
       rethrow;
     }
 
+    final parsedUri = Uri.parse(url);
+    final isAllowedHost = parsedUri.host.isEmpty || parsedUri.host.endsWith('imes.su');
+
     Future<http.Response> doRequest(String cookieHeader) {
+      final headers = <String, String>{
+        'User-Agent': 'Mozilla/5.0',
+        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+      };
+      if (isAllowedHost) {
+        headers['Cookie'] = cookieHeader;
+      }
       return _client
           .get(
-            Uri.parse(url),
-            headers: {
-              'Cookie': cookieHeader,
-              'User-Agent': 'Mozilla/5.0',
-              'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
-            },
+            parsedUri,
+            headers: headers,
           )
           .timeout(timeout);
     }
@@ -365,7 +366,7 @@ class EiosClient {
         if (attempt == retries) {
           sw.stop();
           AppLogger.instance.e('[HTTP] FAIL $url (${sw.elapsedMilliseconds}ms)', lastErr);
-          throw lastErr ?? Exception('Unknown network error');
+          throw lastErr;
         }
 
         AppLogger.instance.w('[HTTP] ERROR attempt=${attempt + 1}/$retries url=$url err=$e');

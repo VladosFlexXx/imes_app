@@ -1,8 +1,9 @@
 import 'package:flutter/material.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 import 'dart:async';
+import '../../app.dart';
 import '../../ui/app_theme.dart';
 import '../../ui/shimmer_skeleton.dart';
+import '../../ui/app_haptics.dart';
 
 import '../grades/models.dart';
 import '../grades/repository.dart';
@@ -18,7 +19,6 @@ import '../study_plan/models.dart';
 part '../grades/ui_parts/course_card.dart';
 part '../grades/ui_parts/study_plan_card.dart';
 part '../grades/ui_parts/recordbook_card.dart';
-part '../grades/ui_parts/badge.dart';
 part '../grades/ui_parts/chip.dart';
 
 enum StudySection { disciplines, studyPlan, recordbook }
@@ -42,10 +42,8 @@ class _GradesTabState extends State<GradesTab>
 
   late final TabController _tabController;
 
+  final _searchController = TextEditingController();
   String _query = '';
-
-  // дисциплины
-  int _cap = 50;
 
   // учебный план
   int _planSemester = 1;
@@ -53,8 +51,6 @@ class _GradesTabState extends State<GradesTab>
   // зачётка
   String? _selectedGradebook;
   int _recordSemester = 1;
-
-  static const _kGradesCapKey = 'grades_current_cap_v1';
 
   @override
   void initState() {
@@ -81,28 +77,13 @@ class _GradesTabState extends State<GradesTab>
       vsync: this,
       animationDuration: const Duration(milliseconds: 170),
     );
-
-    _loadCap();
   }
 
   @override
   void dispose() {
     _tabController.dispose();
+    _searchController.dispose();
     super.dispose();
-  }
-
-  Future<void> _loadCap() async {
-    final prefs = await SharedPreferences.getInstance();
-    final cap = prefs.getInt(_kGradesCapKey);
-    if (cap != null && cap >= 0 && cap <= 200) {
-      setState(() => _cap = cap);
-    }
-  }
-
-  Future<void> _setCap(int v) async {
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setInt(_kGradesCapKey, v);
-    setState(() => _cap = v);
   }
 
   String _fmtTime(DateTime dt) =>
@@ -116,21 +97,29 @@ class _GradesTabState extends State<GradesTab>
     final t = Theme.of(context).textTheme;
     final cs = Theme.of(context).colorScheme;
     final isDark = Theme.of(context).brightness == Brightness.dark;
+    final isAmoled = isDark && themeController.amoledBlack;
+    final accent = _gradesAccent(context);
 
     return Container(
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(24),
-        gradient: LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: isDark
-              ? const [Color(0xFF1A1E23), Color(0xFF171B21)]
-              : const [Color(0xFFF1F3F7), Color(0xFFE9EDF4)],
-        ),
+        color: isAmoled ? Colors.black : null,
+        gradient: isAmoled
+            ? null
+            : LinearGradient(
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+                colors: isDark
+                    ? const [Color(0xFF1A1E23), Color(0xFF171B21)]
+                    : const [Color(0xFFF1F3F7), Color(0xFFE9EDF4)],
+              ),
         border: Border.all(
-          color: isDark
-              ? Colors.white.withValues(alpha: 0.08)
-              : Colors.black.withValues(alpha: 0.08),
+          color: isAmoled
+              ? accent.withValues(alpha: 0.35)
+              : (isDark
+                  ? Colors.white.withValues(alpha: 0.08)
+                  : Colors.black.withValues(alpha: 0.08)),
+          width: isAmoled ? 1.2 : 1.0,
         ),
       ),
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
@@ -291,168 +280,71 @@ class _GradesTabState extends State<GradesTab>
   // Page: disciplines
   // =========================
 
-  Future<void> _openCapDialog() async {
-    final controller = TextEditingController(text: _cap.toString());
-    final res = await showDialog<int>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('Кап баллов для “текущих”'),
-        content: TextField(
-          controller: controller,
-          keyboardType: TextInputType.number,
-          decoration: const InputDecoration(hintText: 'например 50 или 60'),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx),
-            child: const Text('Отмена'),
-          ),
-          FilledButton(
-            onPressed: () {
-              final v = int.tryParse(controller.text.trim());
-              if (v == null) return;
-              Navigator.pop(ctx, v.clamp(0, 200));
-            },
-            child: const Text('Сохранить'),
-          ),
-        ],
-      ),
-    );
-
-    if (res != null) {
-      await _setCap(res);
-    }
-  }
-
   Widget _pageDisciplines() {
     final t = Theme.of(context).textTheme;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
 
     final all = gradesRepo.courses;
-
-    // нормализованные предметы из расписания
     final scheduleNorm = _scheduleSubjectsNorm();
     final scheduleBase = scheduleNorm.map(_normSubjectBase).toSet();
 
-    // 1) Текущие по твоему правилу: есть в расписании И баллы < cap
-    bool isCurrent(GradeCourse c) {
-      // Текущие = есть в расписании И баллы меньше капа.
-      final inSchedule = _inSchedule(
-        c,
-        scheduleNorm: scheduleNorm,
-        scheduleBase: scheduleBase,
-      );
-      if (!inSchedule) return false;
-
-      final pts = _extractPoints(c);
-
-      // В начале семестра баллов может не быть: считаем такую дисциплину "текущей",
-      // если она есть в расписании.
-      if (pts == null) return true;
-
-      return pts <= _cap;
-    }
-
-    final current = all.where(isCurrent).toList();
-
-    // Если в "текущих" оказалось несколько частей одной дисциплины (ч.1/ч.2),
-    // оставляем наиболее вероятно актуальную запись.
-    final dedup = <String, GradeCourse>{};
-    for (final c in current) {
-      final key = _normSubjectBase(c.courseName);
-      final prev = dedup[key];
-      if (prev == null) {
-        dedup[key] = c;
-        continue;
-      }
-
-      final prevGrade = prev.grade?.trim() ?? '';
-      final curGrade = c.grade?.trim() ?? '';
-      final prevHasFinal =
-          prevGrade.isNotEmpty && prevGrade != '—' && prevGrade != '-';
-      final curHasFinal =
-          curGrade.isNotEmpty && curGrade != '—' && curGrade != '-';
-
-      if (prevHasFinal && !curHasFinal) {
-        dedup[key] = c;
-        continue;
-      }
-      if (!prevHasFinal && !curHasFinal) {
-        final prevExact = scheduleNorm.contains(_normSubject(prev.courseName));
-        final curExact = scheduleNorm.contains(_normSubject(c.courseName));
-        if (!prevExact && curExact) {
-          dedup[key] = c;
-          continue;
-        }
-      }
-      if (prevHasFinal == curHasFinal) {
-        final prevPts = _extractPoints(prev) ?? 999;
-        final curPts = _extractPoints(c) ?? 999;
-        if (curPts < prevPts) {
-          dedup[key] = c;
-          continue;
-        }
-        if (curPts == prevPts) {
-          final prevPart = _subjectPart(prev.courseName) ?? 0;
-          final curPart = _subjectPart(c.courseName) ?? 0;
-          if (curPart > prevPart) dedup[key] = c;
-        }
-      }
-    }
-    final currentUnique = dedup.values.toList();
-    final others = all.where((c) => !currentUnique.contains(c)).toList();
-
-    // Защита от пустоты: если текущих 0 (из-за несовпадений названий) —
-    // делаем мягче: просто "есть в расписании"
-    if (currentUnique.isEmpty && scheduleNorm.isNotEmpty) {
-      final softCurrent = all
-          .where(
-            (c) => _inSchedule(
-              c,
-              scheduleNorm: scheduleNorm,
-              scheduleBase: scheduleBase,
-            ),
-          )
-          .toList();
-      if (softCurrent.isNotEmpty) {
-        currentUnique
-          ..clear()
-          ..addAll(softCurrent);
-        others
-          ..clear()
-          ..addAll(all.where((c) => !softCurrent.contains(c)));
-      }
-    }
-
-    final currentQ = _applyQuery(currentUnique);
-    final othersQ = _applyQuery(others);
+    final filtered = _applyQuery(all);
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        TextField(
-          onChanged: (v) => setState(() => _query = v),
-          decoration: const InputDecoration(
-            prefixIcon: Icon(Icons.search),
-            hintText: 'Поиск по дисциплинам',
+        // Sleek compact search bar
+        Container(
+          height: 38,
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(11),
+            color: (isDark && themeController.amoledBlack)
+                ? Colors.black
+                : (isDark
+                    ? Colors.white.withValues(alpha: 0.05)
+                    : Colors.black.withValues(alpha: 0.04)),
+            border: Border.all(
+              color: (isDark && themeController.amoledBlack)
+                  ? _gradesAccent(context).withValues(alpha: 0.35)
+                  : (isDark
+                      ? Colors.white.withValues(alpha: 0.08)
+                      : Colors.black.withValues(alpha: 0.06)),
+              width: (isDark && themeController.amoledBlack) ? 1.2 : 1.0,
+            ),
+          ),
+          child: TextField(
+            controller: _searchController,
+            onChanged: (v) => setState(() => _query = v),
+            style: const TextStyle(fontSize: 13.5),
+            decoration: InputDecoration(
+              border: InputBorder.none,
+              isDense: true,
+              contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+              prefixIcon: Icon(
+                Icons.search_rounded,
+                size: 19,
+                color: isDark ? Colors.white38 : Colors.black38,
+              ),
+              prefixIconConstraints: const BoxConstraints(minWidth: 34, minHeight: 34),
+              hintText: all.isEmpty ? 'Поиск по дисциплинам...' : 'Поиск среди ${all.length} дисциплин...',
+              hintStyle: TextStyle(
+                fontSize: 13,
+                color: isDark ? Colors.white30 : Colors.black26,
+              ),
+              suffixIcon: _query.isNotEmpty
+                  ? IconButton(
+                      icon: const Icon(Icons.close_rounded, size: 16),
+                      padding: EdgeInsets.zero,
+                      onPressed: () {
+                        _searchController.clear();
+                        setState(() => _query = '');
+                      },
+                    )
+                  : null,
+            ),
           ),
         ),
-        const SizedBox(height: 10),
-
-        Row(
-          children: [
-            Text(
-              'Текущие: кап $_cap',
-              style: t.bodySmall?.copyWith(fontWeight: FontWeight.w800),
-            ),
-            const SizedBox(width: 10),
-            TextButton.icon(
-              onPressed: _openCapDialog,
-              icon: const Icon(Icons.tune, size: 18),
-              label: const Text('Изменить'),
-            ),
-          ],
-        ),
-        const SizedBox(height: 6),
+        const SizedBox(height: 9),
 
         if (!gradesRepo.loading && all.isEmpty) ...[
           const SizedBox(height: 80),
@@ -462,47 +354,38 @@ class _GradesTabState extends State<GradesTab>
               style: t.titleMedium?.copyWith(fontWeight: FontWeight.w900),
             ),
           ),
+        ] else if (filtered.isEmpty) ...[
+          const SizedBox(height: 60),
+          Center(
+            child: Text(
+              'Ничего не найдено',
+              style: t.bodyMedium?.copyWith(
+                color: isDark ? Colors.white54 : Colors.black54,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ),
         ] else ...[
-          if (currentQ.isNotEmpty) ...[
-            Text(
-              'Текущие',
-              style: t.titleSmall?.copyWith(fontWeight: FontWeight.w900),
-            ),
-            const SizedBox(height: 8),
-            for (final c in currentQ)
-              _CourseCard(
-                course: c,
-                onTap: () {
-                  Navigator.of(context).push(
-                    MaterialPageRoute(
-                      builder: (_) => CourseGradeReportScreen(course: c),
-                    ),
-                  );
-                },
+          for (final c in filtered)
+            _CourseCard(
+              course: c,
+              isInSchedule: _inSchedule(
+                c,
+                scheduleNorm: scheduleNorm,
+                scheduleBase: scheduleBase,
               ),
-            const SizedBox(height: 12),
-          ],
-          if (othersQ.isNotEmpty) ...[
-            Text(
-              'Остальные',
-              style: t.titleSmall?.copyWith(fontWeight: FontWeight.w900),
+              points: _extractPoints(c),
+              onTap: () {
+                Navigator.of(context).push(
+                  MaterialPageRoute(
+                    builder: (_) => CourseGradeReportScreen(course: c),
+                  ),
+                );
+              },
             ),
-            const SizedBox(height: 8),
-            for (final c in othersQ)
-              _CourseCard(
-                course: c,
-                onTap: () {
-                  Navigator.of(context).push(
-                    MaterialPageRoute(
-                      builder: (_) => CourseGradeReportScreen(course: c),
-                    ),
-                  );
-                },
-              ),
-          ],
         ],
 
-        const SizedBox(height: 60),
+        const SizedBox(height: 30),
       ],
     );
   }
@@ -981,7 +864,7 @@ class _GradesTabState extends State<GradesTab>
       onRefresh: () => _refreshSection(section),
       child: ListView(
         physics: const AlwaysScrollableScrollPhysics(),
-        padding: const EdgeInsets.fromLTRB(16, 12, 16, 106),
+        padding: const EdgeInsets.fromLTRB(16, 8, 16, 96),
         children: [
           if (isLoading) ...[
             const LoadingSkeletonStrip(),

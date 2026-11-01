@@ -8,6 +8,8 @@ import 'features/notifications/notification_service.dart';
 
 // ✅ новое
 import 'core/logging/app_logger.dart';
+import 'core/storage/lesson_notes_storage.dart';
+import 'features/homework/homework_repository.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -35,6 +37,8 @@ Future<void> main() async {
   };
 
   AppLogger.instance.i('[BOOT] app start');
+  unawaited(LessonNotesStorage.initCache());
+  unawaited(HomeworkRepository.instance.init());
   runApp(const VuzApp());
 
   // ✅ стартуем сервис пушей сразу, в фоне

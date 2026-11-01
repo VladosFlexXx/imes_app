@@ -68,6 +68,16 @@ class StudyPlanRepository extends CachedRepository<List<StudyPlanItem>> {
     return _remoteSource.fetchItems();
   }
 
+  @override
+  Future<void> clearCache() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.remove(_kStudyPlanCacheKey);
+      await prefs.remove(_kStudyPlanUpdatedKey);
+    } catch (_) {}
+    await resetState();
+  }
+
   Map<String, dynamic> _toJson(StudyPlanItem i) => {
     'semester': i.semester,
     'code': i.code,

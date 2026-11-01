@@ -1,24 +1,29 @@
 import 'package:flutter/material.dart';
-import 'dart:async';
 
 import '../grades/repository.dart';
 import '../notifications/inbox_repository.dart';
 import '../notifications/notifications_center_screen.dart';
+import '../campus/contacts_screen.dart';
+import '../campus/floor_plan_screen.dart';
+import '../homework/homework_repository.dart';
+import '../homework/homework_screen.dart';
 import '../profile/repository.dart';
 import '../profile/widgets/auth_avatar.dart';
 import '../schedule/models.dart';
 import '../schedule/schedule_repository.dart';
+import '../schedule/lesson_live_status.dart';
+import '../schedule/ui_parts/lesson_details_sheet.dart';
+import '../../ui/app_haptics.dart';
 import '../../ui/shimmer_skeleton.dart';
 import '../../ui/app_theme.dart';
+import '../../app.dart';
+import '../../core/storage/lesson_notes_storage.dart';
 import 'tab_profile.dart';
 
 part 'dashboard_parts/greeting_hero.dart';
-part 'dashboard_parts/week_progress_strip.dart';
-part 'dashboard_parts/week_mood_map_card.dart';
+part 'dashboard_parts/dashboard_quick_actions.dart';
+part 'dashboard_parts/dashboard_deadlines_card.dart';
 part 'dashboard_parts/next_lesson_card.dart';
-
-final ValueNotifier<bool> _dashboardIntroLoading = ValueNotifier<bool>(true);
-bool _dashboardIntroTimerStarted = false;
 
 Color _dashboardAccent(BuildContext context) {
   final palette = Theme.of(context).extension<AppAccentPalette>();
@@ -27,17 +32,16 @@ Color _dashboardAccent(BuildContext context) {
 
 class DashboardTab extends StatelessWidget {
   final void Function(int index) onNavigate;
+  final bool animateEntrance;
 
-  const DashboardTab({super.key, required this.onNavigate});
+  /// Сессионный флаг: анимация воспроизводится только 1 раз при запуске.
+  static bool hasPlayedEntrance = false;
 
-  void _ensureIntroTimer() {
-    if (_dashboardIntroTimerStarted) return;
-    _dashboardIntroTimerStarted = true;
-    // Чуть длиннее интро, чтобы успевал отрисоваться UI до фоновых обновлений.
-    Future<void>.delayed(const Duration(milliseconds: 2600), () {
-      _dashboardIntroLoading.value = false;
-    });
-  }
+  const DashboardTab({
+    super.key,
+    required this.onNavigate,
+    this.animateEntrance = true,
+  });
 
   Future<void> _refreshAll() async {
     await Future.wait([
@@ -110,34 +114,14 @@ class DashboardTab extends StatelessWidget {
   }
 
   String _timeToText(_UpcomingLesson next) {
-    final now = DateTime.now();
-    final start = next.start;
-    final lesson = next.lesson;
-
-    final end = _parseEndForDate(lesson.time, next.day);
-    final isOngoing = end != null && start.isBefore(now) && end.isAfter(now);
-    if (isOngoing) return 'уже идёт';
-
-    final startOfToday = DateTime(now.year, now.month, now.day);
-    final startOfNextDay = startOfToday.add(const Duration(days: 1));
-    if (next.day == startOfToday) {
-      final diff = start.difference(now);
-      final mins = diff.inMinutes;
-      if (mins <= 0) return 'скоро';
-      if (mins < 60) return 'через $mins мин';
-
-      final hours = diff.inHours;
-      final rem = mins - hours * 60;
-      if (rem == 0) return 'через $hours ч';
-      return 'через $hours ч $rem мин';
+    final status = LessonLiveStatus.calculate(
+      timeStr: next.lesson.time,
+      date: next.day,
+    );
+    if (status.isOngoing) {
+      return 'Идёт сейчас · ${status.remainingMinutes} мин';
     }
-
-    if (next.day == startOfNextDay) {
-      return 'завтра в ${lesson.time.split('-').first.trim()}';
-    }
-
-    String two(int x) => x.toString().padLeft(2, '0');
-    return '${two(next.day.day)}.${two(next.day.month)} в ${lesson.time.split('-').first.trim()}';
+    return status.label;
   }
 
   DateTime _weekStart(DateTime date) {
@@ -210,7 +194,6 @@ class DashboardTab extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    _ensureIntroTimer();
     final scheduleRepo = ScheduleRepository.instance;
     final gradesRepo = GradesRepository.instance;
     final profileRepo = ProfileRepository.instance;
@@ -222,10 +205,9 @@ class DashboardTab extends StatelessWidget {
         gradesRepo,
         profileRepo,
         inboxRepo.unreadCount,
-        _dashboardIntroLoading,
+        LessonLiveTicker.instance,
       ]),
       builder: (context, _) {
-        final isIntroLoading = _dashboardIntroLoading.value;
         final now = DateTime.now();
         final todayLessons = scheduleRepo.lessonsForDate(now);
         final next = _nextLessonUpcoming(scheduleRepo);
@@ -288,6 +270,7 @@ class DashboardTab extends StatelessWidget {
           next: next,
           subtitleBuilder: _timeToText,
           onOpenSchedule: () => onNavigate(1),
+          onNavigate: onNavigate,
           onOpenProfile: () {
             Navigator.of(
               context,
@@ -303,7 +286,8 @@ class DashboardTab extends StatelessWidget {
           hasUnreadNotifications: hasUnreadNotifications,
           weekDays: weekDays,
           lessonsByDay: lessonsByDay,
-          skeletonize: isIntroLoading || isLoading,
+          skeletonize: isLoading,
+          animateEntrance: animateEntrance && !DashboardTab.hasPlayedEntrance,
         );
 
         return Scaffold(
@@ -348,12 +332,14 @@ class _DashboardContent extends StatelessWidget {
   final _UpcomingLesson? next;
   final String Function(_UpcomingLesson) subtitleBuilder;
   final VoidCallback onOpenSchedule;
+  final void Function(int index) onNavigate;
   final VoidCallback onOpenProfile;
   final VoidCallback onOpenNotifications;
   final bool hasUnreadNotifications;
   final List<DateTime> weekDays;
   final Map<int, int> lessonsByDay;
   final bool skeletonize;
+  final bool animateEntrance;
 
   const _DashboardContent({
     super.key,
@@ -371,12 +357,14 @@ class _DashboardContent extends StatelessWidget {
     required this.next,
     required this.subtitleBuilder,
     required this.onOpenSchedule,
+    required this.onNavigate,
     required this.onOpenProfile,
     required this.onOpenNotifications,
     required this.hasUnreadNotifications,
     required this.weekDays,
     required this.lessonsByDay,
     required this.skeletonize,
+    required this.animateEntrance,
   });
 
   @override
@@ -384,6 +372,7 @@ class _DashboardContent extends StatelessWidget {
     return Column(
       children: [
         _StaggeredSlideBlock(
+          animate: animateEntrance,
           index: 0,
           child: _GreetingHero(
             fullName: fullName,
@@ -405,6 +394,7 @@ class _DashboardContent extends StatelessWidget {
         ),
         const SizedBox(height: 12),
         _StaggeredSlideBlock(
+          animate: animateEntrance,
           index: 1,
           child: AnimatedSwitcher(
             duration: const Duration(milliseconds: 260),
@@ -418,6 +408,7 @@ class _DashboardContent extends StatelessWidget {
               ),
               child: _NextLessonCard(
                 lesson: next?.lesson,
+                date: next?.day,
                 subtitle: next == null ? null : subtitleBuilder(next!),
                 onOpenSchedule: onOpenSchedule,
                 skeletonize: skeletonize,
@@ -427,8 +418,15 @@ class _DashboardContent extends StatelessWidget {
         ),
         const SizedBox(height: 14),
         _StaggeredSlideBlock(
+          animate: animateEntrance,
           index: 2,
-          child: _WeekMoodMapCard(days: weekDays, lessonsByDay: lessonsByDay),
+          child: _DashboardQuickActions(onNavigate: onNavigate),
+        ),
+        const SizedBox(height: 14),
+        _StaggeredSlideBlock(
+          animate: animateEntrance,
+          index: 3,
+          child: const _DashboardDeadlinesCard(),
         ),
         const SizedBox(height: 24),
       ],
@@ -439,8 +437,13 @@ class _DashboardContent extends StatelessWidget {
 class _StaggeredSlideBlock extends StatefulWidget {
   final int index;
   final Widget child;
+  final bool animate;
 
-  const _StaggeredSlideBlock({required this.index, required this.child});
+  const _StaggeredSlideBlock({
+    required this.index,
+    required this.child,
+    required this.animate,
+  });
 
   @override
   State<_StaggeredSlideBlock> createState() => _StaggeredSlideBlockState();
@@ -456,9 +459,14 @@ class _StaggeredSlideBlockState extends State<_StaggeredSlideBlock>
   void initState() {
     super.initState();
 
+    final shouldAnimate = widget.animate &&
+        !DashboardTab.hasPlayedEntrance &&
+        !themeController.reduceAnimations;
+
     _controller = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 1500),
+      value: shouldAnimate ? 0 : 1,
     );
 
     _slideAnimation = Tween<double>(
@@ -472,7 +480,9 @@ class _StaggeredSlideBlockState extends State<_StaggeredSlideBlock>
         curve: const Interval(0.10, 1.0, curve: Curves.easeOut),
       ),
     );
+    if (!shouldAnimate) return;
     WidgetsBinding.instance.addPostFrameCallback((_) {
+      DashboardTab.hasPlayedEntrance = true;
       Future<void>.delayed(const Duration(milliseconds: 280), () {
         if (mounted) {
           _controller.forward();
@@ -518,25 +528,10 @@ class _DashSkLine extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return ValueListenableBuilder<bool>(
-      valueListenable: _dashboardIntroLoading,
-      builder: (context, intro, _) {
-        if (intro) {
-          return Container(
-            width: width == double.infinity ? null : width,
-            height: height,
-            decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(8),
-              color: Colors.white.withValues(alpha: 0.14),
-            ),
-          );
-        }
-        return ShimmerSkeleton(
-          width: width == double.infinity ? double.infinity : width,
-          height: height,
-          borderRadius: BorderRadius.circular(8),
-        );
-      },
+    return ShimmerSkeleton(
+      width: width,
+      height: height,
+      borderRadius: BorderRadius.circular(8),
     );
   }
 }
