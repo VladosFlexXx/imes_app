@@ -46,6 +46,7 @@ Future<void> main() async {
 }
 
 Future<void> _startPushes() async {
+  if (kIsWeb) return;
   try {
     // Даем UI пройти стартовую анимацию без конкуренции за главный поток.
     await Future<void>.delayed(const Duration(milliseconds: 3200));

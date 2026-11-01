@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_inappwebview/flutter_inappwebview.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
@@ -7,6 +8,7 @@ import 'package:vuz_app/core/demo/demo_mode.dart';
 import 'package:vuz_app/core/network/eios_client.dart';
 import 'package:vuz_app/ui/shimmer_skeleton.dart';
 
+import 'login_web_screen.dart';
 import '../home/home_screen.dart';
 import '../notifications/inbox_repository.dart';
 
@@ -179,6 +181,9 @@ class _LoginWebViewScreenState extends State<LoginWebViewScreen> {
 
   @override
   Widget build(BuildContext context) {
+    if (kIsWeb) {
+      return const LoginWebScreen();
+    }
     return Scaffold(
       appBar: AppBar(
         title: const Text('Вход в ЭИОС'),

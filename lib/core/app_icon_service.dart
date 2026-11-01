@@ -36,7 +36,7 @@ class AppIconService extends ChangeNotifier {
         _current = AppIconVariant.light;
       }
 
-      if (Platform.isAndroid) {
+      if (!kIsWeb && Platform.isAndroid) {
         final platformIcon = await _channel.invokeMethod<String>('getIcon');
         if (platformIcon == 'dark') {
           _current = AppIconVariant.dark;
@@ -55,7 +55,7 @@ class AppIconService extends ChangeNotifier {
       final prefs = await SharedPreferences.getInstance();
       await prefs.setString(_prefKey, variant.key);
 
-      if (Platform.isAndroid) {
+      if (!kIsWeb && Platform.isAndroid) {
         final res = await _channel.invokeMethod<bool>('setIcon', {
           'icon': variant.key,
         });

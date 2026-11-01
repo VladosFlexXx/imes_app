@@ -1,5 +1,5 @@
 import 'dart:async';
-import 'dart:io';
+import 'dart:convert';
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
@@ -29,6 +29,7 @@ class EiosClient {
   EiosClient._();
   static final EiosClient instance = EiosClient._();
 
+  static const String kWebProxyUrl = 'https://functions.yandexcloud.net/d4em24u7p4j095oqk5kc';
   static const _storage = FlutterSecureStorage();
   final http.Client _client = http.Client();
 
@@ -184,6 +185,32 @@ class EiosClient {
     try {
       AppLogger.instance.i('[AUTH] silentLogin start user=$u persist=$persistCookieHeader');
 
+      if (kIsWeb) {
+        final res = await _client
+            .post(
+              Uri.parse('$kWebProxyUrl/login'),
+              headers: {'Content-Type': 'application/json'},
+              body: jsonEncode({'username': u, 'password': password}),
+            )
+            .timeout(const Duration(seconds: 20));
+
+        if (res.statusCode == 200) {
+          final data = jsonDecode(res.body) as Map<String, dynamic>;
+          final cookie = data['cookie'] as String?;
+          if (cookie != null && cookie.isNotEmpty) {
+            _cookieHeader = cookie;
+            _cookieLoaded = true;
+            if (persistCookieHeader) {
+              await _storage.write(key: 'cookie_header', value: cookie);
+            }
+            AppLogger.instance.i('[AUTH] web silentLogin OK');
+            return true;
+          }
+        }
+        AppLogger.instance.w('[AUTH] web silentLogin failed: status=${res.statusCode} body=${res.body}');
+        return false;
+      }
+
       // 1) GET login page -> token + cookies
       final getReq = http.Request('GET', Uri.parse('https://eos.imes.su/login/index.php'));
       getReq.headers.addAll({
@@ -308,6 +335,19 @@ class EiosClient {
     final isAllowedHost = parsedUri.host.isEmpty || parsedUri.host.endsWith('imes.su');
 
     Future<http.Response> doRequest(String cookieHeader) {
+      if (kIsWeb) {
+        return _client
+            .get(
+              Uri.parse(kWebProxyUrl),
+              headers: {
+                'x-target-url': url,
+                'x-cookie-header': cookieHeader,
+                'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+              },
+            )
+            .timeout(timeout);
+      }
+
       final headers = <String, String>{
         'User-Agent': 'Mozilla/5.0',
         'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
@@ -386,7 +426,7 @@ class EiosClient {
       AppLogger.instance.e(
         '[HTTP] ${response.statusCode} $url (${sw.elapsedMilliseconds}ms) bytes=${response.bodyBytes.length}',
       );
-      throw HttpException('Failed to load page: ${response.statusCode}', uri: Uri.parse(url));
+      throw Exception('Failed to load page: ${response.statusCode} for $url');
     }
 
     final html = response.body;

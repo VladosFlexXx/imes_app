@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:http/http.dart' as http;
@@ -52,6 +53,7 @@ class AppUpdateService {
   bool get isChecking => _isChecking;
 
   Future<AppReleaseInfo?> checkUpdate({bool force = false}) async {
+    if (kIsWeb) return null;
     if (_isChecking) return null;
     _isChecking = true;
 
@@ -230,7 +232,7 @@ class AppUpdateService {
 
   Future<bool> installApk(String filePath) async {
     try {
-      if (!Platform.isAndroid) return false;
+      if (kIsWeb || !Platform.isAndroid) return false;
       final result = await _channel.invokeMethod<bool>(
         'installApk',
         {'filePath': filePath},
