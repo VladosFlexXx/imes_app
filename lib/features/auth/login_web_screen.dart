@@ -109,7 +109,7 @@ class _LoginWebScreenState extends State<LoginWebScreen> {
       } else {
         AppHaptics.heavyImpact();
         setState(() {
-          _errorMessage = 'Неверный логин или пароль от ЭИОС ИМЭС';
+          _errorMessage = EiosClient.instance.lastWebLoginError ?? 'Неверный логин или пароль от ЭИОС ИМЭС';
         });
       }
     } catch (e) {

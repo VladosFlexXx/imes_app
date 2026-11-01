@@ -33,6 +33,7 @@ class EiosClient {
   static const _storage = FlutterSecureStorage();
   final http.Client _client = http.Client();
 
+  String? lastWebLoginError;
   String? _cookieHeader;
   bool _cookieLoaded = false;
 
@@ -186,29 +187,44 @@ class EiosClient {
       AppLogger.instance.i('[AUTH] silentLogin start user=$u persist=$persistCookieHeader');
 
       if (kIsWeb) {
-        final res = await _client
-            .post(
-              Uri.parse('$kWebProxyUrl/login'),
-              headers: {'Content-Type': 'application/json'},
-              body: jsonEncode({'username': u, 'password': password}),
-            )
-            .timeout(const Duration(seconds: 20));
+        lastWebLoginError = null;
+        try {
+          final res = await _client
+              .post(
+                Uri.parse(kWebProxyUrl),
+                headers: {'Content-Type': 'application/json'},
+                body: jsonEncode({'username': u, 'password': password}),
+              )
+              .timeout(const Duration(seconds: 25));
 
-        if (res.statusCode == 200) {
-          final data = jsonDecode(res.body) as Map<String, dynamic>;
-          final cookie = data['cookie'] as String?;
-          if (cookie != null && cookie.isNotEmpty) {
-            _cookieHeader = cookie;
-            _cookieLoaded = true;
-            if (persistCookieHeader) {
-              await _storage.write(key: 'cookie_header', value: cookie);
+          Map<String, dynamic>? data;
+          try {
+            data = jsonDecode(res.body) as Map<String, dynamic>?;
+          } catch (_) {}
+
+          if (res.statusCode == 200 && data != null && data['success'] == true) {
+            final cookie = data['cookie'] as String?;
+            if (cookie != null && cookie.isNotEmpty) {
+              _cookieHeader = cookie;
+              _cookieLoaded = true;
+              if (persistCookieHeader) {
+                await _storage.write(key: 'cookie_header', value: cookie);
+              }
+              AppLogger.instance.i('[AUTH] web silentLogin OK');
+              return true;
             }
-            AppLogger.instance.i('[AUTH] web silentLogin OK');
-            return true;
           }
+
+          final err = data?['error'] ?? data?['status'] ?? 'HTTP ${res.statusCode}: ${res.body}';
+          final debugInfo = data?['debug'] != null ? ' (${data!['debug']})' : '';
+          lastWebLoginError = '$err$debugInfo';
+          AppLogger.instance.w('[AUTH] web silentLogin failed: $lastWebLoginError');
+          return false;
+        } catch (e) {
+          lastWebLoginError = 'Сетевая ошибка: $e';
+          AppLogger.instance.e('[AUTH] web silentLogin network error', e);
+          return false;
         }
-        AppLogger.instance.w('[AUTH] web silentLogin failed: status=${res.statusCode} body=${res.body}');
-        return false;
       }
 
       // 1) GET login page -> token + cookies
