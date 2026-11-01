@@ -1,4 +1,4 @@
-﻿<p align="center">
+<p align="center">
   <img src="assets/icon/icon.png" width="160" alt="My IMES" />
 </p>
 
@@ -18,6 +18,16 @@
   &nbsp;&nbsp;
   <a href="README_EN.md">
     <img src="https://img.shields.io/badge/🇬🇧-English%20Version-6E40FF?style=for-the-badge" />
+  </a>
+</p>
+
+<p align="center">
+  <a href="docs/IOS_INSTALL_RU.md">
+    <img src="https://img.shields.io/badge/🍏-Установка%20на%20iOS%20(RU)-gray?style=for-the-badge&logo=apple&logoColor=white" />
+  </a>
+  &nbsp;&nbsp;
+  <a href="docs/IOS_INSTALL_EN.md">
+    <img src="https://img.shields.io/badge/🍏-Install%20on%20iOS%20(EN)-gray?style=for-the-badge&logo=apple&logoColor=white" />
   </a>
 </p>
 

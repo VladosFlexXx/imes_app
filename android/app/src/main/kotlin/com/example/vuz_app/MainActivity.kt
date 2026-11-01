@@ -1,6 +1,8 @@
 package com.example.vuz_app
 
+import android.content.ComponentName
 import android.content.Intent
+import android.content.pm.PackageManager
 import android.os.Bundle
 import android.view.WindowManager
 import androidx.appcompat.app.AppCompatDelegate
@@ -53,8 +55,12 @@ class MainActivity : FlutterFragmentActivity() {
             ICON_CHANNEL
         ).setMethodCallHandler { call, result ->
             when (call.method) {
-                "getIcon" -> result.success("light")
-                "setIcon" -> result.success(true)
+                "getIcon" -> result.success(getAppIcon())
+                "setIcon" -> {
+                    val icon = call.argument<String>("icon") ?: "light"
+                    val success = setAppIcon(icon)
+                    result.success(success)
+                }
                 else -> result.notImplemented()
             }
         }
@@ -130,6 +136,54 @@ class MainActivity : FlutterFragmentActivity() {
             else -> AppCompatDelegate.setDefaultNightMode(
                 AppCompatDelegate.MODE_NIGHT_FOLLOW_SYSTEM
             )
+        }
+    }
+
+    private fun getAppIcon(): String {
+        return try {
+            val pm = packageManager
+            val pkg = packageName
+            val darkComp = ComponentName(pkg, "$pkg.MainActivityDark")
+            val state = pm.getComponentEnabledSetting(darkComp)
+            if (state == PackageManager.COMPONENT_ENABLED_STATE_ENABLED) "dark" else "light"
+        } catch (e: Exception) {
+            "light"
+        }
+    }
+
+    private fun setAppIcon(variant: String): Boolean {
+        return try {
+            val pm = packageManager
+            val pkg = packageName
+            val mainComp = ComponentName(pkg, "$pkg.MainActivity")
+            val darkComp = ComponentName(pkg, "$pkg.MainActivityDark")
+
+            if (variant == "dark") {
+                pm.setComponentEnabledSetting(
+                    darkComp,
+                    PackageManager.COMPONENT_ENABLED_STATE_ENABLED,
+                    PackageManager.DONT_KILL_APP
+                )
+                pm.setComponentEnabledSetting(
+                    mainComp,
+                    PackageManager.COMPONENT_ENABLED_STATE_DISABLED,
+                    PackageManager.DONT_KILL_APP
+                )
+            } else {
+                pm.setComponentEnabledSetting(
+                    mainComp,
+                    PackageManager.COMPONENT_ENABLED_STATE_ENABLED,
+                    PackageManager.DONT_KILL_APP
+                )
+                pm.setComponentEnabledSetting(
+                    darkComp,
+                    PackageManager.COMPONENT_ENABLED_STATE_DISABLED,
+                    PackageManager.DONT_KILL_APP
+                )
+            }
+            true
+        } catch (e: Exception) {
+            false
         }
     }
 }

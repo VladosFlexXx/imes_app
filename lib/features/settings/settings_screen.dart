@@ -65,7 +65,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
   bool _appearanceExpanded = false;
   bool _notificationsExpanded = false;
   bool _securityExpanded = false;
-  AppIconVariant _currentAppIcon = AppIconVariant.light;
 
   @override
   void initState() {
@@ -92,7 +91,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
       _reduceAnimations = themeController.reduceAnimations;
       _materialYou = themeController.materialYou;
       _amoledBlack = themeController.amoledBlack;
-      _currentAppIcon = AppIconService.instance.current;
       _biometricSupported = bioSup;
       _biometricEnabled = bioEn;
       _pinEnabled = pinEn;
@@ -143,6 +141,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
   Future<void> _logout(BuildContext context) async {
     await _storage.delete(key: 'cookie_header');
+    await AuthSettings.instance.resetAll();
     await DemoMode.instance.setEnabled(false);
     EiosClient.instance.invalidateCookieCache();
     try {
@@ -730,20 +729,20 @@ class _SettingsScreenState extends State<SettingsScreen> {
       isScrollControlled: true,
       showDragHandle: true,
       builder: (bottomSheetContext) {
-        ThemeMode tempMode = themeController.mode;
-        AppAccent tempAccent = themeController.accent;
-        double tempScale = themeController.uiScale;
-        AppIconVariant tempIcon = AppIconService.instance.current;
-        bool tempReduceEffects = themeController.reduceEffects;
-        bool tempMaterialYou = themeController.materialYou;
-        bool tempAmoledBlack = themeController.amoledBlack;
-
-        return StatefulBuilder(
-          builder: (context, setModalState) {
+        return ListenableBuilder(
+          listenable: Listenable.merge([themeController, AppIconService.instance]),
+          builder: (context, _) {
             final cs = Theme.of(context).colorScheme;
             final t = Theme.of(context).textTheme;
             final isDark = Theme.of(context).brightness == Brightness.dark;
-            final percent = (tempScale * 100).round();
+            final currentMode = themeController.mode;
+            final currentAccent = themeController.accent;
+            final currentScale = themeController.uiScale;
+            final currentIcon = AppIconService.instance.current;
+            final currentReduceEffects = themeController.reduceEffects;
+            final currentMaterialYou = themeController.materialYou;
+            final currentAmoledBlack = themeController.amoledBlack;
+            final percent = (currentScale * 100).round();
 
             return SafeArea(
               child: SingleChildScrollView(
@@ -775,24 +774,33 @@ class _SettingsScreenState extends State<SettingsScreen> {
                           context: context,
                           label: 'Системная',
                           icon: Icons.brightness_auto_rounded,
-                          selected: tempMode == ThemeMode.system,
-                          onTap: () => setModalState(() => tempMode = ThemeMode.system),
+                          selected: currentMode == ThemeMode.system,
+                          onTap: () {
+                            AppHaptics.selectionClick();
+                            themeController.setThemeMode(ThemeMode.system);
+                          },
                         ),
                         const SizedBox(width: 8),
                         _buildThemeOption(
                           context: context,
                           label: 'Светлая',
                           icon: Icons.light_mode_rounded,
-                          selected: tempMode == ThemeMode.light,
-                          onTap: () => setModalState(() => tempMode = ThemeMode.light),
+                          selected: currentMode == ThemeMode.light,
+                          onTap: () {
+                            AppHaptics.selectionClick();
+                            themeController.setThemeMode(ThemeMode.light);
+                          },
                         ),
                         const SizedBox(width: 8),
                         _buildThemeOption(
                           context: context,
                           label: 'Тёмная',
                           icon: Icons.dark_mode_rounded,
-                          selected: tempMode == ThemeMode.dark,
-                          onTap: () => setModalState(() => tempMode = ThemeMode.dark),
+                          selected: currentMode == ThemeMode.dark,
+                          onTap: () {
+                            AppHaptics.selectionClick();
+                            themeController.setThemeMode(ThemeMode.dark);
+                          },
                         ),
                       ],
                     ),
@@ -807,7 +815,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                           'Акцентный цвет',
                           style: t.titleSmall?.copyWith(fontWeight: FontWeight.w800),
                         ),
-                        if (tempMaterialYou)
+                        if (currentMaterialYou)
                           Text(
                             'Цвета обоев (Material You)',
                             style: TextStyle(
@@ -820,9 +828,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     ),
                     const SizedBox(height: 10),
                     Opacity(
-                      opacity: tempMaterialYou ? 0.38 : 1.0,
+                      opacity: currentMaterialYou ? 0.38 : 1.0,
                       child: IgnorePointer(
-                        ignoring: tempMaterialYou,
+                        ignoring: currentMaterialYou,
                         child: SingleChildScrollView(
                           scrollDirection: Axis.horizontal,
                           physics: const BouncingScrollPhysics(),
@@ -831,19 +839,22 @@ class _SettingsScreenState extends State<SettingsScreen> {
                               for (final acc in AppAccent.values) ...[
                                 InkWell(
                                   borderRadius: BorderRadius.circular(16),
-                                  onTap: () => setModalState(() => tempAccent = acc),
+                                  onTap: () {
+                                    AppHaptics.selectionClick();
+                                    themeController.setAccent(acc);
+                                  },
                                   child: AnimatedContainer(
                                     duration: const Duration(milliseconds: 200),
                                     padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
                                     decoration: BoxDecoration(
-                                      color: tempAccent == acc
+                                      color: currentAccent == acc
                                           ? _accentColor(acc).withValues(alpha: 0.16)
                                           : (isDark
                                               ? Colors.white.withValues(alpha: 0.05)
                                               : cs.surfaceContainerHighest.withValues(alpha: 0.5)),
                                       borderRadius: BorderRadius.circular(16),
                                       border: Border.all(
-                                        color: tempAccent == acc
+                                        color: currentAccent == acc
                                             ? _accentColor(acc)
                                             : Colors.transparent,
                                         width: 2,
@@ -864,11 +875,11 @@ class _SettingsScreenState extends State<SettingsScreen> {
                                         Text(
                                           _accentLabel(acc),
                                           style: TextStyle(
-                                            fontWeight: tempAccent == acc
+                                            fontWeight: currentAccent == acc
                                                 ? FontWeight.w800
                                                 : FontWeight.w600,
                                             fontSize: 13,
-                                            color: tempAccent == acc
+                                            color: currentAccent == acc
                                                 ? _accentColor(acc)
                                                 : cs.onSurface,
                                           ),
@@ -922,14 +933,14 @@ class _SettingsScreenState extends State<SettingsScreen> {
                         const Icon(Icons.text_fields_rounded, size: 16),
                         Expanded(
                           child: Slider(
-                            value: tempScale.clamp(0.5, 1.5),
+                            value: currentScale.clamp(0.5, 1.5),
                             min: 0.5,
                             max: 1.5,
-                            divisions: 10, // 50%, 60%, 70%, 80%, 90%, 100%, 110%, 120%, 130%, 140%, 150%
+                            divisions: 10,
                             label: '$percent%',
                             onChanged: (val) {
                               final rounded = (val * 10).round() / 10.0;
-                              setModalState(() => tempScale = rounded);
+                              themeController.setUiScale(rounded);
                             },
                           ),
                         ),
@@ -955,10 +966,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     const SizedBox(height: 10),
                     _buildIconSelectorRow(
                       context: context,
-                      selected: tempIcon,
-                      onSelect: (variant) {
+                      selected: currentIcon,
+                      onSelect: (variant) async {
                         AppHaptics.selectionClick();
-                        setModalState(() => tempIcon = variant);
+                        await AppIconService.instance.setIcon(variant);
                       },
                     ),
 
@@ -981,10 +992,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
                         'Использовать цвета обоев системы',
                         style: TextStyle(color: cs.onSurfaceVariant, fontSize: 12),
                       ),
-                      value: tempMaterialYou,
+                      value: currentMaterialYou,
                       onChanged: (val) {
                         AppHaptics.selectionClick();
-                        setModalState(() => tempMaterialYou = val);
+                        themeController.setMaterialYou(val);
                       },
                     ),
                     SwitchListTile.adaptive(
@@ -998,10 +1009,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
                         'Чистый чёрный фон — экономит заряд на OLED',
                         style: TextStyle(color: cs.onSurfaceVariant, fontSize: 12),
                       ),
-                      value: tempAmoledBlack,
+                      value: currentAmoledBlack,
                       onChanged: (val) {
                         AppHaptics.selectionClick();
-                        setModalState(() => tempAmoledBlack = val);
+                        themeController.setAmoledBlack(val);
                       },
                     ),
                     SwitchListTile.adaptive(
@@ -1015,47 +1026,35 @@ class _SettingsScreenState extends State<SettingsScreen> {
                         'Отключите на слабых устройствах для экономии заряда и максимальной плавности 60/120 FPS',
                         style: TextStyle(color: cs.onSurfaceVariant, fontSize: 12),
                       ),
-                      value: !tempReduceEffects,
+                      value: !currentReduceEffects,
                       onChanged: (val) {
                         AppHaptics.selectionClick();
-                        setModalState(() => tempReduceEffects = !val);
+                        themeController.setReduceEffects(!val);
                       },
                     ),
 
                     const SizedBox(height: 24),
 
-                    // КНОПКИ ДЕЙСТВИЙ
+                    // КНОПКА ЗАКРЫТЬ / СБРОС
                     Row(
                       children: [
-                        if ((tempScale - 1.0).abs() >= 0.01) ...[
+                        if ((currentScale - 1.0).abs() >= 0.01) ...[
                           OutlinedButton(
                             onPressed: () {
-                              setModalState(() => tempScale = 1.0);
+                              AppHaptics.selectionClick();
+                              themeController.setUiScale(1.0);
                             },
                             child: const Text('Сброс 100%'),
                           ),
                           const SizedBox(width: 10),
                         ],
                         Expanded(
-                          child: FilledButton.icon(
-                            onPressed: () async {
-                              await themeController.setAppearance(
-                                mode: tempMode,
-                                accent: tempAccent,
-                                uiScale: tempScale,
-                                materialYou: tempMaterialYou,
-                                amoledBlack: tempAmoledBlack,
-                              );
-                              await themeController.setReduceEffects(tempReduceEffects);
-                              if (tempIcon != AppIconService.instance.current) {
-                                await AppIconService.instance.setIcon(tempIcon);
-                              }
-                              if (context.mounted) {
-                                Navigator.of(context).pop();
-                              }
+                          child: FilledButton(
+                            onPressed: () {
+                              AppHaptics.selectionClick();
+                              Navigator.of(context).pop();
                             },
-                            icon: const Icon(Icons.check_rounded),
-                            label: const Text('Применить изменения'),
+                            child: const Text('Готово'),
                           ),
                         ),
                       ],
@@ -1237,68 +1236,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
     );
   }
 
-  void _showIconPickerDialog(BuildContext context) {
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      showDragHandle: true,
-      builder: (bottomSheetContext) {
-        AppIconVariant selected = _currentAppIcon;
-
-        return StatefulBuilder(
-          builder: (context, setModalState) {
-            final cs = Theme.of(context).colorScheme;
-            final t = Theme.of(context).textTheme;
-
-            return SafeArea(
-              child: Padding(
-                padding: const EdgeInsets.fromLTRB(20, 8, 20, 24),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'Иконка приложения',
-                      style: t.titleLarge?.copyWith(fontWeight: FontWeight.w900),
-                    ),
-                    const SizedBox(height: 6),
-                    Text(
-                      'Выберите стиль иконки на рабочем столе смартфона.',
-                      style: TextStyle(color: cs.onSurfaceVariant, fontSize: 13),
-                    ),
-                    const SizedBox(height: 20),
-                    _buildIconSelectorRow(
-                      context: context,
-                      selected: selected,
-                      onSelect: (variant) async {
-                        AppHaptics.selectionClick();
-                        setModalState(() => selected = variant);
-                        setState(() => _currentAppIcon = variant);
-                        await AppIconService.instance.setIcon(variant);
-                        if (context.mounted) {
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            SnackBar(
-                              content: Text(
-                                'Иконка изменена на "${variant.title}". На рабочем столе обновится в течение нескольких секунд.',
-                              ),
-                              duration: const Duration(seconds: 3),
-                              behavior: SnackBarBehavior.floating,
-                            ),
-                          );
-                        }
-                      },
-                    ),
-                    const SizedBox(height: 16),
-                  ],
-                ),
-              ),
-            );
-          },
-        );
-      },
-    );
-  }
-
   Widget _buildAccordionCard({
     required IconData icon,
     required String title,
@@ -1463,74 +1400,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
             },
           ),
           const Divider(height: 1),
-          ListTile(
-            leading: Container(
-              width: 32,
-              height: 32,
-              decoration: BoxDecoration(
-                borderRadius: BorderRadius.circular(8),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withValues(alpha: 0.14),
-                    blurRadius: 4,
-                    offset: const Offset(0, 2),
-                  ),
-                ],
-              ),
-              child: ClipRRect(
-                borderRadius: BorderRadius.circular(8),
-                child: Image.asset(
-                  _currentAppIcon.assetPath,
-                  width: 32,
-                  height: 32,
-                  fit: BoxFit.cover,
-                ),
-              ),
-            ),
-            title: Text(
-              'Иконка приложения',
-              style: t.titleMedium?.copyWith(fontWeight: FontWeight.w800),
-            ),
-            subtitle: Text(
-              '${_currentAppIcon.title} (${_currentAppIcon.subtitle})',
-            ),
-            trailing: tileChevron,
-            onTap: () {
-              AppHaptics.selectionClick();
-              _showIconPickerDialog(context);
-            },
-          ),
-          const Divider(height: 1),
-          SwitchListTile(
-            secondary: const Icon(Icons.auto_awesome_rounded),
-            title: Text(
-              'Material You',
-              style: t.titleMedium?.copyWith(fontWeight: FontWeight.w800),
-            ),
-            subtitle: const Text('Использовать цвета обоев системы'),
-            value: _materialYou,
-            onChanged: (val) async {
-              AppHaptics.selectionClick();
-              setState(() => _materialYou = val);
-              await themeController.setMaterialYou(val);
-            },
-          ),
-          const Divider(height: 1),
-          SwitchListTile(
-            secondary: const Icon(Icons.contrast_rounded),
-            title: Text(
-              'AMOLED чёрный',
-              style: t.titleMedium?.copyWith(fontWeight: FontWeight.w800),
-            ),
-            subtitle: const Text('Чистый чёрный фон — экономит заряд на OLED'),
-            value: _amoledBlack,
-            onChanged: (val) async {
-              AppHaptics.selectionClick();
-              setState(() => _amoledBlack = val);
-              await themeController.setAmoledBlack(val);
-            },
-          ),
-          const Divider(height: 1),
           SwitchListTile(
             secondary: const Icon(Icons.vibration_rounded),
             title: Text(
@@ -1543,21 +1412,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
               setState(() => _hapticEnabled = val);
               await AppHaptics.setEnabled(val);
               if (val) AppHaptics.mediumImpact();
-            },
-          ),
-          const Divider(height: 1),
-          SwitchListTile(
-            secondary: const Icon(Icons.blur_on_rounded),
-            title: Text(
-              'Размытие и стекло (Liquid Glass)',
-              style: t.titleMedium?.copyWith(fontWeight: FontWeight.w800),
-            ),
-            subtitle: const Text('Эффект матового стекла на панелях'),
-            value: !_reduceEffects,
-            onChanged: (val) async {
-              AppHaptics.selectionClick();
-              setState(() => _reduceEffects = !val);
-              await themeController.setReduceEffects(!val);
             },
           ),
           const Divider(height: 1),

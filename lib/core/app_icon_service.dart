@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -15,7 +16,7 @@ enum AppIconVariant {
       : 'assets/icon/icon_dark.png';
 }
 
-class AppIconService {
+class AppIconService extends ChangeNotifier {
   AppIconService._();
   static final AppIconService instance = AppIconService._();
 
@@ -43,11 +44,13 @@ class AppIconService {
           _current = AppIconVariant.light;
         }
       }
+      notifyListeners();
     } catch (_) {}
   }
 
   Future<bool> setIcon(AppIconVariant variant) async {
     _current = variant;
+    notifyListeners();
     try {
       final prefs = await SharedPreferences.getInstance();
       await prefs.setString(_prefKey, variant.key);

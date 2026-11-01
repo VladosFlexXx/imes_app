@@ -76,4 +76,10 @@ class AuthSettings extends ChangeNotifier {
     await _storage.delete(key: _kPass);
     notifyListeners();
   }
+
+  Future<void> resetAll() async {
+    await clearCredentials();
+    await setCredsEnabled(false);
+    await setMode(AuthReloginMode.safeUiLogin);
+  }
 }

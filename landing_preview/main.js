@@ -1,4 +1,4 @@
-﻿const I18N = {
+const I18N = {
   ru: {
     headerOfficial: 'OFFICIAL APP',
     navFeatures: 'Возможности',
@@ -9,6 +9,7 @@
     heroTitle: "Твой институт.<br>Твой ритм.<br><span class='hero-gradient'>Твои правила.</span>",
     heroText: 'Представляем абсолютно новое приложение для студентов ИМЭС. Расписание, оценки и уведомления — теперь в нативном формате, быстро и без лишних кликов.',
     btnInstallNow: 'Установить сейчас',
+    btnIosGuide: 'Инструкция для iOS',
     btnViewCode: 'Смотреть код',
     pointSafe: 'Безопасно',
     pointFast: 'Быстро',
@@ -31,7 +32,7 @@
     security3: 'Диагностика не включает пароли.',
     faqTitle: 'FAQ',
     faqQ1: 'Будет ли версия для iOS?',
-    faqA1: 'Да, в планах roadmap v1.0 после стабилизации Android-версии.',
+    faqA1: 'Да! Вы уже можете скачать .ipa архив из наших релизов на GitHub и установить на iPhone по нашей подробной инструкции (через Sideloadly, Scarlet или TrollStore без джейлбрейка).',
     faqQ2: 'Как обновлять приложение?',
     faqA2: 'Скачай свежий APK с GitHub и установи поверх текущей версии.',
     faqQ3: 'Это официальное приложение вуза?',
@@ -59,6 +60,7 @@
     heroTitle: "Your university.<br>Your rhythm.<br><span class='hero-gradient'>Your rules.</span>",
     heroText: 'Schedule, grades, profile and notifications in a native mobile flow for IMES students.',
     btnInstallNow: 'Install now',
+    btnIosGuide: 'iOS Sideload Guide',
     btnViewCode: 'View code',
     pointSafe: 'Secure',
     pointFast: 'Fast',
@@ -81,7 +83,7 @@
     security3: 'Diagnostic report excludes passwords.',
     faqTitle: 'FAQ',
     faqQ1: 'Will there be an iOS version?',
-    faqA1: 'Yes, planned for roadmap v1.0 after Android stabilization.',
+    faqA1: 'Yes! You can already download the .ipa bundle from GitHub Releases and install it on your iPhone following our step-by-step sideload guide (via Sideloadly, Scarlet, or TrollStore without jailbreak).',
     faqQ2: 'How do I update the app?',
     faqA2: 'Download the latest APK from GitHub and install over current version.',
     faqQ3: 'Is this an official university app?',
@@ -112,6 +114,12 @@ function applyLang(lang) {
     const key = el.getAttribute('data-i18n-html');
     if (dict[key]) el.innerHTML = dict[key];
   });
+  const iosLink = document.getElementById('ios-guide-link');
+  if (iosLink) {
+    iosLink.href = lang === 'ru'
+      ? 'https://github.com/VladosFlexXx/imes_app/blob/main/docs/IOS_INSTALL_RU.md'
+      : 'https://github.com/VladosFlexXx/imes_app/blob/main/docs/IOS_INSTALL_EN.md';
+  }
   document.getElementById('lang-ru')?.classList.toggle('active', lang === 'ru');
   document.getElementById('lang-en')?.classList.toggle('active', lang === 'en');
   localStorage.setItem('myimes_lang', lang);

@@ -89,6 +89,18 @@ class ThemeController extends ChangeNotifier {
     await _syncPlatform(mode);
   }
 
+  Future<void> setThemeMode(ThemeMode mode) => setMode(mode);
+
+  Future<void> setUiScale(double scale) async {
+    final rounded = (scale * 10).round() / 10.0;
+    if ((_uiScale - rounded).abs() < 0.01) return;
+    _uiScale = rounded;
+    notifyListeners();
+
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setDouble(_uiScaleKey, _uiScale);
+  }
+
   Future<void> setAccent(AppAccent accent) async {
     if (_accent == accent) return;
     _accent = accent;

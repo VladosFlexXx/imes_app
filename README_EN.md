@@ -1,4 +1,4 @@
-﻿<div align="center">
+<div align="center">
 
 # 🎓 My IMES
 
@@ -11,10 +11,10 @@
 
 <img src="assets/icon/icon.png" alt="App Icon" width="120" height="120" style="border-radius: 20px; box-shadow: 0 4px 20px rgba(0,0,0,0.2);">
 
-**Mobile Android application for working with IMES Educational Platform**  
-Schedule • Grades • Profile • Notifications
+**Cross-platform mobile application for IMES Students (Android & iOS)**  
+Schedule • Grades • Home • Notifications
 
-[📥 Download APK](https://github.com/VladosFlexXx/imes_app/releases/latest) • [📖 Documentation](#-features) • [🐛 Report a Bug](#-report-an-issue)
+[📥 Download APK](https://github.com/VladosFlexXx/imes_app/releases/latest) • [🍏 iPhone (iOS) Guide](docs/IOS_INSTALL_EN.md) • [📖 Features](#-features) • [🐛 Report a Bug](#-report-an-issue)
 
 </div>
 
@@ -29,37 +29,37 @@ Schedule • Grades • Profile • Notifications
 ### 📅 **Smart Schedule**
 - ✅ Automatic odd/even week detection
 - ✅ Filtering by dates and week types
-- ✅ Only relevant subjects
-- ✅ Beautiful calendar view
+- ✅ Only relevant classes and schedules
+- ✅ Clean calendar UI
 
 </td>
 <td width="50%">
 
-### 🎯 **Grades and Progress**
-- ✅ Current grades by subject
-- ✅ Direct integration with IMES
-- ✅ Change history
-- ✅ Performance analysis
+### 🎯 **Grades & Progress**
+- ✅ Modern grade cards by subject
+- ✅ Automatic GPA calculation
+- ✅ Element breakdown and grade details
+- ✅ Direct sync with IMES portal
 
 </td>
 </tr>
 <tr>
 <td width="50%">
 
-### 👤 **Student Profile**
-- ✅ Basic study information
-- ✅ Personal account data
-- ✅ IMES synchronization
-- ✅ Quick data access
+### 🏠 **Home Dashboard**
+- ✅ Real-time upcoming class widget
+- ✅ Quick jump to schedule and grades
+- ✅ Semester progress and status overview
+- ✅ Responsive dynamic cards
 
 </td>
 <td width="50%">
 
-### 🔔 **Push Notifications**
-- ✅ Schedule changes
-- ✅ New grades
-- ✅ Automatic operation
-- ✅ Customizable categories
+### 🔔 **Push Notifications & Themes**
+- ✅ Schedule changes and new grade alerts
+- ✅ Themes: Light, Dark, AMOLED, Liquid Glass
+- ✅ Dynamic Material You colors & accents
+- ✅ Launcher icon switcher (Light / Dark)
 
 </td>
 </tr>
@@ -69,21 +69,21 @@ Schedule • Grades • Profile • Notifications
 
 ## 🚀 Quick Start
 
-### Installation
+### 📱 Android
+1. **Download APK:**  
+   Head to [GitHub Releases](https://github.com/VladosFlexXx/imes_app/releases/latest) and download `vuz_app-release.apk`.
+2. **Allow installation from unknown sources** in your device's security settings.
+3. **Install & sign in:**  
+   Use your IMES portal credentials. Passwords are saved only locally in encrypted secure storage.
 
-1. **Download the latest APK version:**
-   ```bash
-   https://github.com/VladosFlexXx/imes_app/releases/latest
-   ```
+### 🍏 Apple iPhone (iOS)
+1. **Download IPA:**  
+   Download the `MyIMES-*.ipa` bundle from [GitHub Releases](https://github.com/VladosFlexXx/imes_app/releases/latest).
+2. **Install via Sideload:**  
+   Follow our detailed step-by-step beginner guide:  
+   👉 **[iOS Sideload Installation Guide (Sideloadly, Scarlet, TrollStore)](docs/IOS_INSTALL_EN.md)**.
 
-2. **Allow installation from unknown sources:**
-   - Settings → Security → Unknown sources
-
-3. **Install the app and log in:**
-   - Use your IMES credentials
-   - Cookies are not shared with third parties
-
-> ⚠️ **Warning:** The app is in **BETA** version. Bugs and changes are possible.
+> ⚠️ **Warning:** The app is currently in **BETA**. It is under active continuous development.
 
 ---
 
@@ -91,9 +91,9 @@ Schedule • Grades • Profile • Notifications
 
 <div align="center">
 
-| Schedule | Grades | Profile |
+| Schedule | Grades | Home |
 |:----------:|:------:|:-------:|
-| ![Schedule](https://via.placeholder.com/250x500/4CAF50/FFFFFF?text=Schedule) | ![Grades](https://via.placeholder.com/250x500/2196F3/FFFFFF?text=Grades) | ![Profile](https://via.placeholder.com/250x500/FF9800/FFFFFF?text=Profile) |
+| <img src="docs/screenshots/schedule.jpg" width="240" alt="Schedule" /> | <img src="docs/screenshots/marks.jpg" width="240" alt="Grades" /> | <img src="docs/screenshots/main.jpg" width="240" alt="Home" /> |
 
 </div>
 
@@ -116,10 +116,10 @@ Schedule • Grades • Profile • Notifications
 ## 📊 Project Status
 
 ```yaml
-Version: 0.3.4 (beta)
-Platform: Android
+Version: 0.4.1 (beta)
+Platform: Android / iOS (Sideload)
 Status: Active Development
-Last Update: February 2026
+Last Update: November 2026
 ```
 
 <div align="center">
@@ -136,64 +136,66 @@ Last Update: February 2026
 
 ## 🐞 Report an Issue
 
-Found a bug? Help make the app better!
+Found a bug? Help us improve the app!
 
-### Steps to report:
+### Reporting Steps:
 
-1. 📱 Open **Profile → Diagnostics**
-2. 📦 Collect the report (logs + cache + state)
-3. 📤 Send the file or create an [Issue](https://github.com/VladosFlexXx/imes_app/issues/new)
+1. 📱 Navigate to **Settings → Diagnostics**
+2. 📦 Export a bug report (sanitized logs + cache + state)
+3. 📤 Attach the report file and open an [Issue](https://github.com/VladosFlexXx/imes_app/issues/new)
 
-> 💡 **Tip:** Diagnostic report helps find and fix bugs faster!
+> 💡 **Tip:** Diagnostic reports help us isolate and patch issues rapidly!
 
 ---
 
 ## 🗺 Roadmap
 
-### ✅ Completed (v0.3.x)
-- [x] Core application functionality
-- [x] Push notifications
-- [x] Diagnostic system
-- [x] Auto-build APK via GitHub Actions
+### ✅ Implemented (v0.3.x — v0.4.1)
+- [x] Core schedule and grading engine
+- [x] Redesigned grades interface (modern cards, GPA, detail breakdown)
+- [x] AppHaptics tactile feedback
+- [x] Material You, AMOLED, Liquid Glass, custom theme accents
+- [x] Native light/dark app icon switching on Android
+- [x] GitHub Actions automated iOS `.ipa` packaging
+- [x] Comprehensive iOS Sideload installation guides
+- [x] Secure silent relogin with instant credential cleanup on logout
 
-### 🔨 In Development (v0.4.x)
-- [ ] Improved UI for grades screen
-- [ ] Cache and background update optimization
-- [ ] Migration to API/DB instead of IMES parsing
-- [ ] Full integration into institute ecosystem
+### 🔨 In Progress (v0.5.x)
+- [ ] Offline caching and background sync optimizations
+- [ ] Offline schedule viewing
+- [ ] Migration to 1C API backend instead of HTML scraping
+- [ ] Full university ecosystem integration
 
-### 🚀 Planned (v1.0+)
-- [ ] Google Play publication
-- [ ] iOS version
-- [ ] Offline mode
-- [ ] Calendar integration
-- [ ] Schedule export
+### 🚀 Future Plans (v1.0+)
+- [ ] RuStore / Google Play store distribution
+- [ ] System calendar integration
+- [ ] Schedule export (ICS)
 
 ---
 
-## 🔐 Security and Privacy
+## 🔐 Security & Privacy
 
 <table>
 <tr>
 <td width="33%" align="center">
 
 ### 🔒 **Authentication**
-Via official IMES  
-Secure token storage
+Direct authentication with IMES portal  
+Encrypted secure credential store
 
 </td>
 <td width="33%" align="center">
 
-### 🛡 **Data**
-Cookies not shared with third parties  
-Local encryption
+### 🛡 **Data Privacy**
+No third-party server data transmission  
+Strict on-device sandboxing
 
 </td>
 <td width="33%" align="center">
 
 ### 🔍 **Diagnostics**
-No passwords  
-Technical information only
+No credentials or passwords collected  
+Technical logs only
 
 </td>
 </tr>
@@ -203,21 +205,21 @@ Technical information only
 
 ## 🤝 Contributing
 
-Want to help? Great!
+Contributions are welcome!
 
 1. 🍴 Fork the repository
-2. 🌿 Create a feature branch (`git checkout -b feature/AmazingFeature`)
+2. 🌿 Create your feature branch (`git checkout -b feature/AmazingFeature`)
 3. 💾 Commit your changes (`git commit -m 'Add some AmazingFeature'`)
-4. 📤 Push to the branch (`git push origin feature/AmazingFeature`)
+4. 📤 Push to your branch (`git push origin feature/AmazingFeature`)
 5. 🎉 Open a Pull Request
 
 ---
 
 ## 📄 License
 
-The project is distributed **without an open license**.  
+This project is distributed **without an open-source license**.  
 
-**Use at your own risk** — for educational and testing purposes only.
+**Use at your own risk** — intended for educational and testing purposes.
 
 ---
 
@@ -231,7 +233,7 @@ The project is distributed **without an open license**.
 
 ### Support the Project
 
-⭐ **Star the repo** if the project was helpful!
+⭐ **Leave a star** if you found this project helpful!
 
 </div>
 
@@ -242,7 +244,8 @@ The project is distributed **without an open license**.
 ### 📱 Download Now
 
 [![Download APK](https://img.shields.io/badge/Download-APK-4CAF50?style=for-the-badge&logo=android&logoColor=white)](https://github.com/VladosFlexXx/imes_app/releases/latest)
+[![Download IPA](https://img.shields.io/badge/Download-IPA%20(iOS)-gray?style=for-the-badge&logo=apple&logoColor=white)](https://github.com/VladosFlexXx/imes_app/releases/latest)
 
-**Made with ❤️ for IMES students**
+**Crafted with ❤️ for IMES Students**
 
 </div>
