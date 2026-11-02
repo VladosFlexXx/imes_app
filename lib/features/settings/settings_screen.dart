@@ -700,18 +700,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
   static const List<_PresetAccent> _presetAccents = [
     _PresetAccent('Оранжевый', Color(0xFFEC5C0D)),
-    _PresetAccent('Синий', Color(0xFF2868EC)),
-    _PresetAccent('Небесный', Color(0xFF0EA5E9)),
-    _PresetAccent('Бирюзовый', Color(0xFF10B981)),
-    _PresetAccent('Изумруд', Color(0xFF059669)),
-    _PresetAccent('Лайм', Color(0xFF84CC16)),
-    _PresetAccent('Янтарный', Color(0xFFF59E0B)),
-    _PresetAccent('Коралл', Color(0xFFF97316)),
-    _PresetAccent('Алый', Color(0xFFEF4444)),
-    _PresetAccent('Розовый', Color(0xFFEC4899)),
-    _PresetAccent('Фуксия', Color(0xFFD946EF)),
     _PresetAccent('Фиолетовый', Color(0xFF8B5CF6)),
-    _PresetAccent('Индиго', Color(0xFF6366F1)),
+    _PresetAccent('Зелёный', Color(0xFF10B981)),
   ];
 
   static String _accentLabelFromColor(Color color) {
