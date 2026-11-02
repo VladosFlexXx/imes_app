@@ -1,6 +1,8 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_inappwebview/flutter_inappwebview.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import '../../app.dart';
 import '../../ui/app_theme.dart';
@@ -956,22 +958,24 @@ class _SettingsScreenState extends State<SettingsScreen> {
                       ],
                     ),
 
-                    const SizedBox(height: 24),
+                    if (!kIsWeb) ...[
+                      const SizedBox(height: 24),
 
-                    // 4. ИКОНКА ПРИЛОЖЕНИЯ
-                    Text(
-                      'Иконка приложения',
-                      style: t.titleSmall?.copyWith(fontWeight: FontWeight.w800),
-                    ),
-                    const SizedBox(height: 10),
-                    _buildIconSelectorRow(
-                      context: context,
-                      selected: currentIcon,
-                      onSelect: (variant) async {
-                        AppHaptics.selectionClick();
-                        await AppIconService.instance.setIcon(variant);
-                      },
-                    ),
+                      // 4. ИКОНКА ПРИЛОЖЕНИЯ
+                      Text(
+                        'Иконка приложения',
+                        style: t.titleSmall?.copyWith(fontWeight: FontWeight.w800),
+                      ),
+                      const SizedBox(height: 10),
+                      _buildIconSelectorRow(
+                        context: context,
+                        selected: currentIcon,
+                        onSelect: (variant) async {
+                          AppHaptics.selectionClick();
+                          await AppIconService.instance.setIcon(variant);
+                        },
+                      ),
+                    ],
 
                     const SizedBox(height: 20),
 
@@ -1669,35 +1673,44 @@ class _SettingsScreenState extends State<SettingsScreen> {
     return _buildCardContainer(
       child: Column(
         children: [
-          ListTile(
-            leading: const Icon(Icons.system_update_rounded),
-            title: Text(
-              'Проверить обновления',
-              style: t.titleMedium?.copyWith(fontWeight: FontWeight.w800),
+          if (!kIsWeb) ...[
+            ListTile(
+              leading: const Icon(Icons.system_update_rounded),
+              title: Text(
+                'Проверить обновления',
+                style: t.titleMedium?.copyWith(fontWeight: FontWeight.w800),
+              ),
+              subtitle: const Text('Сравнить с последним релизом на GitHub'),
+              trailing: tileChevron,
+              onTap: () {
+                AppHaptics.selectionClick();
+                AppUpdateService.instance.checkAndPrompt(context, force: true);
+              },
             ),
-            subtitle: const Text('Сравнить с последним релизом на GitHub'),
-            trailing: tileChevron,
-            onTap: () {
-              AppHaptics.selectionClick();
-              AppUpdateService.instance.checkAndPrompt(context, force: true);
-            },
-          ),
-          const Divider(height: 1),
+            const Divider(height: 1),
+          ],
           ListTile(
             leading: const Icon(Icons.public_outlined),
             title: Text(
-              'Открыть ЭИОС (Web)',
+              kIsWeb ? 'Официальный сайт ЭИОС' : 'Открыть ЭИОС (Web)',
               style: t.titleMedium?.copyWith(fontWeight: FontWeight.w800),
             ),
-            subtitle: const Text('Открыть my/ в WebView'),
-            trailing: tileChevron,
-            onTap: () {
+            subtitle: Text(kIsWeb ? 'Открыть eos.imes.su в новой вкладке' : 'Открыть my/ в WebView'),
+            trailing: const Icon(Icons.open_in_new_rounded, size: 18),
+            onTap: () async {
               AppHaptics.selectionClick();
-              Navigator.of(context).push(
-                MaterialPageRoute(
-                  builder: (_) => const EiosWebViewScreen(),
-                ),
-              );
+              if (kIsWeb) {
+                await launchUrl(
+                  Uri.parse('https://eos.imes.su/my/'),
+                  mode: LaunchMode.externalApplication,
+                );
+              } else {
+                Navigator.of(context).push(
+                  MaterialPageRoute(
+                    builder: (_) => const EiosWebViewScreen(),
+                  ),
+                );
+              }
             },
           ),
           const Divider(height: 1),
@@ -1769,8 +1782,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
         children: [
           _buildAppearanceSection(t, theme, tileChevron),
           const SizedBox(height: 12),
-          _buildNotificationsSection(t, theme, tileChevron),
-          const SizedBox(height: 12),
+          if (!kIsWeb) ...[
+            _buildNotificationsSection(t, theme, tileChevron),
+            const SizedBox(height: 12),
+          ],
           _buildSecuritySection(t, theme, tileChevron),
           const SizedBox(height: 20),
           Text(

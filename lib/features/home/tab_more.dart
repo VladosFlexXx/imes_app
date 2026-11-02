@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:package_info_plus/package_info_plus.dart';
@@ -174,6 +175,150 @@ class _MoreTabState extends State<MoreTab> {
           children: [
             Text('Еще', style: t.titleLarge?.copyWith(fontWeight: FontWeight.w900)),
             const SizedBox(height: 12),
+            if (kIsWeb) ...[
+              Container(
+                decoration: cardDecoration,
+                child: Padding(
+                  padding: const EdgeInsets.all(16),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.all(8),
+                            decoration: BoxDecoration(
+                              color: accent.withValues(alpha: 0.15),
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            child: Icon(Icons.install_mobile_rounded, color: accent, size: 22),
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  'Иконка на экран «Домой»',
+                                  style: t.titleSmall?.copyWith(fontWeight: FontWeight.w900),
+                                ),
+                                const SizedBox(height: 2),
+                                Text(
+                                  'Работает как нативное приложение',
+                                  style: t.bodySmall?.copyWith(
+                                    color: isDark ? Colors.white60 : Colors.black54,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 12),
+                      Text(
+                        'В Safari нажмите «Поделиться» ⎋ → «На экран “Домой”» ⊞. Приложение установится на телефон и будет открываться во весь экран без рамок браузера.',
+                        style: t.bodySmall?.copyWith(
+                          color: isDark ? Colors.white.withValues(alpha: 0.85) : cs.onSurface.withValues(alpha: 0.85),
+                          height: 1.35,
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+                      OutlinedButton.icon(
+                        onPressed: () async {
+                          AppHaptics.selectionClick();
+                          await Clipboard.setData(
+                            const ClipboardData(text: 'https://vladosflexxx.github.io/imes_app/app/'),
+                          );
+                          if (!context.mounted) return;
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(content: Text('Ссылка на веб-приложение скопирована!')),
+                          );
+                        },
+                        icon: const Icon(Icons.copy_rounded, size: 18),
+                        label: const Text('Скопировать ссылку для друзей'),
+                        style: OutlinedButton.styleFrom(
+                          minimumSize: const Size.fromHeight(40),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+              const SizedBox(height: 12),
+              Container(
+                decoration: cardDecoration,
+                child: Padding(
+                  padding: const EdgeInsets.all(16),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.all(8),
+                            decoration: BoxDecoration(
+                              color: (isDark ? Colors.white : Colors.black).withValues(alpha: 0.1),
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            child: Icon(
+                              Icons.apple,
+                              color: isDark ? Colors.white : Colors.black87,
+                              size: 22,
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  'Полноценный .IPA для iPhone',
+                                  style: t.titleSmall?.copyWith(fontWeight: FontWeight.w900),
+                                ),
+                                const SizedBox(height: 2),
+                                Text(
+                                  'Для любителей нативного опыта',
+                                  style: t.bodySmall?.copyWith(
+                                    color: isDark ? Colors.white60 : Colors.black54,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 12),
+                      Text(
+                        'Если готов немного заморочиться с установкой через ПК (AltStore / Scarlet / Sideloadly) — можно накатить официальный .IPA с системными пушами и Face ID.',
+                        style: t.bodySmall?.copyWith(
+                          color: isDark ? Colors.white.withValues(alpha: 0.85) : cs.onSurface.withValues(alpha: 0.85),
+                          height: 1.35,
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+                      ElevatedButton.icon(
+                        onPressed: () async {
+                          AppHaptics.selectionClick();
+                          final url = Uri.parse('https://github.com/VladosFlexXx/imes_app/blob/main/docs/IOS_INSTALL_RU.md');
+                          await launchUrl(url, mode: LaunchMode.externalApplication);
+                        },
+                        icon: const Icon(Icons.menu_book_rounded, size: 18),
+                        label: const Text('Инструкция по установке .IPA →'),
+                        style: ElevatedButton.styleFrom(
+                          minimumSize: const Size.fromHeight(40),
+                          backgroundColor: isDark ? const Color(0xFF2C323D) : const Color(0xFFE2E6EE),
+                          foregroundColor: isDark ? Colors.white : Colors.black87,
+                          elevation: 0,
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+              const SizedBox(height: 12),
+            ],
             Container(
               decoration: cardDecoration,
               child: ClipRRect(

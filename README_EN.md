@@ -153,7 +153,7 @@ Found a bug? Help us improve the app!
 
 ## 🗺 Roadmap
 
-### ✅ Implemented (v0.3.x — v0.4.4)
+### ✅ Implemented (v0.3.x — v0.4.5)
 - [x] Core schedule and grading engine
 - [x] Web PWA client for iPhone and desktop without sideloading (works in RU without VPN)
 - [x] Redesigned grades interface (modern cards, GPA, detail breakdown)
