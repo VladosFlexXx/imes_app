@@ -153,12 +153,14 @@ Found a bug? Help us improve the app!
 
 ## 🗺 Roadmap
 
-### ✅ Implemented (v0.3.x — v0.4.5)
+### ✅ Implemented (v0.3.x — v0.4.6)
 - [x] Core schedule and grading engine
 - [x] Web PWA client for iPhone and desktop without sideloading (works in RU without VPN)
+- [x] Desktop / PC monitor responsive layout adaptation (centered app frame, smooth mouse scroll)
+- [x] Custom color palette picker (Hue/Sat/Val sliders & HEX input) + 13 vibrant presets
 - [x] Redesigned grades interface (modern cards, GPA, detail breakdown)
 - [x] AppHaptics tactile feedback
-- [x] Material You, AMOLED, Liquid Glass, custom theme accents
+- [x] Material You (Android), AMOLED, Liquid Glass, custom theme accents
 - [x] Native light/dark app icon switching on Android
 - [x] GitHub Actions automated iOS `.ipa` packaging
 - [x] Comprehensive iOS Sideload installation guides

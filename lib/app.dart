@@ -1,3 +1,5 @@
+import 'dart:ui';
+
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
@@ -167,9 +169,10 @@ class _VuzAppState extends State<VuzApp> {
   Widget build(BuildContext context) {
     return DynamicColorBuilder(
       builder: (ColorScheme? lightDynamic, ColorScheme? darkDynamic) {
-        final useMaterialYou = themeController.materialYou;
+        final useMaterialYou = !kIsWeb && themeController.materialYou;
         return MaterialApp(
           title: 'Мой ИМЭС',
+          scrollBehavior: const AppScrollBehavior(),
           theme: AppTheme.light(
             seed: themeController.seedColor,
             uiScale: themeController.uiScale,
@@ -196,16 +199,92 @@ class _VuzAppState extends State<VuzApp> {
           builder: (context, child) {
             final media = MediaQuery.of(context);
             final scale = themeController.uiScale;
+            Widget content = child ?? const SizedBox.shrink();
+
+            if (kIsWeb && media.size.width > 600) {
+              content = _DesktopWebFrame(child: content);
+            }
+
             final scaledChild = MediaQuery(
               data: media.copyWith(
                 textScaler: TextScaler.linear(scale),
               ),
-              child: child ?? const SizedBox.shrink(),
+              child: content,
             );
             return _wrapWithBetaBadge(context, scaledChild);
           },
         );
       },
+    );
+  }
+}
+
+class AppScrollBehavior extends MaterialScrollBehavior {
+  const AppScrollBehavior();
+
+  @override
+  Set<PointerDeviceKind> get dragDevices => {
+        PointerDeviceKind.touch,
+        PointerDeviceKind.mouse,
+        PointerDeviceKind.trackpad,
+        PointerDeviceKind.stylus,
+      };
+}
+
+class _DesktopWebFrame extends StatelessWidget {
+  const _DesktopWebFrame({required this.child});
+
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+    final isAmoled = themeController.amoledBlack && isDark;
+
+    final desktopBg = isAmoled
+        ? Colors.black
+        : (isDark ? const Color(0xFF0E1116) : const Color(0xFFECEFF5));
+
+    final borderColor = isAmoled
+        ? theme.colorScheme.primary.withValues(alpha: 0.3)
+        : (isDark
+            ? Colors.white.withValues(alpha: 0.08)
+            : Colors.black.withValues(alpha: 0.08));
+
+    return Container(
+      color: desktopBg,
+      child: Center(
+        child: Container(
+          constraints: const BoxConstraints(maxWidth: 520),
+          decoration: BoxDecoration(
+            color: theme.scaffoldBackgroundColor,
+            border: Border.symmetric(
+              vertical: BorderSide(color: borderColor, width: 1.0),
+            ),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withValues(alpha: isDark ? 0.45 : 0.08),
+                blurRadius: 32,
+                spreadRadius: 2,
+              ),
+            ],
+          ),
+          clipBehavior: Clip.hardEdge,
+          child: LayoutBuilder(
+            builder: (context, constraints) {
+              final frameWidth = constraints.maxWidth;
+              final media = MediaQuery.of(context);
+              return MediaQuery(
+                data: media.copyWith(
+                  size: Size(frameWidth, media.size.height),
+                ),
+                child: child,
+              );
+            },
+          ),
+        ),
+      ),
     );
   }
 }

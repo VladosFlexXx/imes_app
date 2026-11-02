@@ -8,6 +8,7 @@ enum AppAccent { blue, orange, purple, red }
 class ThemeController extends ChangeNotifier {
   static const _key = 'theme_mode'; // light | dark | system
   static const _accentKey = 'theme_accent'; // blue | orange | purple | red
+  static const _customColorKey = 'theme_custom_seed_color'; // ARGB 32-bit int
   static const _uiScaleKey = 'ui_scale'; // double, 0.8 .. 1.3
   static const _reduceEffectsKey = 'reduce_visual_effects';
   static const _reduceAnimationsKey = 'reduce_animations';
@@ -34,12 +35,17 @@ class ThemeController extends ChangeNotifier {
   AppAccent _accent = AppAccent.orange;
   AppAccent get accent => _accent;
 
-  Color get seedColor => switch (_accent) {
-    AppAccent.blue => const Color(0xFF2868EC),
-    AppAccent.orange => const Color(0xFFEC5C0D),
-    AppAccent.purple => const Color(0xFF973AED),
-    AppAccent.red => const Color(0xFFDF2B2B),
-  };
+  Color? _customColor;
+  Color? get customColor => _customColor;
+
+  Color get seedColor =>
+      _customColor ??
+      switch (_accent) {
+        AppAccent.blue => const Color(0xFF2868EC),
+        AppAccent.orange => const Color(0xFFEC5C0D),
+        AppAccent.purple => const Color(0xFF973AED),
+        AppAccent.red => const Color(0xFFDF2B2B),
+      };
 
   bool _loaded = false;
   bool get loaded => _loaded;
@@ -60,6 +66,10 @@ class ThemeController extends ChangeNotifier {
       'red' => AppAccent.red,
       _ => AppAccent.blue,
     };
+    final customVal = prefs.getInt(_customColorKey);
+    if (customVal != null) {
+      _customColor = Color(customVal);
+    }
     _uiScale = prefs.getDouble(_uiScaleKey) ?? 1.0;
     _reduceEffects = prefs.getBool(_reduceEffectsKey) ?? false;
     _reduceAnimations = prefs.getBool(_reduceAnimationsKey) ?? false;
@@ -102,8 +112,13 @@ class ThemeController extends ChangeNotifier {
   }
 
   Future<void> setAccent(AppAccent accent) async {
-    if (_accent == accent) return;
     _accent = accent;
+    _customColor = switch (accent) {
+      AppAccent.blue => const Color(0xFF2868EC),
+      AppAccent.orange => const Color(0xFFEC5C0D),
+      AppAccent.purple => const Color(0xFF973AED),
+      AppAccent.red => const Color(0xFFDF2B2B),
+    };
     notifyListeners();
 
     final prefs = await SharedPreferences.getInstance();
@@ -114,6 +129,25 @@ class ThemeController extends ChangeNotifier {
       AppAccent.red => 'red',
     };
     await prefs.setString(_accentKey, v);
+    await prefs.setInt(_customColorKey, _customColor!.toARGB32());
+  }
+
+  Future<void> setSeedColor(Color color) async {
+    _customColor = color;
+    final cInt = color.toARGB32();
+    if (cInt == const Color(0xFF2868EC).toARGB32()) {
+      _accent = AppAccent.blue;
+    } else if (cInt == const Color(0xFFEC5C0D).toARGB32()) {
+      _accent = AppAccent.orange;
+    } else if (cInt == const Color(0xFF973AED).toARGB32()) {
+      _accent = AppAccent.purple;
+    } else if (cInt == const Color(0xFFDF2B2B).toARGB32()) {
+      _accent = AppAccent.red;
+    }
+    notifyListeners();
+
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setInt(_customColorKey, cInt);
   }
 
   Future<void> setReduceEffects(bool value) async {

@@ -14,7 +14,6 @@ import '../auth/pin_code_screen.dart';
 import '../../core/demo/demo_mode.dart';
 import '../../core/network/eios_client.dart';
 import '../../core/network/eios_endpoints.dart';
-import '../../theme_controller.dart';
 
 // debug/log/share
 import '../../core/logging/app_logger.dart';
@@ -699,30 +698,40 @@ class _SettingsScreenState extends State<SettingsScreen> {
     }
   }
 
-  static String _accentLabel(AppAccent accent) {
-    switch (accent) {
-      case AppAccent.blue:
-        return 'Синий';
-      case AppAccent.orange:
-        return 'Оранжевый';
-      case AppAccent.purple:
-        return 'Фиолетовый';
-      case AppAccent.red:
-        return 'Красный';
+  static const List<_PresetAccent> _presetAccents = [
+    _PresetAccent('Оранжевый', Color(0xFFEC5C0D)),
+    _PresetAccent('Синий', Color(0xFF2868EC)),
+    _PresetAccent('Небесный', Color(0xFF0EA5E9)),
+    _PresetAccent('Бирюзовый', Color(0xFF10B981)),
+    _PresetAccent('Изумруд', Color(0xFF059669)),
+    _PresetAccent('Лайм', Color(0xFF84CC16)),
+    _PresetAccent('Янтарный', Color(0xFFF59E0B)),
+    _PresetAccent('Коралл', Color(0xFFF97316)),
+    _PresetAccent('Алый', Color(0xFFEF4444)),
+    _PresetAccent('Розовый', Color(0xFFEC4899)),
+    _PresetAccent('Фуксия', Color(0xFFD946EF)),
+    _PresetAccent('Фиолетовый', Color(0xFF8B5CF6)),
+    _PresetAccent('Индиго', Color(0xFF6366F1)),
+  ];
+
+  static String _accentLabelFromColor(Color color) {
+    final target = color.toARGB32();
+    for (final p in _presetAccents) {
+      if (p.color.toARGB32() == target) return p.label;
     }
+    return '#${color.toARGB32().toRadixString(16).padLeft(8, '0').substring(2).toUpperCase()}';
   }
 
-  static Color _accentColor(AppAccent accent) {
-    switch (accent) {
-      case AppAccent.blue:
-        return const Color(0xFF2868EC);
-      case AppAccent.orange:
-        return const Color(0xFFEC5C0D);
-      case AppAccent.purple:
-        return const Color(0xFF973AED);
-      case AppAccent.red:
-        return const Color(0xFFDF2B2B);
-    }
+  static void _showColorPickerDialog(BuildContext context) {
+    showDialog(
+      context: context,
+      builder: (_) => _ColorPickerDialog(
+        initialColor: themeController.seedColor,
+        onColorSelected: (color) {
+          themeController.setSeedColor(color);
+        },
+      ),
+    );
   }
 
   static void _showAppearanceDialog(BuildContext context) {
@@ -738,7 +747,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
             final t = Theme.of(context).textTheme;
             final isDark = Theme.of(context).brightness == Brightness.dark;
             final currentMode = themeController.mode;
-            final currentAccent = themeController.accent;
             final currentScale = themeController.uiScale;
             final currentIcon = AppIconService.instance.current;
             final currentReduceEffects = themeController.reduceEffects;
@@ -817,7 +825,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                           'Акцентный цвет',
                           style: t.titleSmall?.copyWith(fontWeight: FontWeight.w800),
                         ),
-                        if (currentMaterialYou)
+                        if (!kIsWeb && currentMaterialYou)
                           Text(
                             'Цвета обоев (Material You)',
                             style: TextStyle(
@@ -829,74 +837,164 @@ class _SettingsScreenState extends State<SettingsScreen> {
                       ],
                     ),
                     const SizedBox(height: 10),
-                    Opacity(
-                      opacity: currentMaterialYou ? 0.38 : 1.0,
-                      child: IgnorePointer(
-                        ignoring: currentMaterialYou,
-                        child: SingleChildScrollView(
-                          scrollDirection: Axis.horizontal,
-                          physics: const BouncingScrollPhysics(),
-                          child: Row(
-                            children: [
-                              for (final acc in AppAccent.values) ...[
-                                InkWell(
-                                  borderRadius: BorderRadius.circular(16),
-                                  onTap: () {
-                                    AppHaptics.selectionClick();
-                                    themeController.setAccent(acc);
-                                  },
-                                  child: AnimatedContainer(
-                                    duration: const Duration(milliseconds: 200),
-                                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-                                    decoration: BoxDecoration(
-                                      color: currentAccent == acc
-                                          ? _accentColor(acc).withValues(alpha: 0.16)
-                                          : (isDark
-                                              ? Colors.white.withValues(alpha: 0.05)
-                                              : cs.surfaceContainerHighest.withValues(alpha: 0.5)),
-                                      borderRadius: BorderRadius.circular(16),
-                                      border: Border.all(
-                                        color: currentAccent == acc
-                                            ? _accentColor(acc)
-                                            : Colors.transparent,
-                                        width: 2,
+                    Builder(
+                      builder: (context) {
+                        final currentSeed = themeController.seedColor;
+                        final isCustomColor = !_presetAccents.any(
+                          (p) => p.color.toARGB32() == currentSeed.toARGB32(),
+                        );
+                        return Opacity(
+                          opacity: (!kIsWeb && currentMaterialYou) ? 0.38 : 1.0,
+                          child: IgnorePointer(
+                            ignoring: !kIsWeb && currentMaterialYou,
+                            child: SingleChildScrollView(
+                              scrollDirection: Axis.horizontal,
+                              physics: const BouncingScrollPhysics(),
+                              child: Row(
+                                children: [
+                                  for (final p in _presetAccents) ...[
+                                    Builder(
+                                      builder: (context) {
+                                        final isSelected =
+                                            currentSeed.toARGB32() == p.color.toARGB32();
+                                        return InkWell(
+                                          borderRadius: BorderRadius.circular(16),
+                                          onTap: () {
+                                            AppHaptics.selectionClick();
+                                            themeController.setSeedColor(p.color);
+                                          },
+                                          child: AnimatedContainer(
+                                            duration: const Duration(milliseconds: 200),
+                                            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                                            decoration: BoxDecoration(
+                                              color: isSelected
+                                                  ? p.color.withValues(alpha: 0.16)
+                                                  : (isDark
+                                                      ? Colors.white.withValues(alpha: 0.05)
+                                                      : cs.surfaceContainerHighest.withValues(alpha: 0.5)),
+                                              borderRadius: BorderRadius.circular(16),
+                                              border: Border.all(
+                                                color: isSelected
+                                                    ? p.color
+                                                    : Colors.transparent,
+                                                width: 2,
+                                              ),
+                                            ),
+                                            child: Row(
+                                              mainAxisSize: MainAxisSize.min,
+                                              children: [
+                                                Container(
+                                                  width: 14,
+                                                  height: 14,
+                                                  decoration: BoxDecoration(
+                                                    color: p.color,
+                                                    shape: BoxShape.circle,
+                                                  ),
+                                                ),
+                                                const SizedBox(width: 8),
+                                                Text(
+                                                  p.label,
+                                                  style: TextStyle(
+                                                    fontWeight: isSelected
+                                                        ? FontWeight.w800
+                                                        : FontWeight.w600,
+                                                    fontSize: 13,
+                                                    color: isSelected
+                                                        ? p.color
+                                                        : cs.onSurface,
+                                                  ),
+                                                ),
+                                              ],
+                                            ),
+                                          ),
+                                        );
+                                      },
+                                    ),
+                                    const SizedBox(width: 8),
+                                  ],
+                                  // Свой цвет / Палитра
+                                  InkWell(
+                                    borderRadius: BorderRadius.circular(16),
+                                    onTap: () {
+                                      AppHaptics.selectionClick();
+                                      _showColorPickerDialog(context);
+                                    },
+                                    child: AnimatedContainer(
+                                      duration: const Duration(milliseconds: 200),
+                                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                                      decoration: BoxDecoration(
+                                        color: isCustomColor
+                                            ? currentSeed.withValues(alpha: 0.16)
+                                            : (isDark
+                                                ? Colors.white.withValues(alpha: 0.05)
+                                                : cs.surfaceContainerHighest.withValues(alpha: 0.5)),
+                                        borderRadius: BorderRadius.circular(16),
+                                        border: Border.all(
+                                          color: isCustomColor
+                                              ? currentSeed
+                                              : (isDark
+                                                  ? Colors.white.withValues(alpha: 0.12)
+                                                  : Colors.black.withValues(alpha: 0.12)),
+                                          width: 2,
+                                        ),
+                                      ),
+                                      child: Row(
+                                        mainAxisSize: MainAxisSize.min,
+                                        children: [
+                                          if (isCustomColor)
+                                            Container(
+                                              width: 14,
+                                              height: 14,
+                                              margin: const EdgeInsets.only(right: 8),
+                                              decoration: BoxDecoration(
+                                                color: currentSeed,
+                                                shape: BoxShape.circle,
+                                              ),
+                                            )
+                                          else
+                                            ShaderMask(
+                                              shaderCallback: (bounds) => const SweepGradient(
+                                                colors: [
+                                                  Colors.red,
+                                                  Colors.amber,
+                                                  Colors.green,
+                                                  Colors.cyan,
+                                                  Colors.blue,
+                                                  Colors.purple,
+                                                  Colors.red,
+                                                ],
+                                              ).createShader(bounds),
+                                              child: const Icon(
+                                                Icons.palette_rounded,
+                                                size: 16,
+                                                color: Colors.white,
+                                              ),
+                                            ),
+                                          const SizedBox(width: 6),
+                                          Text(
+                                            isCustomColor
+                                                ? _accentLabelFromColor(currentSeed)
+                                                : 'Палитра',
+                                            style: TextStyle(
+                                              fontWeight: isCustomColor
+                                                  ? FontWeight.w800
+                                                  : FontWeight.w600,
+                                              fontSize: 13,
+                                              color: isCustomColor
+                                                  ? currentSeed
+                                                  : cs.onSurface,
+                                            ),
+                                          ),
+                                        ],
                                       ),
                                     ),
-                                    child: Row(
-                                      mainAxisSize: MainAxisSize.min,
-                                      children: [
-                                        Container(
-                                          width: 14,
-                                          height: 14,
-                                          decoration: BoxDecoration(
-                                            color: _accentColor(acc),
-                                            shape: BoxShape.circle,
-                                          ),
-                                        ),
-                                        const SizedBox(width: 8),
-                                        Text(
-                                          _accentLabel(acc),
-                                          style: TextStyle(
-                                            fontWeight: currentAccent == acc
-                                                ? FontWeight.w800
-                                                : FontWeight.w600,
-                                            fontSize: 13,
-                                            color: currentAccent == acc
-                                                ? _accentColor(acc)
-                                                : cs.onSurface,
-                                          ),
-                                        ),
-                                      ],
-                                    ),
                                   ),
-                                ),
-                                if (acc != AppAccent.values.last)
-                                  const SizedBox(width: 8),
-                              ],
-                            ],
+                                ],
+                              ),
+                            ),
                           ),
-                        ),
-                      ),
+                        );
+                      },
                     ),
 
                     const SizedBox(height: 24),
@@ -985,23 +1083,25 @@ class _SettingsScreenState extends State<SettingsScreen> {
                       style: t.titleSmall?.copyWith(fontWeight: FontWeight.w800),
                     ),
                     const SizedBox(height: 8),
-                    SwitchListTile.adaptive(
-                      contentPadding: EdgeInsets.zero,
-                      secondary: const Icon(Icons.auto_awesome_rounded),
-                      title: Text(
-                        'Material You',
-                        style: t.titleSmall?.copyWith(fontWeight: FontWeight.w800),
+                    if (!kIsWeb) ...[
+                      SwitchListTile.adaptive(
+                        contentPadding: EdgeInsets.zero,
+                        secondary: const Icon(Icons.auto_awesome_rounded),
+                        title: Text(
+                          'Material You',
+                          style: t.titleSmall?.copyWith(fontWeight: FontWeight.w800),
+                        ),
+                        subtitle: Text(
+                          'Использовать цвета обоев системы',
+                          style: TextStyle(color: cs.onSurfaceVariant, fontSize: 12),
+                        ),
+                        value: currentMaterialYou,
+                        onChanged: (val) {
+                          AppHaptics.selectionClick();
+                          themeController.setMaterialYou(val);
+                        },
                       ),
-                      subtitle: Text(
-                        'Использовать цвета обоев системы',
-                        style: TextStyle(color: cs.onSurfaceVariant, fontSize: 12),
-                      ),
-                      value: currentMaterialYou,
-                      onChanged: (val) {
-                        AppHaptics.selectionClick();
-                        themeController.setMaterialYou(val);
-                      },
-                    ),
+                    ],
                     SwitchListTile.adaptive(
                       contentPadding: EdgeInsets.zero,
                       secondary: const Icon(Icons.contrast_rounded),
@@ -1375,7 +1475,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
     ThemeData theme,
     Icon tileChevron,
   ) {
-    final accentPart = _materialYou ? 'Material You' : _accentLabel(themeController.accent);
+    final accentPart = (!kIsWeb && _materialYou)
+        ? 'Material You'
+        : _accentLabelFromColor(themeController.seedColor);
     final amoledPart = _amoledBlack ? ' · AMOLED' : '';
     final glassPart = _reduceEffects ? 'Без стекла' : 'Стекло';
     final status = '${_themeLabel(themeController.mode)} · $accentPart$amoledPart · $glassPart';
@@ -1866,6 +1968,393 @@ class EiosWebViewScreen extends StatelessWidget {
     return Scaffold(
       appBar: AppBar(title: const Text('ЭИОС (Web)')),
       body: InAppWebView(initialUrlRequest: URLRequest(url: WebUri(_url))),
+    );
+  }
+}
+
+class _PresetAccent {
+  final String label;
+  final Color color;
+
+  const _PresetAccent(this.label, this.color);
+}
+
+class _ColorPickerDialog extends StatefulWidget {
+  final Color initialColor;
+  final ValueChanged<Color> onColorSelected;
+
+  const _ColorPickerDialog({
+    required this.initialColor,
+    required this.onColorSelected,
+  });
+
+  @override
+  State<_ColorPickerDialog> createState() => _ColorPickerDialogState();
+}
+
+class _ColorPickerDialogState extends State<_ColorPickerDialog> {
+  late double _hue;
+  late double _saturation;
+  late double _value;
+  late final TextEditingController _hexController;
+  bool _updatingText = false;
+
+  static const List<Color> _quickSwatches = [
+    Color(0xFFEC5C0D), // Оранжевый ИМЭС
+    Color(0xFF2868EC), // Синий
+    Color(0xFF0EA5E9), // Небесный
+    Color(0xFF10B981), // Мятный
+    Color(0xFF84CC16), // Лайм
+    Color(0xFFF59E0B), // Янтарный
+    Color(0xFFEF4444), // Алый
+    Color(0xFFEC4899), // Розовый
+    Color(0xFFD946EF), // Фуксия
+    Color(0xFF8B5CF6), // Фиолетовый
+  ];
+
+  @override
+  void initState() {
+    super.initState();
+    final hsv = HSVColor.fromColor(widget.initialColor);
+    _hue = hsv.hue;
+    _saturation = hsv.saturation.clamp(0.20, 1.0);
+    _value = hsv.value.clamp(0.35, 1.0);
+    _hexController = TextEditingController(
+      text: _formatHex(widget.initialColor),
+    );
+  }
+
+  @override
+  void dispose() {
+    _hexController.dispose();
+    super.dispose();
+  }
+
+  Color get _currentColor =>
+      HSVColor.fromAHSV(1.0, _hue, _saturation, _value).toColor();
+
+  String _formatHex(Color c) =>
+      c.toARGB32().toRadixString(16).padLeft(8, '0').substring(2).toUpperCase();
+
+  void _syncHexFromHsv() {
+    if (_updatingText) return;
+    _updatingText = true;
+    _hexController.text = _formatHex(_currentColor);
+    _updatingText = false;
+  }
+
+  void _onHexChanged(String input) {
+    if (_updatingText) return;
+    final cleaned = input.replaceAll('#', '').trim();
+    if (cleaned.length == 6) {
+      final parsed = int.tryParse(cleaned, radix: 16);
+      if (parsed != null) {
+        final c = Color(0xFF000000 | parsed);
+        final hsv = HSVColor.fromColor(c);
+        setState(() {
+          _hue = hsv.hue;
+          _saturation = hsv.saturation.clamp(0.20, 1.0);
+          _value = hsv.value.clamp(0.35, 1.0);
+        });
+      }
+    }
+  }
+
+  void _setSwatch(Color c) {
+    AppHaptics.selectionClick();
+    final hsv = HSVColor.fromColor(c);
+    setState(() {
+      _hue = hsv.hue;
+      _saturation = hsv.saturation.clamp(0.20, 1.0);
+      _value = hsv.value.clamp(0.35, 1.0);
+      _syncHexFromHsv();
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final cs = theme.colorScheme;
+    final t = theme.textTheme;
+    final isDark = theme.brightness == Brightness.dark;
+    final current = _currentColor;
+
+    return Dialog(
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(28)),
+      backgroundColor: isDark ? const Color(0xFF1A1D24) : Colors.white,
+      insetPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 24),
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 400),
+        child: Padding(
+          padding: const EdgeInsets.all(22),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              // Заголовок
+              Row(
+                children: [
+                  Container(
+                    width: 36,
+                    height: 36,
+                    decoration: BoxDecoration(
+                      color: current.withValues(alpha: 0.16),
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: Icon(Icons.palette_rounded, color: current, size: 20),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Text(
+                      'Палитра акцента',
+                      style: t.titleMedium?.copyWith(fontWeight: FontWeight.w900),
+                    ),
+                  ),
+                  IconButton(
+                    icon: const Icon(Icons.close_rounded, size: 20),
+                    onPressed: () => Navigator.of(context).pop(),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 16),
+
+              // Превью карточки
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                decoration: BoxDecoration(
+                  color: current,
+                  borderRadius: BorderRadius.circular(20),
+                  boxShadow: [
+                    BoxShadow(
+                      color: current.withValues(alpha: 0.35),
+                      blurRadius: 18,
+                      offset: const Offset(0, 6),
+                    ),
+                  ],
+                ),
+                child: Row(
+                  children: [
+                    const Icon(Icons.school_rounded, color: Colors.white, size: 28),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Text(
+                            'Мой ИМЭС',
+                            style: TextStyle(
+                              color: Colors.white,
+                              fontWeight: FontWeight.w900,
+                              fontSize: 16,
+                            ),
+                          ),
+                          Text(
+                            'HEX: #${_formatHex(current)}',
+                            style: TextStyle(
+                              color: Colors.white.withValues(alpha: 0.85),
+                              fontSize: 12,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                      decoration: BoxDecoration(
+                        color: Colors.white.withValues(alpha: 0.22),
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      child: const Text(
+                        'Превью',
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontSize: 11,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 16),
+
+              // Быстрые оттенки
+              Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                children: [
+                  for (final swatch in _quickSwatches)
+                    GestureDetector(
+                      onTap: () => _setSwatch(swatch),
+                      child: Container(
+                        width: 28,
+                        height: 28,
+                        decoration: BoxDecoration(
+                          color: swatch,
+                          shape: BoxShape.circle,
+                          border: Border.all(
+                            color: swatch.toARGB32() == current.toARGB32()
+                                ? (isDark ? Colors.white : Colors.black87)
+                                : Colors.transparent,
+                            width: 2.5,
+                          ),
+                        ),
+                      ),
+                    ),
+                ],
+              ),
+              const SizedBox(height: 16),
+
+              // Слайдер оттенка (Hue)
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Text('Оттенок (Hue)', style: t.labelMedium?.copyWith(fontWeight: FontWeight.w700)),
+                  Text('${_hue.round()}°', style: TextStyle(color: cs.onSurfaceVariant, fontSize: 12)),
+                ],
+              ),
+              const SizedBox(height: 4),
+              Stack(
+                alignment: Alignment.center,
+                children: [
+                  Container(
+                    height: 12,
+                    margin: const EdgeInsets.symmetric(horizontal: 12),
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(6),
+                      gradient: const LinearGradient(
+                        colors: [
+                          Color(0xFFFF0000),
+                          Color(0xFFFFFF00),
+                          Color(0xFF00FF00),
+                          Color(0xFF00FFFF),
+                          Color(0xFF0000FF),
+                          Color(0xFFFF00FF),
+                          Color(0xFFFF0000),
+                        ],
+                      ),
+                    ),
+                  ),
+                  SliderTheme(
+                    data: SliderTheme.of(context).copyWith(
+                      activeTrackColor: Colors.transparent,
+                      inactiveTrackColor: Colors.transparent,
+                      thumbColor: current,
+                      overlayColor: current.withValues(alpha: 0.2),
+                    ),
+                    child: Slider(
+                      value: _hue,
+                      min: 0,
+                      max: 360,
+                      onChanged: (val) {
+                        setState(() {
+                          _hue = val;
+                          _syncHexFromHsv();
+                        });
+                      },
+                    ),
+                  ),
+                ],
+              ),
+
+              // Слайдер насыщенности
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Text('Насыщенность', style: t.labelMedium?.copyWith(fontWeight: FontWeight.w700)),
+                  Text('${(_saturation * 100).round()}%', style: TextStyle(color: cs.onSurfaceVariant, fontSize: 12)),
+                ],
+              ),
+              Slider(
+                value: _saturation,
+                min: 0.20,
+                max: 1.0,
+                activeColor: current,
+                onChanged: (val) {
+                  setState(() {
+                    _saturation = val;
+                    _syncHexFromHsv();
+                  });
+                },
+              ),
+
+              // Слайдер яркости
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Text('Яркость', style: t.labelMedium?.copyWith(fontWeight: FontWeight.w700)),
+                  Text('${(_value * 100).round()}%', style: TextStyle(color: cs.onSurfaceVariant, fontSize: 12)),
+                ],
+              ),
+              Slider(
+                value: _value,
+                min: 0.35,
+                max: 1.0,
+                activeColor: current,
+                onChanged: (val) {
+                  setState(() {
+                    _value = val;
+                    _syncHexFromHsv();
+                  });
+                },
+              ),
+              const SizedBox(height: 6),
+
+              // Поле HEX
+              TextField(
+                controller: _hexController,
+                maxLength: 6,
+                style: const TextStyle(
+                  fontFamily: 'monospace',
+                  fontWeight: FontWeight.w800,
+                  letterSpacing: 1.5,
+                ),
+                decoration: InputDecoration(
+                  counterText: '',
+                  prefixText: '# ',
+                  prefixStyle: TextStyle(
+                    color: cs.onSurfaceVariant,
+                    fontWeight: FontWeight.w800,
+                  ),
+                  labelText: 'HEX код цвета',
+                  labelStyle: TextStyle(color: cs.onSurfaceVariant, fontSize: 13),
+                  isDense: true,
+                  filled: true,
+                  fillColor: isDark
+                      ? Colors.white.withValues(alpha: 0.05)
+                      : cs.surfaceContainerHighest.withValues(alpha: 0.5),
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(14),
+                    borderSide: BorderSide.none,
+                  ),
+                ),
+                onChanged: _onHexChanged,
+              ),
+              const SizedBox(height: 18),
+
+              // Кнопка применить
+              FilledButton(
+                style: FilledButton.styleFrom(
+                  backgroundColor: current,
+                  foregroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(vertical: 14),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                ),
+                onPressed: () {
+                  AppHaptics.mediumImpact();
+                  widget.onColorSelected(current);
+                  Navigator.of(context).pop();
+                },
+                child: const Text(
+                  'Применить цвет',
+                  style: TextStyle(fontWeight: FontWeight.w900, fontSize: 15),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
     );
   }
 }
