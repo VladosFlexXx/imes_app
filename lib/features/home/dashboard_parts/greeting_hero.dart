@@ -9,8 +9,8 @@ class _GreetingHero extends StatelessWidget {
   final bool evenWeek;
   final int progressPercent;
   final double progressValue;
-  final double? avgGrade;
-  final int? attendance;
+  final int lessonsTomorrow;
+  final int daysUntilWeekend;
   final int? courseNumber;
   final bool skeletonize;
   final VoidCallback onOpenProfile;
@@ -26,8 +26,8 @@ class _GreetingHero extends StatelessWidget {
     required this.evenWeek,
     required this.progressPercent,
     required this.progressValue,
-    required this.avgGrade,
-    required this.attendance,
+    required this.lessonsTomorrow,
+    required this.daysUntilWeekend,
     required this.courseNumber,
     required this.skeletonize,
     required this.onOpenProfile,
@@ -91,11 +91,6 @@ class _GreetingHero extends StatelessWidget {
       'декабря',
     ];
     return months[(m - 1).clamp(0, 11)];
-  }
-
-  String _fmtOne(double? v) {
-    if (v == null) return '—';
-    return v.toStringAsFixed(1).replaceAll('.', ',');
   }
 
   @override
@@ -374,20 +369,18 @@ class _GreetingHero extends StatelessWidget {
                       ),
                       const SizedBox(width: 10),
                       _StatBox(
-                        title: 'Средний балл',
-                        value: _fmtOne(avgGrade),
+                        title: 'Пары завтра',
+                        value: lessonsTomorrow == 0 ? 'Отдых' : '$lessonsTomorrow',
                         skeletonize: skeletonize,
                         accent: accent,
-                        emphasize: true,
+                        emphasize: lessonsTomorrow > 0,
                       ),
                       const SizedBox(width: 10),
                       _StatBox(
-                        title: attendance != null
-                            ? 'Посещаемость'
-                            : (courseNumber != null ? 'Курс' : 'Посещаемость'),
-                        value: attendance != null
-                            ? '$attendance%'
-                            : (courseNumber?.toString() ?? '—'),
+                        title: 'До выходных',
+                        value: daysUntilWeekend == 0
+                            ? 'Выходной 🎉'
+                            : '$daysUntilWeekend дн.',
                         skeletonize: skeletonize,
                         accent: accent,
                       ),

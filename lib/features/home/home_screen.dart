@@ -25,6 +25,8 @@ import 'tab_dashboard.dart';
 import 'tab_grades.dart';
 import 'tab_more.dart';
 import 'tab_schedule.dart';
+import 'desktop/desktop_dashboard.dart';
+import 'desktop/desktop_scaffold.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key, this.initialDataReady = false});
@@ -283,6 +285,18 @@ class _HomeScreenState extends State<HomeScreen>
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final screenWidth = MediaQuery.sizeOf(context).width;
+    final isDesktop = screenWidth >= 900;
+
+    if (isDesktop) {
+      return DesktopScaffold(
+        currentIndex: _index,
+        onNavigate: _navigateTo,
+        body: _index == 0
+            ? DesktopDashboard(onNavigate: _navigateTo)
+            : _getTab(_index),
+      );
+    }
 
     return PopScope(
       canPop: false,

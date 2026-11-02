@@ -144,38 +144,10 @@ class DashboardTab extends StatelessWidget {
 
   bool _isEvenWeek(DateTime d) => _isoWeek(d).isEven;
 
-  double? _parseDecimal(String? raw) {
-    if (raw == null || raw.trim().isEmpty) return null;
-    final normalized = raw.replaceAll(' ', '').replaceAll(',', '.');
-    final m = RegExp(r'-?\d+(?:\.\d+)?').firstMatch(normalized);
-    if (m == null) return null;
-    return double.tryParse(m.group(0)!);
-  }
-
-  double? _avgGrade(List<dynamic> courses) {
-    final vals = <double>[];
-    for (final c in courses) {
-      try {
-        final v = _parseDecimal(c.grade as String?);
-        if (v == null) continue;
-        if (v >= 2 && v <= 10) vals.add(v);
-      } catch (_) {}
-    }
-    if (vals.isEmpty) return null;
-    return vals.reduce((a, b) => a + b) / vals.length;
-  }
-
-  int? _attendancePercent(List<dynamic> courses) {
-    final vals = <double>[];
-    for (final c in courses) {
-      try {
-        final v = _parseDecimal(c.percent as String?);
-        if (v == null) continue;
-        if (v >= 0 && v <= 100) vals.add(v);
-      } catch (_) {}
-    }
-    if (vals.isEmpty) return null;
-    return (vals.reduce((a, b) => a + b) / vals.length).round().clamp(0, 100);
+  int _daysUntilWeekend(DateTime date) {
+    final wd = date.weekday;
+    if (wd == DateTime.saturday || wd == DateTime.sunday) return 0;
+    return 6 - wd;
   }
 
   int? _courseFromProfile(ProfileRepository repo) {
@@ -253,12 +225,8 @@ class DashboardTab extends StatelessWidget {
         final avatarUrl = profileRepo.profile?.avatarUrl;
         final group = profileRepo.profile?.group;
         final level = profileRepo.profile?.level;
-        final avgGrade = _avgGrade(gradesRepo.courses);
-        final attendance =
-            _attendancePercent(gradesRepo.courses) ??
-            (totalWeekLessons > 0
-                ? ((completedWeekLessons / totalWeekLessons) * 100).round()
-                : null);
+        final daysUntilWeekend = _daysUntilWeekend(now);
+        final lessonsTomorrow = tomorrowLessons.length;
         final courseNum = _courseFromProfile(profileRepo);
         final progressPct = totalWeekLessons > 0
             ? ((completedWeekLessons / totalWeekLessons) * 100).round()
@@ -278,8 +246,8 @@ class DashboardTab extends StatelessWidget {
           progressValue: totalWeekLessons > 0
               ? (completedWeekLessons / totalWeekLessons).clamp(0.0, 1.0)
               : 0.0,
-          avgGrade: avgGrade,
-          attendance: attendance,
+          lessonsTomorrow: lessonsTomorrow,
+          daysUntilWeekend: daysUntilWeekend,
           courseNumber: courseNum,
           next: next,
           subtitleBuilder: _timeToText,
@@ -343,8 +311,8 @@ class _DashboardContent extends StatelessWidget {
   final bool evenWeek;
   final int progressPercent;
   final double progressValue;
-  final double? avgGrade;
-  final int? attendance;
+  final int lessonsTomorrow;
+  final int daysUntilWeekend;
   final int? courseNumber;
   final _UpcomingLesson? next;
   final String Function(_UpcomingLesson) subtitleBuilder;
@@ -371,8 +339,8 @@ class _DashboardContent extends StatelessWidget {
     required this.evenWeek,
     required this.progressPercent,
     required this.progressValue,
-    required this.avgGrade,
-    required this.attendance,
+    required this.lessonsTomorrow,
+    required this.daysUntilWeekend,
     required this.courseNumber,
     required this.next,
     required this.subtitleBuilder,
@@ -406,8 +374,8 @@ class _DashboardContent extends StatelessWidget {
             evenWeek: evenWeek,
             progressPercent: progressPercent,
             progressValue: progressValue,
-            avgGrade: avgGrade,
-            attendance: attendance,
+            lessonsTomorrow: lessonsTomorrow,
+            daysUntilWeekend: daysUntilWeekend,
             courseNumber: courseNumber,
             skeletonize: skeletonize,
             onOpenProfile: onOpenProfile,

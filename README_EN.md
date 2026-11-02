@@ -153,10 +153,11 @@ Found a bug? Help us improve the app!
 
 ## 🗺 Roadmap
 
-### ✅ Implemented (v0.3.x — v0.4.7)
+### ✅ Implemented (v0.3.x — v0.4.8)
 - [x] Core schedule and grading engine
+- [x] Desktop dashboard layout (Bento Grid): navigation sidebar, topbar with Ctrl+K search, sync status & schedule timeline
+- [x] Refined student KPIs: "Lessons Today", "Lessons Tomorrow", and "Until Weekend" metrics replacing noisy GPA & attendance math
 - [x] Web PWA client for iPhone and desktop without sideloading (works in RU without VPN)
-- [x] Desktop / PC monitor responsive layout adaptation (centered app frame, smooth mouse scroll)
 - [x] Custom color palette picker (Hue/Sat/Val sliders & HEX input) + 3 clean presets (IMES Orange, Violet, Green)
 - [x] Redesigned grades interface (modern cards, GPA, detail breakdown)
 - [x] AppHaptics tactile feedback
