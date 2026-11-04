@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:vuz_app/ui/app_theme.dart';
+import 'package:imes_app/ui/app_theme.dart';
 
 import 'inbox_repository.dart';
 

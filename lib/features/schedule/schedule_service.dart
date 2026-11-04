@@ -1,4 +1,4 @@
-import 'package:vuz_app/core/network/eios_client.dart';
+import 'package:imes_app/core/network/eios_client.dart';
 
 /// Исторически этот класс использовался как "HTTP + cookies".
 /// Оставляем его как тонкий фасад, чтобы не переписывать все репозитории.

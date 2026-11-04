@@ -11,8 +11,8 @@ import '../profile/models.dart';
 import '../profile/repository.dart';
 import '../profile/widgets/auth_avatar.dart';
 
-import 'package:vuz_app/core/network/eios_client.dart';
-import 'package:vuz_app/core/demo/demo_mode.dart';
+import 'package:imes_app/core/network/eios_client.dart';
+import 'package:imes_app/core/demo/demo_mode.dart';
 
 part '../profile/ui_parts/profile_header.dart';
 part '../profile/ui_parts/profile_info_card.dart';

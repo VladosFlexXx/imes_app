@@ -2,18 +2,18 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
-import 'package:vuz_app/app.dart';
-import 'package:vuz_app/core/auth/auth_settings.dart';
-import 'package:vuz_app/core/auth/session_manager.dart';
-import 'package:vuz_app/core/demo/demo_mode.dart';
-import 'package:vuz_app/core/network/eios_client.dart';
-import 'package:vuz_app/features/grades/repository.dart';
-import 'package:vuz_app/features/home/home_screen.dart';
-import 'package:vuz_app/features/notifications/inbox_repository.dart';
-import 'package:vuz_app/features/profile/repository.dart';
-import 'package:vuz_app/features/schedule/schedule_repository.dart';
-import 'package:vuz_app/ui/app_haptics.dart';
-import 'package:vuz_app/ui/app_theme.dart';
+import 'package:imes_app/app.dart';
+import 'package:imes_app/core/auth/auth_settings.dart';
+import 'package:imes_app/core/auth/session_manager.dart';
+import 'package:imes_app/core/demo/demo_mode.dart';
+import 'package:imes_app/core/network/eios_client.dart';
+import 'package:imes_app/features/grades/repository.dart';
+import 'package:imes_app/features/home/home_screen.dart';
+import 'package:imes_app/features/notifications/inbox_repository.dart';
+import 'package:imes_app/features/profile/repository.dart';
+import 'package:imes_app/features/schedule/schedule_repository.dart';
+import 'package:imes_app/ui/app_haptics.dart';
+import 'package:imes_app/ui/app_theme.dart';
 
 class LoginWebScreen extends StatefulWidget {
   const LoginWebScreen({super.key});

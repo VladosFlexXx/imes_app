@@ -1,9 +1,9 @@
-name: vuz_app
-description: "A new Flutter project."
+name: imes_app
+description: "Мобильное и веб-приложение для студентов ИМЭС"
 
 publish_to: 'none' 
 
-version: 0.5.0+35
+version: 0.6.0+37
 
 environment:
   sdk: ^3.10.7

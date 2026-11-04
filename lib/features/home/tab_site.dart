@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_inappwebview/flutter_inappwebview.dart';
-import 'package:vuz_app/ui/shimmer_skeleton.dart';
+import 'package:imes_app/ui/shimmer_skeleton.dart';
 
 class SiteTab extends StatefulWidget {
   const SiteTab({super.key});

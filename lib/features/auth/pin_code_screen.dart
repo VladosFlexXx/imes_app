@@ -1,9 +1,9 @@
 import 'dart:math';
 import 'package:flutter/material.dart';
 
-import 'package:vuz_app/core/auth/biometric_service.dart';
-import 'package:vuz_app/core/auth/pin_code_service.dart';
-import 'package:vuz_app/ui/app_haptics.dart';
+import 'package:imes_app/core/auth/biometric_service.dart';
+import 'package:imes_app/core/auth/pin_code_service.dart';
+import 'package:imes_app/ui/app_haptics.dart';
 
 enum PinScreenMode {
   create,

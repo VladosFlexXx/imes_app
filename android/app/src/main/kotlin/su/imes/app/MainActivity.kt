@@ -1,4 +1,4 @@
-package com.example.vuz_app
+package su.imes.app
 
 import android.content.ComponentName
 import android.content.Intent

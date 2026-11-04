@@ -4,7 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:vuz_app/ui/startup_gate.dart';
+import 'package:imes_app/ui/startup_gate.dart';
 
 const _splashKey = Key('splash');
 const _screenKey = Key('screen');

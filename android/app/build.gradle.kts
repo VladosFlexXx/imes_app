@@ -14,7 +14,7 @@ if (keystorePropsFile.exists()) {
 }
 
 android {
-    namespace = "com.example.vuz_app"
+    namespace = "su.imes.app"
     compileSdk = flutter.compileSdkVersion
     ndkVersion = flutter.ndkVersion
 
@@ -29,7 +29,7 @@ android {
     }
 
     defaultConfig {
-        applicationId = "com.example.vuz_app"
+        applicationId = "su.imes.app"
         minSdk = 26
         targetSdk = flutter.targetSdkVersion
         versionCode = flutter.versionCode

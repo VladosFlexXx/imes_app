@@ -137,7 +137,7 @@ AppLogger хранит кольцевой буфер 4000 записей. DebugR
 
 ## Платформы, сборка и лендинг
 
-Android: applicationId/namespace com.example.vuz_app, Java 17, Gradle plugin 8.11.1, Kotlin 2.2.20, Google services plugin 4.4.2. Firebase-конфигурация для Android присутствует. Release-подпись берётся из key.properties, при его отсутствии используется debug-подпись.
+Android: applicationId/namespace su.imes.app, Java 17, Gradle plugin 8.11.1, Kotlin 2.2.20, Google services plugin 4.4.2. Firebase-конфигурация для Android присутствует. Release-подпись берётся из key.properties, при его отсутствии используется debug-подпись.
 
 release-apk.yml запускается вручную или на тегах версий, устанавливает Flutter stable, выполняет pub get и release APK build; опционально собирает APK по ABI. Артефакты сохраняются в Actions, для тегов публикуется GitHub Release. flutter analyze и flutter test в workflow отсутствуют.
 

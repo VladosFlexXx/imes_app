@@ -119,10 +119,10 @@ Schedule • Grades • Home • Notifications
 ## 📊 Project Status
 
 ```yaml
-Version: 0.5.0 (beta)
+Version: 0.6.0 (beta)
 Platform: Android / iOS (Sideload) / Web (PWA)
 Status: Active Development
-Last Update: November 2026
+Last Update: November 04, 2026
 ```
 
 <div align="center">
@@ -134,6 +134,28 @@ Last Update: November 2026
 ![GitHub issues](https://img.shields.io/github/issues/VladosFlexXx/imes_app?style=flat-square&color=FF9800)
 
 </div>
+
+---
+
+## 📝 Release Notes (Changelog)
+
+### 🚀 v0.6.0 (Build 37) — 04.11.2026
+
+> ⚠️ **ATTENTION: UNINSTALL PREVIOUS VERSION BEFORE INSTALLING! WE CHANGED THE APPLICATION ID TO SU.IMES.APP, SO THIS VERSION CANNOT BE INSTALLED OVER THE OLD ONE. UNINSTALL THE APP FIRST AND INSTALL THE NEW APK CLEANLY FROM GITHUB.**
+
+- 🏷 **Package ID Migration:** Official application identifier migrated to `su.imes.app` (Android applicationId/namespace, iOS Bundle Identifier, Dart package `imes_app`).
+- 🖥 **Grades Desktop UI (Master-Detail):**
+  - Two-pane layout (subject list on the left, full BRS breakdown of the selected course on the right).
+  - Selected course highlighted with glowing neon accent, clean progress bars, and status indicators.
+  - Removed misleading automated pass markers; now showing accurate points and direct progress.
+  - Smart teacher auto-matching from schedule to grading records.
+  - In-memory report cache for instant switching between subjects without waiting or spinners.
+- 📅 **Schedule Desktop UI:**
+  - 7-column weekly schedule overview (Mon — Sun) with compact lesson cards and classroom badges.
+  - Top KPI status cards: "Today", "Next Class", "Free Windows".
+- 🌐 **Network Gateway & Web:**
+  - Cloudflare Workers fallback proxy and Smart Failover engine for reliable access across any VPN.
+  - Updated production Web PWA release in `landing_preview/app/`.
 
 ---
 
@@ -153,9 +175,13 @@ Found a bug? Help us improve the app!
 
 ## 🗺 Roadmap
 
-### ✅ Implemented (v0.3.x — v0.5.0)
+### ✅ Implemented (v0.3.x — v0.6.0)
+- [x] Official Package ID migration to `su.imes.app` (Android, iOS, Dart)
+- [x] Desktop Master-Detail grades view with active course highlighting and in-memory cache
+- [x] Desktop 7-day schedule grid (Mon — Sun) with top KPI status cards
 - [x] Core schedule and grading engine
 - [x] Desktop dashboard layout (Bento Grid): navigation sidebar, topbar with Ctrl+K search, sync status & schedule timeline
+- [x] Desktop UX Polish (v0.5.1): adaptive 2-3 column grades grid, two-column schedule layout with tomorrow's preview and full week glance, compact week selector, centered BRS detail view and profile screen
 - [x] Web PWA: full VPN compatibility with Cloudflare Worker gateway & Smart Failover with Yandex Cloud
 - [x] Web & Mobile: Back button in profile header (resolving navigation trap in web browsers)
 - [x] Web: automatic haptic deactivation and switch removal in web browser settings

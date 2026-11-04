@@ -4,13 +4,13 @@ import 'package:flutter/services.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 import 'package:url_launcher/url_launcher.dart';
 
-import 'package:vuz_app/features/campus/contacts_screen.dart';
-import 'package:vuz_app/features/campus/floor_plan_screen.dart';
-import 'package:vuz_app/features/homework/homework_screen.dart';
-import 'package:vuz_app/features/settings/settings_screen.dart';
-import 'package:vuz_app/ui/app_haptics.dart';
-import 'package:vuz_app/ui/app_theme.dart';
-import 'package:vuz_app/app.dart';
+import 'package:imes_app/features/campus/contacts_screen.dart';
+import 'package:imes_app/features/campus/floor_plan_screen.dart';
+import 'package:imes_app/features/homework/homework_screen.dart';
+import 'package:imes_app/features/settings/settings_screen.dart';
+import 'package:imes_app/ui/app_haptics.dart';
+import 'package:imes_app/ui/app_theme.dart';
+import 'package:imes_app/app.dart';
 
 class MoreTab extends StatefulWidget {
   const MoreTab({super.key});

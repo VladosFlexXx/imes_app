@@ -4,15 +4,15 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 
-import 'package:vuz_app/app.dart';
+import 'package:imes_app/app.dart';
 
-import 'package:vuz_app/core/auth/session_manager.dart';
-import 'package:vuz_app/core/demo/demo_mode.dart';
-import 'package:vuz_app/core/network/eios_client.dart';
-import 'package:vuz_app/features/auth/login_webview.dart';
-import 'package:vuz_app/ui/app_haptics.dart';
-import 'package:vuz_app/ui/app_theme.dart';
-import 'package:vuz_app/core/updater/app_update_service.dart';
+import 'package:imes_app/core/auth/session_manager.dart';
+import 'package:imes_app/core/demo/demo_mode.dart';
+import 'package:imes_app/core/network/eios_client.dart';
+import 'package:imes_app/features/auth/login_webview.dart';
+import 'package:imes_app/ui/app_haptics.dart';
+import 'package:imes_app/ui/app_theme.dart';
+import 'package:imes_app/core/updater/app_update_service.dart';
 
 import '../notifications/notification_service.dart';
 import '../notifications/inbox_repository.dart';
@@ -26,7 +26,9 @@ import 'tab_grades.dart';
 import 'tab_more.dart';
 import 'tab_schedule.dart';
 import 'desktop/desktop_dashboard.dart';
+import 'desktop/desktop_grades_view.dart';
 import 'desktop/desktop_scaffold.dart';
+import 'desktop/desktop_schedule_view.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key, this.initialDataReady = false});
@@ -294,7 +296,7 @@ class _HomeScreenState extends State<HomeScreen>
         onNavigate: _navigateTo,
         body: _index == 0
             ? DesktopDashboard(onNavigate: _navigateTo)
-            : _getTab(_index),
+            : (_index == 1 ? DesktopScheduleView(onNavigate: _navigateTo) : (_index == 2 ? DesktopGradesView(onNavigate: _navigateTo) : _getTab(_index))),
       );
     }
 
