@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -8,10 +9,15 @@ class AppHaptics {
   static bool _enabled = true;
   static bool _initialized = false;
 
-  static bool get enabled => _enabled;
+  static bool get enabled => !kIsWeb && _enabled;
 
   static Future<void> init() async {
     if (_initialized) return;
+    if (kIsWeb) {
+      _enabled = false;
+      _initialized = true;
+      return;
+    }
     try {
       final prefs = await SharedPreferences.getInstance();
       _enabled = prefs.getBool(_kHapticEnabledKey) ?? true;
@@ -20,6 +26,7 @@ class AppHaptics {
   }
 
   static Future<void> setEnabled(bool value) async {
+    if (kIsWeb) return;
     _enabled = value;
     try {
       final prefs = await SharedPreferences.getInstance();
@@ -28,27 +35,29 @@ class AppHaptics {
   }
 
   static void selectionClick() {
-    if (!_enabled) return;
+    if (kIsWeb || !_enabled) return;
     HapticFeedback.selectionClick();
   }
 
   static void lightImpact() {
-    if (!_enabled) return;
+    if (kIsWeb || !_enabled) return;
     HapticFeedback.lightImpact();
   }
 
+  static void light() => lightImpact();
+
   static void mediumImpact() {
-    if (!_enabled) return;
+    if (kIsWeb || !_enabled) return;
     HapticFeedback.mediumImpact();
   }
 
   static void heavyImpact() {
-    if (!_enabled) return;
+    if (kIsWeb || !_enabled) return;
     HapticFeedback.heavyImpact();
   }
 
   static void vibrate() {
-    if (!_enabled) return;
+    if (kIsWeb || !_enabled) return;
     HapticFeedback.vibrate();
   }
 }

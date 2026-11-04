@@ -4,10 +4,17 @@ import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:http/http.dart' as http;
+import 'package:shared_preferences/shared_preferences.dart';
 
 import '../auth/auth_settings.dart';
 import '../auth/session_manager.dart';
 import '../logging/app_logger.dart';
+
+enum WebProxyProvider {
+  auto,
+  yandex,
+  cloudflare,
+}
 
 class SessionExpiredException implements Exception {
   final String message;
@@ -29,9 +36,53 @@ class EiosClient {
   EiosClient._();
   static final EiosClient instance = EiosClient._();
 
-  static const String kWebProxyUrl = 'https://functions.yandexcloud.net/d4em24u7p4j095oqk5kc';
+  static const String kWebProxyYandex = 'https://functions.yandexcloud.net/d4em24u7p4j095oqk5kc';
+  static const String kWebProxyCloudflare = 'https://imes-proxy.v-lobanov-o89.workers.dev';
+  static const String kWebProxyUrl = kWebProxyYandex;
+  static const String _kWebProxyProviderKey = 'web_proxy_provider_choice_v1';
+
   static const _storage = FlutterSecureStorage();
   final http.Client _client = http.Client();
+
+  WebProxyProvider _proxyProvider = WebProxyProvider.auto;
+  String _activeProxyUrl = kWebProxyYandex;
+  bool _proxyConfigLoaded = false;
+
+  WebProxyProvider get proxyProvider => _proxyProvider;
+  String get activeProxyUrl => _activeProxyUrl;
+
+  Future<void> initProxyProvider() async {
+    if (_proxyConfigLoaded) return;
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final val = prefs.getString(_kWebProxyProviderKey);
+      if (val != null) {
+        _proxyProvider = WebProxyProvider.values.firstWhere(
+          (e) => e.name == val,
+          orElse: () => WebProxyProvider.auto,
+        );
+      }
+      if (_proxyProvider == WebProxyProvider.cloudflare) {
+        _activeProxyUrl = kWebProxyCloudflare;
+      } else {
+        _activeProxyUrl = kWebProxyYandex;
+      }
+    } catch (_) {}
+    _proxyConfigLoaded = true;
+  }
+
+  Future<void> setProxyProvider(WebProxyProvider provider) async {
+    _proxyProvider = provider;
+    if (provider == WebProxyProvider.cloudflare) {
+      _activeProxyUrl = kWebProxyCloudflare;
+    } else {
+      _activeProxyUrl = kWebProxyYandex;
+    }
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString(_kWebProxyProviderKey, provider.name);
+    } catch (_) {}
+  }
 
   String? lastWebLoginError;
   String? _cookieHeader;
@@ -188,14 +239,17 @@ class EiosClient {
 
       if (kIsWeb) {
         lastWebLoginError = null;
-        try {
+        await initProxyProvider();
+
+        Future<bool> tryProxyLogin(String proxyUrl, {required Duration timeout}) async {
+          AppLogger.instance.i('[AUTH] web silentLogin trying: $proxyUrl (timeout=${timeout.inSeconds}s)');
           final res = await _client
               .post(
-                Uri.parse(kWebProxyUrl),
-                headers: {'Content-Type': 'text/plain'},
+                Uri.parse(proxyUrl),
+                headers: {'Content-Type': 'application/json'},
                 body: jsonEncode({'username': u, 'password': password}),
               )
-              .timeout(const Duration(seconds: 25));
+              .timeout(timeout);
 
           Map<String, dynamic>? data;
           try {
@@ -207,10 +261,11 @@ class EiosClient {
             if (cookie != null && cookie.isNotEmpty) {
               _cookieHeader = cookie;
               _cookieLoaded = true;
+              _activeProxyUrl = proxyUrl;
               if (persistCookieHeader) {
                 await _storage.write(key: 'cookie_header', value: cookie);
               }
-              AppLogger.instance.i('[AUTH] web silentLogin OK');
+              AppLogger.instance.i('[AUTH] web silentLogin OK via $proxyUrl');
               return true;
             }
           }
@@ -218,12 +273,47 @@ class EiosClient {
           final err = data?['error'] ?? data?['status'] ?? 'HTTP ${res.statusCode}: ${res.body}';
           final debugInfo = data?['debug'] != null ? ' (${data!['debug']})' : '';
           lastWebLoginError = '$err$debugInfo';
-          AppLogger.instance.w('[AUTH] web silentLogin failed: $lastWebLoginError');
+          AppLogger.instance.w('[AUTH] web silentLogin failed via $proxyUrl: $lastWebLoginError');
           return false;
-        } catch (e) {
-          lastWebLoginError = 'Сетевая ошибка: $e';
-          AppLogger.instance.e('[AUTH] web silentLogin network error', e);
-          return false;
+        }
+
+        if (_proxyProvider == WebProxyProvider.yandex) {
+          try {
+            return await tryProxyLogin(kWebProxyYandex, timeout: const Duration(seconds: 25));
+          } catch (e) {
+            lastWebLoginError = 'Сетевая ошибка Яндекс: $e';
+            AppLogger.instance.e('[AUTH] web silentLogin Yandex error', e);
+            return false;
+          }
+        } else if (_proxyProvider == WebProxyProvider.cloudflare) {
+          try {
+            return await tryProxyLogin(kWebProxyCloudflare, timeout: const Duration(seconds: 25));
+          } catch (e) {
+            lastWebLoginError = 'Сетевая ошибка Cloudflare: $e';
+            AppLogger.instance.e('[AUTH] web silentLogin Cloudflare error', e);
+            return false;
+          }
+        } else {
+          // Auto: Try Yandex first with short 3.5s timeout. If it hangs or fails, fallback to Cloudflare
+          try {
+            final ok = await tryProxyLogin(kWebProxyYandex, timeout: const Duration(milliseconds: 3500));
+            if (ok) return true;
+          } catch (e) {
+            AppLogger.instance.w('[AUTH] Auto mode: Yandex failed ($e), falling back to Cloudflare');
+          }
+
+          if (lastWebLoginError != null && lastWebLoginError!.contains('Неверный логин или пароль')) {
+            return false;
+          }
+
+          try {
+            final ok = await tryProxyLogin(kWebProxyCloudflare, timeout: const Duration(seconds: 25));
+            return ok;
+          } catch (e) {
+            lastWebLoginError = 'Сетевая ошибка (РФ и VPN): $e';
+            AppLogger.instance.e('[AUTH] web silentLogin Cloudflare fallback error', e);
+            return false;
+          }
         }
       }
 
@@ -350,20 +440,37 @@ class EiosClient {
     final parsedUri = Uri.parse(url);
     final isAllowedHost = parsedUri.host.isEmpty || parsedUri.host.endsWith('imes.su');
 
-    Future<http.Response> doRequest(String cookieHeader) {
+    Future<http.Response> doRequest(String cookieHeader) async {
       if (kIsWeb) {
-        final uri = Uri.parse(kWebProxyUrl).replace(queryParameters: {
-          'url': url,
-          if (cookieHeader.isNotEmpty) 'cookie': cookieHeader,
-        });
-        return _client
-            .get(
-              uri,
-              headers: {
-                'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
-              },
-            )
-            .timeout(timeout);
+        Future<http.Response> makeProxyRequest(String proxyUrl) {
+          final uri = Uri.parse(proxyUrl).replace(queryParameters: {
+            'url': url,
+            if (cookieHeader.isNotEmpty) 'cookie': cookieHeader,
+          });
+          return _client
+              .get(
+                uri,
+                headers: {
+                  'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+                },
+              )
+              .timeout(timeout);
+        }
+
+        try {
+          return await makeProxyRequest(_activeProxyUrl);
+        } catch (e) {
+          if (_proxyProvider == WebProxyProvider.auto) {
+            final fallbackUrl = _activeProxyUrl == kWebProxyYandex
+                ? kWebProxyCloudflare
+                : kWebProxyYandex;
+            AppLogger.instance.w('[HTTP] Web request to $_activeProxyUrl failed, trying fallback $fallbackUrl');
+            final resp = await makeProxyRequest(fallbackUrl);
+            _activeProxyUrl = fallbackUrl;
+            return resp;
+          }
+          rethrow;
+        }
       }
 
       final headers = <String, String>{

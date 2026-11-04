@@ -35,3 +35,7 @@ macos/Flutter/GeneratedPluginRegistrant.swift
 **/*service-account*.json
 **/*firebase-adminsdk*.json
 .env
+
+# MobSF audit reports
+mobsf_report.*
+

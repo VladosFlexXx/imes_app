@@ -30,6 +30,7 @@ class _LoginWebScreenState extends State<LoginWebScreen> {
   bool _rememberMe = true;
   bool _loading = false;
   String? _errorMessage;
+  WebProxyProvider _proxyProvider = WebProxyProvider.auto;
 
   @override
   void initState() {
@@ -40,10 +41,14 @@ class _LoginWebScreenState extends State<LoginWebScreen> {
   Future<void> _loadSavedCreds() async {
     final s = AuthSettings.instance;
     final creds = await s.getCredentials();
-    if (creds != null && mounted) {
+    await EiosClient.instance.initProxyProvider();
+    if (mounted) {
       setState(() {
-        _usernameController.text = creds.username;
-        _passwordController.text = creds.password;
+        if (creds != null) {
+          _usernameController.text = creds.username;
+          _passwordController.text = creds.password;
+        }
+        _proxyProvider = EiosClient.instance.proxyProvider;
       });
     }
   }
@@ -352,6 +357,91 @@ class _LoginWebScreenState extends State<LoginWebScreen> {
                       ),
                       const SizedBox(height: 16),
 
+                      // Выбор шлюза (РФ / VPN / Авто)
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                        decoration: BoxDecoration(
+                          color: isDark
+                              ? Colors.white.withValues(alpha: 0.04)
+                              : Colors.black.withValues(alpha: 0.03),
+                          borderRadius: BorderRadius.circular(16),
+                          border: Border.all(color: cardBorder),
+                        ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Padding(
+                              padding: const EdgeInsets.only(left: 4, bottom: 6),
+                              child: Row(
+                                children: [
+                                  Icon(
+                                    _proxyProvider == WebProxyProvider.cloudflare
+                                        ? Icons.vpn_lock_rounded
+                                        : (_proxyProvider == WebProxyProvider.yandex
+                                            ? Icons.dns_rounded
+                                            : Icons.bolt_rounded),
+                                    size: 14,
+                                    color: accent,
+                                  ),
+                                  const SizedBox(width: 6),
+                                  Text(
+                                    'Шлюз подключения:',
+                                    style: TextStyle(
+                                      fontSize: 12,
+                                      fontWeight: FontWeight.w700,
+                                      color: isDark ? Colors.white70 : Colors.black87,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            SizedBox(
+                              width: double.infinity,
+                              child: SegmentedButton<WebProxyProvider>(
+                                showSelectedIcon: false,
+                                segments: const [
+                                  ButtonSegment<WebProxyProvider>(
+                                    value: WebProxyProvider.auto,
+                                    label: Text('⚡ Авто'),
+                                    tooltip: 'Авто-переключение при включённом VPN',
+                                  ),
+                                  ButtonSegment<WebProxyProvider>(
+                                    value: WebProxyProvider.yandex,
+                                    label: Text('🇷🇺 Яндекс'),
+                                    tooltip: 'РФ сервер (без VPN)',
+                                  ),
+                                  ButtonSegment<WebProxyProvider>(
+                                    value: WebProxyProvider.cloudflare,
+                                    label: Text('🌐 Cloudflare'),
+                                    tooltip: 'Работает с любым VPN',
+                                  ),
+                                ],
+                                selected: {_proxyProvider},
+                                onSelectionChanged: (Set<WebProxyProvider> newSelection) async {
+                                  AppHaptics.selectionClick();
+                                  final selected = newSelection.first;
+                                  setState(() => _proxyProvider = selected);
+                                  await EiosClient.instance.setProxyProvider(selected);
+                                },
+                                style: SegmentedButton.styleFrom(
+                                  visualDensity: VisualDensity.compact,
+                                  textStyle: const TextStyle(
+                                    fontSize: 11,
+                                    fontWeight: FontWeight.w700,
+                                  ),
+                                  selectedBackgroundColor: accent.withValues(alpha: 0.18),
+                                  selectedForegroundColor: accent,
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(12),
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(height: 16),
+
                       // Кнопка Войти
                       SizedBox(
                         height: 52,
@@ -418,7 +508,11 @@ class _LoginWebScreenState extends State<LoginWebScreen> {
                           ),
                           const SizedBox(width: 6),
                           Text(
-                            'Сервер в РФ • Работает без VPN',
+                            _proxyProvider == WebProxyProvider.cloudflare
+                                ? 'Шлюз Cloudflare • Доступен через любой VPN'
+                                : (_proxyProvider == WebProxyProvider.yandex
+                                    ? 'Сервер в РФ • Работает без VPN'
+                                    : 'Умный шлюз • Работает и с VPN, и без него'),
                             style: TextStyle(
                               fontSize: 12,
                               fontWeight: FontWeight.w500,

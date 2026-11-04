@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
+import '../../ui/app_haptics.dart';
 import '../../ui/app_theme.dart';
 import '../../ui/shimmer_skeleton.dart';
 
@@ -71,7 +72,23 @@ class _ProfileTabState extends State<ProfileTab> {
         final p = repo.profile;
         final authExpired = _isAuthExpiredError(repo.lastError);
 
+        final canPop = Navigator.of(context).canPop();
+
         return Scaffold(
+          appBar: AppBar(
+            title: const Text('Профиль'),
+            centerTitle: false,
+            leading: canPop
+                ? IconButton(
+                    icon: const Icon(Icons.arrow_back_rounded),
+                    tooltip: 'Назад',
+                    onPressed: () {
+                      AppHaptics.light();
+                      Navigator.of(context).pop();
+                    },
+                  )
+                : null,
+          ),
           body: SafeArea(
             bottom: false,
             child: RefreshIndicator(
@@ -81,7 +98,7 @@ class _ProfileTabState extends State<ProfileTab> {
               },
               child: ListView(
                 physics: const AlwaysScrollableScrollPhysics(),
-                padding: const EdgeInsets.fromLTRB(14, 16, 14, 106),
+                padding: const EdgeInsets.fromLTRB(14, 8, 14, 106),
                 children: [
                   if (repo.loading) ...[
                     const LoadingSkeletonStrip(),

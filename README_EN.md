@@ -119,8 +119,8 @@ Schedule • Grades • Home • Notifications
 ## 📊 Project Status
 
 ```yaml
-Version: 0.4.1 (beta)
-Platform: Android / iOS (Sideload)
+Version: 0.5.0 (beta)
+Platform: Android / iOS (Sideload) / Web (PWA)
 Status: Active Development
 Last Update: November 2026
 ```
@@ -153,11 +153,14 @@ Found a bug? Help us improve the app!
 
 ## 🗺 Roadmap
 
-### ✅ Implemented (v0.3.x — v0.4.9)
+### ✅ Implemented (v0.3.x — v0.5.0)
 - [x] Core schedule and grading engine
 - [x] Desktop dashboard layout (Bento Grid): navigation sidebar, topbar with Ctrl+K search, sync status & schedule timeline
+- [x] Web PWA: full VPN compatibility with Cloudflare Worker gateway & Smart Failover with Yandex Cloud
+- [x] Web & Mobile: Back button in profile header (resolving navigation trap in web browsers)
+- [x] Web: automatic haptic deactivation and switch removal in web browser settings
 - [x] Refined student KPIs: "Lessons Today", "Lessons Tomorrow", and "Until Weekend" metrics replacing noisy GPA & attendance math
-- [x] Web PWA client for iPhone and desktop without sideloading (works in RU without VPN)
+- [x] Web PWA client for iPhone and desktop without sideloading (works in RU without VPN and worldwide with VPN)
 - [x] Custom color palette picker (Hue/Sat/Val sliders & HEX input) + 3 clean presets (IMES Orange, Violet, Green)
 - [x] Updated team credits and university Easter eggs in the "About" dialog
 - [x] Redesigned grades interface (modern cards, GPA, detail breakdown)

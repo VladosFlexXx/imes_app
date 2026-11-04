@@ -1496,21 +1496,23 @@ class _SettingsScreenState extends State<SettingsScreen> {
             },
           ),
           const Divider(height: 1),
-          SwitchListTile(
-            secondary: const Icon(Icons.vibration_rounded),
-            title: Text(
-              'Тактильный отклик (Haptic)',
-              style: t.titleMedium?.copyWith(fontWeight: FontWeight.w800),
+          if (!kIsWeb) ...[
+            SwitchListTile(
+              secondary: const Icon(Icons.vibration_rounded),
+              title: Text(
+                'Тактильный отклик (Haptic)',
+                style: t.titleMedium?.copyWith(fontWeight: FontWeight.w800),
+              ),
+              subtitle: const Text('Вибрация при тапах и переключениях'),
+              value: _hapticEnabled,
+              onChanged: (val) async {
+                setState(() => _hapticEnabled = val);
+                await AppHaptics.setEnabled(val);
+                if (val) AppHaptics.mediumImpact();
+              },
             ),
-            subtitle: const Text('Вибрация при тапах и переключениях'),
-            value: _hapticEnabled,
-            onChanged: (val) async {
-              setState(() => _hapticEnabled = val);
-              await AppHaptics.setEnabled(val);
-              if (val) AppHaptics.mediumImpact();
-            },
-          ),
-          const Divider(height: 1),
+            const Divider(height: 1),
+          ],
           SwitchListTile(
             secondary: const Icon(Icons.bolt_rounded),
             title: Text(
