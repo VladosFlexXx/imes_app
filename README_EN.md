@@ -5,16 +5,18 @@
 ### Your personal study assistant in your pocket
 
 [![Latest Release](https://img.shields.io/github/v/release/VladosFlexXx/imes_app?color=4CAF50&logo=android&logoColor=white&style=for-the-badge)](https://github.com/VladosFlexXx/imes_app/releases/latest)
+[![Web PWA](https://img.shields.io/badge/Web%20PWA-Online-FF6F00?style=for-the-badge&logo=googlechrome&logoColor=white)](https://vladosflexxx.github.io/imes_app/app/)
+[![Security Audit](https://img.shields.io/badge/MobSF-0%20Trackers-brightgreen?style=for-the-badge&logo=shield&logoColor=white)](docs/SECURITY_AUDIT_EN.md)
 [![Flutter](https://img.shields.io/badge/Flutter-02569B?style=for-the-badge&logo=flutter&logoColor=white)](https://flutter.dev)
 [![Dart](https://img.shields.io/badge/Dart-0175C2?style=for-the-badge&logo=dart&logoColor=white)](https://dart.dev)
 [![License](https://img.shields.io/badge/License-Proprietary-red?style=for-the-badge)](LICENSE)
 
 <img src="assets/icon/icon.png" alt="App Icon" width="120" height="120" style="border-radius: 20px; box-shadow: 0 4px 20px rgba(0,0,0,0.2);">
 
-**Cross-platform mobile application for IMES Students (Android & iOS)**  
+**Cross-platform application for IMES Students (Android, iOS & Web)**  
 Schedule • Grades • Home • Notifications
 
-[📥 Download APK](https://github.com/VladosFlexXx/imes_app/releases/latest) • [🍏 iPhone (iOS) Guide](docs/IOS_INSTALL_EN.md) • [📖 Features](#-features) • [🐛 Report a Bug](#-report-an-issue)
+[📥 Download APK](https://github.com/VladosFlexXx/imes_app/releases/latest) • [🌐 Open Web (PWA)](https://vladosflexxx.github.io/imes_app/app/) • [📲 Web Guide](docs/WEB_INSTALL_EN.md) • [🍏 iPhone (iOS) Guide](docs/IOS_INSTALL_EN.md) • [🛡️ MobSF Audit](docs/SECURITY_AUDIT_EN.md) • [🐛 Report a Bug](#-report-an-issue)
 
 </div>
 
@@ -79,7 +81,14 @@ Schedule • Grades • Home • Notifications
 3. **Install & sign in:**  
    Use your IMES portal credentials. Passwords are saved only locally in encrypted secure storage.
 
-### 🍏 Apple iPhone (iOS)
+### 🌐 Web App (PWA — iPhone, Android & Desktop)
+1. **Open directly:** Navigate to **[https://vladosflexxx.github.io/imes_app/app/](https://vladosflexxx.github.io/imes_app/app/)**.
+2. **Install to Home Screen:**
+   - **iPhone (Safari):** Tap *Share → "Add to Home Screen"* (runs in fullscreen standalone mode without browser bars).
+   - **Android / Desktop (Chrome / Edge):** Click *Install App* in the browser address bar or menu.
+   - 👉 **[Detailed Web (PWA) Guide](docs/WEB_INSTALL_EN.md)**
+
+### 🍏 Apple iPhone (iOS IPA Sideload)
 1. **Download IPA:**  
    Download the `MyIMES-*.ipa` bundle from [GitHub Releases](https://github.com/VladosFlexXx/imes_app/releases/latest).
 2. **Install via Sideload:**  
@@ -119,10 +128,10 @@ Schedule • Grades • Home • Notifications
 ## 📊 Project Status
 
 ```yaml
-Version: 0.6.0 (beta)
+Version: 0.6.1 (beta)
 Platform: Android / iOS (Sideload) / Web (PWA)
 Status: Active Development
-Last Update: November 04, 2026
+Last Update: November 07, 2026
 ```
 
 <div align="center">
@@ -138,6 +147,14 @@ Last Update: November 04, 2026
 ---
 
 ## 📝 Release Notes (Changelog)
+
+### 🚀 v0.6.1 (Build 38) — 07.11.2026
+
+- 🛡️ **MobSF Security Audit Release:** Published official MobSF v4.6.4 static application security testing audit (`docs/SECURITY_AUDIT_EN.md` & `docs/mobsf_report.pdf`): 0 trackers, 0 malware, strict HTTPS enforced.
+- 🌐 **Web PWA:** Added fast-launch buttons for browser access and detailed step-by-step Home Screen installation guide for iPhone, Android, and PC (`docs/WEB_INSTALL_EN.md`).
+- 📅 **Week Parity Synchronization:** Fixed week parity calculation discrepancies between the next lesson card and the main dashboard header, adopting unified `WeekParityService`.
+- 📳 **Haptic Feedback (AppHaptics):** Integrated native haptic responses on grades tabs, schedule date pills, and lesson cards respecting the Settings toggle.
+- 🎨 **Title Hub Redesign:** Complete refresh of `README.md` with interactive action badges, live platform statuses, and verified security metrics.
 
 ### 🚀 v0.6.0 (Build 37) — 04.11.2026
 
@@ -212,6 +229,9 @@ Found a bug? Help us improve the app!
 
 ## 🔐 Security & Privacy
 
+> 🛡️ **Independent MobSF Audit:** The app underwent comprehensive static application security testing (SAST) in **Mobile Security Framework (MobSF)**. Verified: **0 trackers**, **0 malware**, strict **HTTPS enforced**.  
+> 👉 **[Full Technical Security Audit Report (MobSF)](docs/SECURITY_AUDIT_EN.md)** • **[Download PDF Report](docs/mobsf_report.pdf)**
+
 <table>
 <tr>
 <td width="33%" align="center">
@@ -223,9 +243,9 @@ Encrypted secure credential store
 </td>
 <td width="33%" align="center">
 
-### 🛡 **Data Privacy**
-No third-party server data transmission  
-Strict on-device sandboxing
+### 🛡 **Privacy: 0 Trackers**
+No third-party data tracking  
+Hardware-backed Android Keystore
 
 </td>
 <td width="33%" align="center">
@@ -278,10 +298,12 @@ This project is distributed **without an open-source license**.
 
 <div align="center">
 
-### 📱 Download Now
+### 📱 Launch & Install
 
 [![Download APK](https://img.shields.io/badge/Download-APK-4CAF50?style=for-the-badge&logo=android&logoColor=white)](https://github.com/VladosFlexXx/imes_app/releases/latest)
+[![Open Web PWA](https://img.shields.io/badge/Open-Web%20(PWA)-orange?style=for-the-badge&logo=googlechrome&logoColor=white)](https://vladosflexxx.github.io/imes_app/app/)
 [![Download IPA](https://img.shields.io/badge/Download-IPA%20(iOS)-gray?style=for-the-badge&logo=apple&logoColor=white)](https://github.com/VladosFlexXx/imes_app/releases/latest)
+[![Security Audit](https://img.shields.io/badge/MobSF-Passed-brightgreen?style=for-the-badge&logo=shield&logoColor=white)](docs/SECURITY_AUDIT_EN.md)
 
 **Crafted with ❤️ for IMES Students**
 

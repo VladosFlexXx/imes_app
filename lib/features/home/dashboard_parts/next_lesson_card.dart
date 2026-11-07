@@ -41,6 +41,22 @@ class _NextLessonCard extends StatelessWidget {
         : const Color(0xFF626A78);
     final isOngoing = subtitle != null && subtitle!.startsWith('Идёт сейчас');
 
+    final targetDate = date ?? DateTime.now();
+    final p = WeekParityService.parityFor(targetDate);
+    final rule = lesson != null
+        ? ScheduleRule.parseFromSubject(lesson!.subject)
+        : null;
+    final String parityLabel;
+    if (rule != null && rule.type == ScheduleRuleType.evenWeeks) {
+      parityLabel = 'чётная неделя';
+    } else if (rule != null && rule.type == ScheduleRuleType.oddWeeks) {
+      parityLabel = 'нечётная неделя';
+    } else if (rule != null && rule.type == ScheduleRuleType.specificDates) {
+      parityLabel = 'по отдельным датам';
+    } else {
+      parityLabel = p == WeekParity.even ? 'чётная неделя' : 'нечётная неделя';
+    }
+
     final statusChipBg = isOngoing
         ? const Color(0xFF22C55E).withValues(alpha: isDark ? 0.22 : 0.14)
         : (isDark ? const Color(0xFF0F5A34) : const Color(0xFFDDF8E8));
@@ -280,7 +296,7 @@ class _NextLessonCard extends StatelessWidget {
                         const _DashSkLine(width: 120, height: 16)
                       else
                         Text(
-                          'чётная неделя',
+                          parityLabel,
                           style: theme.textTheme.bodyMedium?.copyWith(
                             color: subText,
                             fontWeight: FontWeight.w600,

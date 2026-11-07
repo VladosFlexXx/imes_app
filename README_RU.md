@@ -5,16 +5,18 @@
 ### Твой личный помощник для учёбы в кармане
 
 [![Latest Release](https://img.shields.io/github/v/release/VladosFlexXx/imes_app?color=4CAF50&logo=android&logoColor=white&style=for-the-badge)](https://github.com/VladosFlexXx/imes_app/releases/latest)
+[![Web PWA](https://img.shields.io/badge/Web%20PWA-Онлайн-FF6F00?style=for-the-badge&logo=googlechrome&logoColor=white)](https://vladosflexxx.github.io/imes_app/app/)
+[![Security Audit](https://img.shields.io/badge/MobSF-0%20Трекеров-brightgreen?style=for-the-badge&logo=shield&logoColor=white)](docs/SECURITY_AUDIT_RU.md)
 [![Flutter](https://img.shields.io/badge/Flutter-02569B?style=for-the-badge&logo=flutter&logoColor=white)](https://flutter.dev)
 [![Dart](https://img.shields.io/badge/Dart-0175C2?style=for-the-badge&logo=dart&logoColor=white)](https://dart.dev)
 [![License](https://img.shields.io/badge/License-Proprietary-red?style=for-the-badge)](LICENSE)
 
 <img src="assets/icon/icon.png" alt="App Icon" width="120" height="120" style="border-radius: 20px; box-shadow: 0 4px 20px rgba(0,0,0,0.2);">
 
-**Мобильное приложение для работы с ЭИОС ИМЭС (Android & iOS)**  
+**Кроссплатформенное приложение для работы с ЭИОС ИМЭС (Android, iOS & Web)**  
 Расписание • Оценки • Главный экран • Уведомления
 
-[📥 Скачать APK](https://github.com/VladosFlexXx/imes_app/releases/latest) • [🍏 Инструкция для iPhone](docs/IOS_INSTALL_RU.md) • [📖 Документация](#-возможности) • [🐛 Сообщить о баге](#-сообщить-о-проблеме)
+[📥 Скачать APK](https://github.com/VladosFlexXx/imes_app/releases/latest) • [🌐 Открыть Web (PWA)](https://vladosflexxx.github.io/imes_app/app/) • [📲 Инструкция Web](docs/WEB_INSTALL_RU.md) • [🍏 Инструкция для iPhone](docs/IOS_INSTALL_RU.md) • [🛡️ Аудит MobSF](docs/SECURITY_AUDIT_RU.md) • [🐛 Сообщить о баге](#-сообщить-о-проблеме)
 
 </div>
 
@@ -79,7 +81,14 @@
 3. **Установите и войдите:**  
    Используйте ваши учётные данные от ЭИОС ИМЭС. Пароль сохраняется локально в защищённом хранилище.
 
-### 🍏 Apple iPhone (iOS)
+### 🌐 Web-версия (PWA — iPhone, Android и ПК без установки)
+1. **Откройте онлайн:** Перейдите по ссылке **[https://vladosflexxx.github.io/imes_app/app/](https://vladosflexxx.github.io/imes_app/app/)**.
+2. **Добавьте на домашний экран:** 
+   - **iPhone (Safari):** Нажмите *«Поделиться» → «На экран „Домой“»* (работает как нативное приложение без рамок браузера).
+   - **Android / ПК (Chrome / Edge):** Нажмите *«Установить приложение»* в адресной строке или меню.
+   - 👉 **[Подробная инструкция по Web (PWA)](docs/WEB_INSTALL_RU.md)**
+
+### 🍏 Apple iPhone (iOS IPA Sideload)
 1. **Скачайте IPA:**  
    В [GitHub Releases](https://github.com/VladosFlexXx/imes_app/releases/latest) скачайте архив приложения `MyIMES-*.ipa`.
 2. **Установите по инструкции:**  
@@ -119,10 +128,10 @@
 ## 📊 Статус проекта
 
 ```yaml
-Version: 0.6.0 (beta)
+Version: 0.6.1 (beta)
 Platform: Android / iOS (Sideload) / Web (PWA)
 Status: Active Development
-Last Update: 04 Ноября 2026
+Last Update: 07 Ноября 2026
 ```
 
 <div align="center">
@@ -138,6 +147,14 @@ Last Update: 04 Ноября 2026
 ---
 
 ## 📝 История изменений (Changelog)
+
+### 🚀 v0.6.1 (Build 38) — 07.11.2026
+
+- 🛡️ **Публикация аудита безопасности MobSF:** Добавлен официальный отчёт аудита безопасности MobSF v4.6.4 (`docs/SECURITY_AUDIT_RU.md` и `docs/mobsf_report.pdf`): 0 трекеров, 0 вредоносного кода, строгий принудительный HTTPS.
+- 🌐 **Web PWA:** Добавлены кнопки быстрого запуска Web-версии в браузере и подробная пошаговая инструкция по установке на домашний экран iPhone/Android/ПК (`docs/WEB_INSTALL_RU.md`).
+- 📅 **Синхронизация чётности недель:** Устранены расхождения в расчёте чётности учебных недель между карточкой ближайшей пары и главным экраном — расчёт переведён на единый семестровый `WeekParityService`.
+- 📳 **Тактильный отклик (AppHaptics):** Добавлен нативный тактильный отклик при переключении вкладок оценок, табов расписания и нажатии на карточки пар с учётом системного тумблера в Настройках.
+- 🎨 **Редизайн титульного хаба:** Полное обновление `README.md`, добавлены интерактивные бейджи быстрого запуска, живые статусы платформы и безопасности.
 
 ### 🚀 v0.6.0 (Build 37) — 04.11.2026
 
@@ -212,6 +229,9 @@ Last Update: 04 Ноября 2026
 
 ## 🔐 Безопасность и приватность
 
+> 🛡️ **Независимый аудит MobSF:** Приложение прошло статический анализ безопасности (SAST) в **Mobile Security Framework (MobSF)**. Найдено **0 трекеров**, **0 вредоносного кода**, подтверждён принудительный **HTTPS**.  
+> 👉 **[Полный технический отчёт об аудите безопасности (MobSF)](docs/SECURITY_AUDIT_RU.md)** • **[Скачать PDF-отчёт](docs/mobsf_report.pdf)**
+
 <table>
 <tr>
 <td width="33%" align="center">
@@ -223,9 +243,9 @@ Last Update: 04 Ноября 2026
 </td>
 <td width="33%" align="center">
 
-### 🛡 **Данные**
+### 🛡 **Приватность: 0 трекеров**
 Данные не передаются третьим лицам  
-Локальное шифрование
+Аппаратное шифрование Keystore
 
 </td>
 <td width="33%" align="center">
@@ -278,10 +298,12 @@ Last Update: 04 Ноября 2026
 
 <div align="center">
 
-### 📱 Скачать сейчас
+### 📱 Запуск и установка
 
 [![Download APK](https://img.shields.io/badge/Download-APK-4CAF50?style=for-the-badge&logo=android&logoColor=white)](https://github.com/VladosFlexXx/imes_app/releases/latest)
+[![Open Web PWA](https://img.shields.io/badge/Open-Web%20(PWA)-orange?style=for-the-badge&logo=googlechrome&logoColor=white)](https://vladosflexxx.github.io/imes_app/app/)
 [![Download IPA](https://img.shields.io/badge/Download-IPA%20(iOS)-gray?style=for-the-badge&logo=apple&logoColor=white)](https://github.com/VladosFlexXx/imes_app/releases/latest)
+[![Security Audit](https://img.shields.io/badge/MobSF-Passed-brightgreen?style=for-the-badge&logo=shield&logoColor=white)](docs/SECURITY_AUDIT_RU.md)
 
 **Сделано с ❤️ для студентов ИМЭС**
 

@@ -36,7 +36,10 @@ class _TapPillState extends State<_TapPill> {
     return InkWell(
       borderRadius: BorderRadius.circular(999),
       onHighlightChanged: (v) => setState(() => _pressed = v),
-      onTap: widget.onTap,
+      onTap: () {
+        AppHaptics.lightImpact();
+        widget.onTap();
+      },
       child: AnimatedScale(
         scale: _pressed ? 0.97 : 1.0,
         duration: const Duration(milliseconds: 130),

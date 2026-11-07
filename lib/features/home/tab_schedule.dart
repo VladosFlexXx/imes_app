@@ -1,3 +1,4 @@
+import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import '../../app.dart';
 import '../../core/storage/lesson_notes_storage.dart';
@@ -27,6 +28,7 @@ part '../schedule/ui_parts/lesson_card.dart';
 part '../schedule/ui_parts/info_chip.dart';
 part '../schedule/ui_parts/pill.dart';
 part '../schedule/ui_parts/tap_pill.dart';
+part '../schedule/ui_parts/interactive_day_swipe.dart';
 
 enum ScheduleUiFilter { all, changes } // changes = changed + cancelled
 
@@ -59,10 +61,6 @@ class _ScheduleTabState extends State<ScheduleTab>
 
   /// Для анимации ряда кружков при смене недели.
   int _weekSlideDir = 0; // -1 пред., +1 след.
-
-  static const _kAnim = Duration(milliseconds: 260);
-  static const _kCurveIn = Curves.easeOutCubic;
-  static const _kCurveOut = Curves.easeInCubic;
 
   /// Плавная анимация изменения высоты контента дня.
   static const _kSizeAnim = Duration(milliseconds: 220);
@@ -682,69 +680,27 @@ class _ScheduleTabState extends State<ScheduleTab>
                 ),
                 const SizedBox(height: 12),
 
-                ConstrainedBox(
-                  constraints: BoxConstraints(minHeight: swipeAreaMinHeight),
-                  child: GestureDetector(
-                    behavior: HitTestBehavior.opaque,
-                    onHorizontalDragEnd: (details) {
-                      final v = details.primaryVelocity ?? 0;
-                      if (v.abs() < 250) return;
-                      if (v < 0) {
-                        _swipeDay(1);
-                      } else {
-                        _swipeDay(-1);
-                      }
-                    },
+                InteractiveDaySwipe(
+                  pageKey: ValueKey(
+                    '${_contentWeekStart.year}-${_contentWeekStart.month}-${_contentWeekStart.day}-$_selectedIndex-${_filter.name}',
+                  ),
+                  slideDir: daySlideDir,
+                  onSwipeDay: _swipeDay,
+                  child: ConstrainedBox(
+                    constraints: BoxConstraints(minHeight: swipeAreaMinHeight),
                     child: AnimatedSize(
                       duration: _kSizeAnim,
                       curve: _kSizeCurve,
                       alignment: Alignment.topCenter,
-                      child: AnimatedSwitcher(
-                        duration: _kAnim,
-                        switchInCurve: _kCurveIn,
-                        switchOutCurve: _kCurveOut,
-                        layoutBuilder: (currentChild, previousChildren) {
-                          return Stack(
-                            alignment: Alignment.topCenter,
-                            children: <Widget>[
-                              ...previousChildren,
-                              if (currentChild != null) currentChild,
-                            ],
-                          );
-                        },
-                        transitionBuilder: (child, anim) {
-                          final beginX = daySlideDir == 0
-                              ? 0.0
-                              : (daySlideDir > 0 ? 0.10 : -0.10);
-
-                          return ClipRect(
-                            child: SlideTransition(
-                              position: Tween<Offset>(
-                                begin: Offset(beginX, 0),
-                                end: Offset.zero,
-                              ).animate(anim),
-                              child: FadeTransition(
-                                opacity: anim,
-                                child: child,
-                              ),
-                            ),
-                          );
-                        },
-                        child: KeyedSubtree(
-                          key: ValueKey(
-                            '${_contentWeekStart.year}-${_contentWeekStart.month}-${_contentWeekStart.day}-$_selectedIndex-${_filter.name}',
-                          ),
-                          child: Padding(
-                            padding: const EdgeInsets.fromLTRB(0, 14, 0, 12),
-                            child: _DayPage(
-                              date: contentDate,
-                              lessons: dayLessons,
-                              nextLesson: next,
-                              isOngoing: (l) => _isOngoing(l, contentDate),
-                              isPast: (l) => _isPast(l, contentDate),
-                              onLessonTap: _openLessonDetails,
-                            ),
-                          ),
+                      child: Padding(
+                        padding: const EdgeInsets.fromLTRB(0, 14, 0, 12),
+                        child: _DayPage(
+                          date: contentDate,
+                          lessons: dayLessons,
+                          nextLesson: next,
+                          isOngoing: (l) => _isOngoing(l, contentDate),
+                          isPast: (l) => _isPast(l, contentDate),
+                          onLessonTap: _openLessonDetails,
                         ),
                       ),
                     ),

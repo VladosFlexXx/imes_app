@@ -147,6 +147,7 @@ class _GradesTabState extends State<GradesTab>
         ),
         onTap: (idx) {
           if (idx == _tabController.index) return;
+          AppHaptics.selectionClick();
           _tabController.animateTo(
             idx,
             duration: const Duration(milliseconds: 170),

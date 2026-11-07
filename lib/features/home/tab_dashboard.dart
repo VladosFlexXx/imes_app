@@ -12,6 +12,9 @@ import '../profile/widgets/auth_avatar.dart';
 import '../schedule/models.dart';
 import '../schedule/schedule_repository.dart';
 import '../schedule/lesson_live_status.dart';
+import '../schedule/schedule_rule.dart';
+import '../schedule/week_parity.dart';
+import '../schedule/week_parity_service.dart';
 import '../schedule/ui_parts/lesson_details_sheet.dart';
 import '../../ui/app_haptics.dart';
 import '../../ui/shimmer_skeleton.dart';
@@ -142,7 +145,11 @@ class DashboardTab extends StatelessWidget {
     return ((thursday.difference(firstJan).inDays) / 7).floor() + 1;
   }
 
-  bool _isEvenWeek(DateTime d) => _isoWeek(d).isEven;
+  bool _isEvenWeek(DateTime d) {
+    final p = WeekParityService.parityFor(d);
+    if (p == WeekParity.unknown) return _isoWeek(d).isEven;
+    return p == WeekParity.even;
+  }
 
   int _daysUntilWeekend(DateTime date) {
     final wd = date.weekday;

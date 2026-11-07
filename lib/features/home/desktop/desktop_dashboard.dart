@@ -8,6 +8,8 @@ import '../../homework/homework_screen.dart';
 import '../../profile/repository.dart';
 import '../../schedule/models.dart';
 import '../../schedule/schedule_repository.dart';
+import '../../schedule/week_parity.dart';
+import '../../schedule/week_parity_service.dart';
 
 class DesktopDashboard extends StatelessWidget {
   final void Function(int index) onNavigate;
@@ -146,7 +148,8 @@ class DesktopDashboard extends StatelessWidget {
         final tomorrowLessons = scheduleRepo.lessonsForDate(tomorrowDate);
 
         final daysUntilWeekend = _daysUntilWeekend(now);
-        final isEven = _isoWeek(now).isEven;
+        final p = WeekParityService.parityFor(now);
+        final isEven = p == WeekParity.unknown ? _isoWeek(now).isEven : p == WeekParity.even;
 
         // Расчёт прогресса недели (пн-пт)
         final dayOfWeek = now.weekday.clamp(1, 5);

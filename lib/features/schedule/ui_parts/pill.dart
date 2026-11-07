@@ -1,3 +1,4 @@
+// ignore_for_file: unused_element, unused_element_parameter
 part of '../../home/tab_schedule.dart';
 
 class _Pill extends StatelessWidget {

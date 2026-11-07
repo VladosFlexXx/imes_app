@@ -37,5 +37,18 @@ macos/Flutter/GeneratedPluginRegistrant.swift
 .env
 
 # MobSF audit reports
-mobsf_report.*
+/mobsf_report.json
+/mobsf_report.pdf
+!docs/mobsf_report.pdf
+
+# Graphify knowledge graph outputs
+*graphify*
+
+# Antigravity agent tools & skills
+.agents/
+.tools/
+audio-curves/
+skills-lock.json
+
+
 
