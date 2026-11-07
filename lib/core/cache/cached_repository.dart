@@ -114,7 +114,7 @@ abstract class CachedRepository<T> extends ChangeNotifier {
     _lastError = null;
     notifyListeners();
 
-    final sw = Stopwatch()..start();
+    final startedAt = DateTime.now();
     AppLogger.instance.i('[$debugName] refresh start force=$force');
 
     try {
@@ -123,14 +123,14 @@ abstract class CachedRepository<T> extends ChangeNotifier {
       _updatedAt = DateTime.now();
       await writeCache(_data, _updatedAt!);
 
-      sw.stop();
+      final elapsedMs = DateTime.now().difference(startedAt).inMilliseconds;
       AppLogger.instance.i(
-        '[$debugName] refresh ok (${sw.elapsedMilliseconds}ms) updatedAt=${_updatedAt?.toIso8601String()}',
+        '[$debugName] refresh ok (${elapsedMs}ms) updatedAt=${_updatedAt?.toIso8601String()}',
       );
     } catch (e, st) {
-      sw.stop();
+      final elapsedMs = DateTime.now().difference(startedAt).inMilliseconds;
       _lastError = e;
-      AppLogger.instance.e('[$debugName] refresh error (${sw.elapsedMilliseconds}ms)', e, st);
+      AppLogger.instance.e('[$debugName] refresh error (${elapsedMs}ms)', e, st);
     } finally {
       _loading = false;
       notifyListeners();

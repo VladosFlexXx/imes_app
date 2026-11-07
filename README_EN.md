@@ -128,7 +128,7 @@ Schedule • Grades • Home • Notifications
 ## 📊 Project Status
 
 ```yaml
-Version: 0.6.1 (beta)
+Version: 0.6.2 (beta)
 Platform: Android / iOS (Sideload) / Web (PWA)
 Status: Active Development
 Last Update: November 07, 2026
@@ -147,6 +147,13 @@ Last Update: November 07, 2026
 ---
 
 ## 📝 Release Notes (Changelog)
+
+### 🚀 v0.6.2 (Build 39) — 07.11.2026
+
+- 🌐 **Web PWA: Retry & dart2js Compiler Collision Fix:** Resolved a minified compiler register aliasing bug in `dart2js` (`c.b is not a function`) that crashed the UI during network retries on course grade reports. Isolated delay helper logic and transitioned duration tracking from `Stopwatch` to `DateTime`.
+- 🩺 **Web-Native Diagnostics:** Redesigned system diagnostic exporter to function seamlessly in Web environments without touching missing disk APIs — report generated in memory with one-tap clipboard copy and Web Share API integration.
+- 💬 **Human-Readable Error Messages:** Converted technical network and session exceptions on the course report screen into helpful, student-friendly explanations.
+- 🚀 **Web Bundle Update:** Rebuilt production web assets in `landing_preview/app/` for GitHub Pages continuous deployment.
 
 ### 🚀 v0.6.1 (Build 38) — 07.11.2026
 

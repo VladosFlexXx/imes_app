@@ -907,19 +907,37 @@ class _CourseGradeReportScreenState extends State<CourseGradeReportScreen> {
           ),
           const SizedBox(height: 6),
           Text(
-            '$_error',
+            _friendlyErrorMessage(_error),
             textAlign: TextAlign.center,
             style: const TextStyle(fontSize: 13, color: Colors.grey),
           ),
           const SizedBox(height: 16),
           FilledButton.icon(
-            onPressed: _load,
+            onPressed: () {
+              AppHaptics.light();
+              _load();
+            },
             icon: const Icon(Icons.refresh),
             label: const Text('Повторить'),
           ),
         ],
       ),
     );
+  }
+
+  String _friendlyErrorMessage(Object? error) {
+    if (error == null) return 'Неизвестная ошибка';
+    final s = error.toString().replaceFirst('Exception: ', '').replaceFirst('Error: ', '');
+    if (s.contains('XMLHttpRequest') || s.contains('ClientException') || s.contains('SocketException')) {
+      return 'Проблема с подключением к сети или прокси ЭИОС.';
+    }
+    if (s.contains('TimeoutException') || s.contains('timed out')) {
+      return 'Сервер ЭИОС отвечает слишком долго. Попробуйте ещё раз.';
+    }
+    if (s.contains('SessionExpiredException') || s.contains('auth expired') || s.contains('login page')) {
+      return 'Сессия в ЭИОС истекла. Перезайдите в аккаунт через Профиль.';
+    }
+    return s;
   }
 }
 

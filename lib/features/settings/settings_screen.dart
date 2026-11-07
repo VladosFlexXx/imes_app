@@ -172,7 +172,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
       final report = await DebugReport.build();
       final file = await LogExporter.exportToTempFile(report);
       AppLogger.instance.i(
-        '[DIAG] report ready file=${file.path} bytes=${report.length}',
+        '[DIAG] report ready path=${file?.path ?? 'in-memory'} bytes=${report.length}',
       );
 
       if (!mounted) return;
@@ -181,14 +181,14 @@ class _SettingsScreenState extends State<SettingsScreen> {
         context: context,
         showDragHandle: true,
         isScrollControlled: true,
-        builder: (_) {
+        builder: (sheetContext) {
           return SafeArea(
             child: Padding(
               padding: EdgeInsets.only(
                 left: 16,
                 right: 16,
                 top: 10,
-                bottom: 16 + MediaQuery.of(context).viewInsets.bottom,
+                bottom: 16 + MediaQuery.of(sheetContext).viewInsets.bottom,
               ),
               child: Column(
                 mainAxisSize: MainAxisSize.min,
@@ -199,17 +199,23 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     style: t.titleLarge?.copyWith(fontWeight: FontWeight.w900),
                   ),
                   const SizedBox(height: 6),
-                  Text('Файл: ${file.path}', style: t.bodySmall),
+                  Text(
+                    kIsWeb
+                        ? 'Платформа: Web (Браузер) • ${report.length} симв.'
+                        : (file != null ? 'Файл: ${file.path}' : 'В памяти (${report.length} симв.)'),
+                    style: t.bodySmall,
+                  ),
                   const SizedBox(height: 12),
                   Row(
                     children: [
                       Expanded(
                         child: FilledButton.icon(
                           onPressed: () async {
+                            AppHaptics.light();
                             await LogExporter.copyToClipboard(report);
-                            if (!context.mounted) return;
-                            Navigator.of(context).pop();
-                            ScaffoldMessenger.of(context).showSnackBar(
+                            if (!sheetContext.mounted) return;
+                            Navigator.of(sheetContext).pop();
+                            ScaffoldMessenger.of(sheetContext).showSnackBar(
                               const SnackBar(
                                 content: Text('Отчёт скопирован в буфер'),
                               ),
@@ -222,12 +228,13 @@ class _SettingsScreenState extends State<SettingsScreen> {
                       const SizedBox(width: 10),
                       OutlinedButton.icon(
                         onPressed: () async {
-                          await ShareHelper.shareFile(
-                            file,
-                            text: 'Отчёт диагностики Мой ИМЭС',
+                          AppHaptics.light();
+                          await ShareHelper.shareReport(
+                            report: report,
+                            file: file,
                           );
-                          if (!context.mounted) return;
-                          Navigator.of(context).pop();
+                          if (!sheetContext.mounted) return;
+                          Navigator.of(sheetContext).pop();
                         },
                         icon: const Icon(Icons.share_outlined),
                         label: const Text('Поделиться'),

@@ -32,6 +32,10 @@ class NoAuthCookiesException implements Exception {
   String toString() => 'NoAuthCookiesException: $message';
 }
 
+Future<void> _safeDelay(int ms) {
+  return Future.delayed(Duration(milliseconds: ms));
+}
+
 class EiosClient {
   EiosClient._();
   static final EiosClient instance = EiosClient._();
@@ -458,7 +462,11 @@ class EiosClient {
         }
 
         try {
-          return await makeProxyRequest(_activeProxyUrl);
+          final resp = await makeProxyRequest(_activeProxyUrl);
+          if (resp.statusCode >= 500 && _proxyProvider == WebProxyProvider.auto) {
+            throw http.ClientException('Proxy server error ${resp.statusCode}');
+          }
+          return resp;
         } catch (e) {
           if (_proxyProvider == WebProxyProvider.auto) {
             final fallbackUrl = _activeProxyUrl == kWebProxyYandex
@@ -488,7 +496,7 @@ class EiosClient {
           .timeout(timeout);
     }
 
-    final sw = Stopwatch()..start();
+    final startedAt = DateTime.now();
     AppLogger.instance.i('[HTTP] GET $url timeout=${timeout.inSeconds}s retries=$retries');
 
     http.Response? res;
@@ -529,27 +537,27 @@ class EiosClient {
         }
 
         if (attempt == retries) {
-          sw.stop();
-          AppLogger.instance.e('[HTTP] FAIL $url (${sw.elapsedMilliseconds}ms)', lastErr);
+          final elapsedMs = DateTime.now().difference(startedAt).inMilliseconds;
+          AppLogger.instance.e('[HTTP] FAIL $url (${elapsedMs}ms)', lastErr);
           throw lastErr;
         }
 
         AppLogger.instance.w('[HTTP] ERROR attempt=${attempt + 1}/$retries url=$url err=$e');
-        await Future<void>.delayed(Duration(milliseconds: 250 * (attempt + 1)));
+        await _safeDelay(250 * (attempt + 1));
       }
     }
 
     final response = res;
     if (response == null) {
-      sw.stop();
-      AppLogger.instance.e('[HTTP] FAIL(no response) $url (${sw.elapsedMilliseconds}ms)', lastErr);
+      final elapsedMs = DateTime.now().difference(startedAt).inMilliseconds;
+      AppLogger.instance.e('[HTTP] FAIL(no response) $url (${elapsedMs}ms)', lastErr);
       throw lastErr ?? Exception('Unknown network error');
     }
 
     if (response.statusCode != 200) {
-      sw.stop();
+      final elapsedMs = DateTime.now().difference(startedAt).inMilliseconds;
       AppLogger.instance.e(
-        '[HTTP] ${response.statusCode} $url (${sw.elapsedMilliseconds}ms) bytes=${response.bodyBytes.length}',
+        '[HTTP] ${response.statusCode} $url (${elapsedMs}ms) bytes=${response.bodyBytes.length}',
       );
       throw Exception('Failed to load page: ${response.statusCode} for $url');
     }
@@ -560,14 +568,14 @@ class EiosClient {
 
     final redirectedToLogin = _isLoginRedirectUrl(finalUrl) || _looksLikeLoginPage(lower);
     if (redirectedToLogin) {
-      sw.stop();
-      AppLogger.instance.w('[HTTP] login page detected url=$url finalUrl=$finalUrl (${sw.elapsedMilliseconds}ms)');
+      final elapsedMs = DateTime.now().difference(startedAt).inMilliseconds;
+      AppLogger.instance.w('[HTTP] login page detected url=$url finalUrl=$finalUrl (${elapsedMs}ms)');
       _markSessionExpired('login page detected');
       throw const SessionExpiredException('Moodle returned login page');
     }
 
-    sw.stop();
-    AppLogger.instance.i('[HTTP] 200 $url (${sw.elapsedMilliseconds}ms) bytes=${response.bodyBytes.length}');
+    final elapsedMs = DateTime.now().difference(startedAt).inMilliseconds;
+    AppLogger.instance.i('[HTTP] 200 $url (${elapsedMs}ms) bytes=${response.bodyBytes.length}');
 
     if (kDebugMode) {
       // ignore: avoid_print
