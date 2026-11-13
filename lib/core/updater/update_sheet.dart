@@ -70,7 +70,13 @@ class _UpdateSheetState extends State<UpdateSheet> {
     }
     // Remove raw commit hash links or compare links if messy
     s = s.replaceAll(RegExp(r'\*\*Full Changelog\*\*:.*'), '').trim();
-    return s.isEmpty ? 'В этом обновлении улучшена стабильность.' : s;
+    // Clean markdown bold syntax (**text** -> text)
+    s = s.replaceAllMapped(RegExp(r'\*\*(.*?)\*\*'), (m) => m.group(1) ?? '');
+    // Clean markdown link syntax ([text](url) -> text)
+    s = s.replaceAllMapped(RegExp(r'\[(.*?)\]\(.*?\)'), (m) => m.group(1) ?? '');
+    // Clean inline code ticks (`code` -> code)
+    s = s.replaceAll('`', '');
+    return s.isEmpty ? 'В этом обновлении улучшена стабильность и исправлены ошибки.' : s;
   }
 
   @override

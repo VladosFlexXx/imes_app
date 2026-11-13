@@ -128,10 +128,10 @@ Schedule • Grades • Home • Notifications
 ## 📊 Project Status
 
 ```yaml
-Version: 0.6.2 (beta)
+Version: 0.6.3 (beta)
 Platform: Android / iOS (Sideload) / Web (PWA)
 Status: Active Development
-Last Update: November 07, 2026
+Last Update: November 13, 2026
 ```
 
 <div align="center">
@@ -147,6 +147,11 @@ Last Update: November 07, 2026
 ---
 
 ## 📝 Release Notes (Changelog)
+
+### 🚀 v0.6.3 (Build 40) — 13.11.2026
+
+- 🚀 **Update Dialog: Real Changelog Delivery:** Fixed an issue where the update dialog displayed a generic placeholder instead of actual release notes. The app now dynamically fetches and parses the genuine changelog directly from the repository.
+- ⚙️ **CI/CD: Automated Release Notes in GitHub Releases:** Updated GitHub Actions release workflow to extract release descriptions from `README_RU.md` on every tagged build, ensuring full changelogs in GitHub Releases.
 
 ### 🚀 v0.6.2 (Build 39) — 07.11.2026
 

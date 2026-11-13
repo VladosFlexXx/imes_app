@@ -119,11 +119,19 @@ class AppUpdateService {
         publishedAt = DateTime.tryParse(data['published_at'].toString());
       }
 
+      var changelogText = body;
+      if (_isChangelogEmptyOrStub(changelogText)) {
+        final fallback = await _fetchChangelogFromReadme(remoteVersion);
+        if (fallback.isNotEmpty) {
+          changelogText = fallback;
+        }
+      }
+
       return AppReleaseInfo(
         version: remoteVersion,
         tagName: tagName,
         title: title.isNotEmpty ? title : 'Обновление $remoteVersion',
-        changelog: body,
+        changelog: changelogText,
         apkUrl: apkUrl,
         apkSize: apkSize,
         apkName: apkName,
@@ -134,6 +142,41 @@ class AppUpdateService {
     } finally {
       _isChecking = false;
     }
+  }
+
+  bool _isChangelogEmptyOrStub(String text) {
+    final t = text.trim();
+    if (t.isEmpty) return true;
+    final cleaned = t.replaceAll(RegExp(r'\*\*Full Changelog\*\*:.*'), '').trim();
+    return cleaned.isEmpty;
+  }
+
+  Future<String> _fetchChangelogFromReadme(String targetVersion) async {
+    try {
+      final url = Uri.parse(
+        'https://raw.githubusercontent.com/$_repoOwner/$_repoName/main/README_RU.md',
+      );
+      final res = await http.get(url, headers: {
+        'User-Agent': 'MyIMES-App',
+      }).timeout(const Duration(seconds: 4));
+
+      if (res.statusCode == 200) {
+        return parseChangelogFromMarkdown(res.body, targetVersion);
+      }
+    } catch (_) {}
+    return '';
+  }
+
+  static String parseChangelogFromMarkdown(String markdown, String targetVersion) {
+    final cleanVer = targetVersion.replaceAll(RegExp(r'^[vV]'), '').trim();
+    final pattern = RegExp(
+      r'###\s*🚀\s*v?' + RegExp.escape(cleanVer) + r'[^\n]*\n([\s\S]*?)(?=\n###|\n---|$)',
+    );
+    final match = pattern.firstMatch(markdown);
+    if (match != null) {
+      return match.group(1)?.trim() ?? '';
+    }
+    return '';
   }
 
   bool _isVersionGreater(String remote, String current) {

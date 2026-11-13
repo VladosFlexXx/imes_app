@@ -90,16 +90,40 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           TAG: ${{ github.ref_name }}
         run: |
+          # Extract changelog for the tag from README_RU.md
+          python3 -c "
+          import re, os, subprocess
+          tag = os.environ.get('TAG', '').lstrip('v')
+          notes = ''
+          if os.path.exists('README_RU.md'):
+              with open('README_RU.md', encoding='utf-8') as f:
+                  content = f.read()
+              m = re.search(r'### 🚀\s*v?' + re.escape(tag) + r'[^\n]*\n([\s\S]*?)(?=\n###|\n---|\Z)', content)
+              if m:
+                  notes = m.group(1).strip()
+          if not notes:
+              try:
+                  notes = subprocess.check_output(['git', 'tag', '-l', '--format=%(contents)', f'v{tag}'], text=True).strip()
+              except Exception:
+                  pass
+          if not notes:
+              notes = 'В этом обновлении улучшена стабильность и исправлены ошибки.'
+          with open('release_notes.txt', 'w', encoding='utf-8') as out:
+              out.write(notes)
+          "
+          echo "Generated release notes:"
+          cat release_notes.txt
+
           if gh release view "$TAG" >/dev/null 2>&1; then
-            echo "Release $TAG already exists -> uploading assets"
+            echo "Release $TAG already exists -> uploading assets & notes"
             # Если релиз случайно draft/prerelease, делаем его обычным публичным релизом.
-            gh release edit "$TAG" --draft=false --prerelease=false || true
+            gh release edit "$TAG" --notes-file release_notes.txt --draft=false --prerelease=false || true
             gh release upload "$TAG" artifacts/* --clobber
             gh release edit "$TAG" --latest || echo "Skip --latest (release state does not allow it)"
           else
             echo "Creating release $TAG"
             gh release create "$TAG" artifacts/* \
               --title "$TAG" \
-              --generate-notes \
+              --notes-file release_notes.txt \
               --latest
           fi
