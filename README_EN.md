@@ -148,6 +148,12 @@ Last Update: November 13, 2026
 
 ## 📝 Release Notes (Changelog)
 
+### 🚀 v0.6.4 (Build 41) — 13.11.2026
+
+- 🛠️ **CI/CD & Android Build Pipeline:** Optimized Gradle JVM memory settings to prevent runner Out-Of-Memory errors on GitHub Actions Ubuntu runners, added `--android-skip-build-dependency-validation`, and introduced flexible tag targeting in manual `workflow_dispatch`.
+- 🚀 **Update Dialog: Real Changelog Delivery:** Fixed an issue where the update dialog displayed a generic placeholder instead of actual release notes. The app now dynamically fetches and parses the genuine changelog directly from the repository.
+- ⚙️ **CI/CD: Automated Release Notes in GitHub Releases:** Updated GitHub Actions release workflow to extract release descriptions from `README_RU.md` on every tagged build, ensuring full changelogs in GitHub Releases.
+
 ### 🚀 v0.6.3 (Build 40) — 13.11.2026
 
 - 🚀 **Update Dialog: Real Changelog Delivery:** Fixed an issue where the update dialog displayed a generic placeholder instead of actual release notes. The app now dynamically fetches and parses the genuine changelog directly from the repository.
