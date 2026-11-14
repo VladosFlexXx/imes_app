@@ -131,7 +131,7 @@ Schedule • Grades • Home • Notifications
 Version: 0.6.3 (beta)
 Platform: Android / iOS (Sideload) / Web (PWA)
 Status: Active Development
-Last Update: November 13, 2026
+Last Update: November 14, 2026
 ```
 
 <div align="center">
@@ -147,6 +147,13 @@ Last Update: November 13, 2026
 ---
 
 ## 📝 Release Notes (Changelog)
+
+### 🚀 v0.6.5 (Build 42) — 14.11.2026
+
+- 🔑 **Seamless In-Place App Updates (Release Signing):** Configured persistent release keystore signing across all automated CI pipelines. Fixes Android `INSTALL_FAILED_UPDATE_INCOMPATIBLE` ("App not installed") error when updating. All future releases starting from this version install directly over existing installations without data loss or sign-out! *(If you had v0.6.3 or older installed, please uninstall it one last time and install v0.6.5 cleanly).*
+- 🤖 **Telegram Release Bot:** Added automated Telegram notification dispatching changelogs, direct download buttons for APK and IPA, and feedback actions into group topics upon release.
+- 💡 **Direct Developer Feedback:** Added a "Found a bug / Have an idea" feedback button linking directly to the developer.
+- ⚙️ **CI/CD Build Pipeline Stability:** Pinned Flutter SDK to stable 3.47.9 to eliminate Android Gradle Plugin DSL incompatibilities.
 
 ### 🚀 v0.6.4 (Build 41) — 13.11.2026
 
