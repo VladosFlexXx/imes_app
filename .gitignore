@@ -50,5 +50,9 @@ macos/Flutter/GeneratedPluginRegistrant.swift
 audio-curves/
 skills-lock.json
 
+# Python
+__pycache__/
+*.py[cod]
+
 
 

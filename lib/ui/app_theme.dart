@@ -1,5 +1,8 @@
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
+import 'package:google_fonts/google_fonts.dart';
+
+import '../theme_controller.dart';
 
 @immutable
 class AppAccentPalette extends ThemeExtension<AppAccentPalette> {
@@ -105,6 +108,7 @@ class AppTheme {
   static ThemeData light({
     Color seed = _defaultSeed,
     double uiScale = 1.0,
+    AppFontFamily font = AppFontFamily.system,
     ColorScheme? dynamicColorScheme,
   }) {
     final ColorScheme tunedColorScheme;
@@ -136,7 +140,7 @@ class AppTheme {
     // Более “чистые” фоны: не серый, а мягкий светлый
     const scaffoldBg = Color(0xFFF7F8FC);
 
-    final text = _textTheme(base.textTheme, cs);
+    final text = _buildTextTheme(base.textTheme, cs, font);
 
     return base.copyWith(
       extensions: <ThemeExtension<dynamic>>[
@@ -319,6 +323,7 @@ class AppTheme {
     Color seed = _defaultSeed,
     double uiScale = 1.0,
     bool amoled = false,
+    AppFontFamily font = AppFontFamily.system,
     ColorScheme? dynamicColorScheme,
   }) {
     final ColorScheme tunedColorScheme;
@@ -362,7 +367,7 @@ class AppTheme {
         ? Colors.black
         : cs.outlineVariant.withValues(alpha: 0.25);
 
-    final text = _textTheme(base.textTheme, cs);
+    final text = _buildTextTheme(base.textTheme, cs, font);
 
     return base.copyWith(
       extensions: <ThemeExtension<dynamic>>[
@@ -545,31 +550,50 @@ class AppTheme {
     );
   }
 
-  static TextTheme _textTheme(TextTheme base, ColorScheme cs) {
-    // Чуть сильнее иерархия + читаемость. Без подключения шрифтов.
-    return base.copyWith(
-      titleLarge: base.titleLarge?.copyWith(
-        fontWeight: FontWeight.w900,
+  static TextTheme _applyFont(TextTheme base, AppFontFamily font) {
+    try {
+      return switch (font) {
+        AppFontFamily.system => base,
+        AppFontFamily.golosText => GoogleFonts.golosTextTextTheme(base),
+        AppFontFamily.inter => GoogleFonts.interTextTheme(base),
+        AppFontFamily.manrope => GoogleFonts.manropeTextTheme(base),
+        AppFontFamily.rubik => GoogleFonts.rubikTextTheme(base),
+        AppFontFamily.montserrat => GoogleFonts.montserratTextTheme(base),
+      };
+    } catch (_) {
+      return base;
+    }
+  }
+
+  static TextTheme _buildTextTheme(
+    TextTheme base,
+    ColorScheme cs,
+    AppFontFamily font,
+  ) {
+    final fontBase = _applyFont(base, font);
+    return fontBase.copyWith(
+      titleLarge: fontBase.titleLarge?.copyWith(
+        fontWeight: FontWeight.w800,
         letterSpacing: -0.2,
         color: cs.onSurface,
       ),
-      titleMedium: base.titleMedium?.copyWith(
-        fontWeight: FontWeight.w800,
+      titleMedium: fontBase.titleMedium?.copyWith(
+        fontWeight: FontWeight.w700,
         letterSpacing: -0.1,
         color: cs.onSurface,
       ),
-      titleSmall: base.titleSmall?.copyWith(
-        fontWeight: FontWeight.w800,
+      titleSmall: fontBase.titleSmall?.copyWith(
+        fontWeight: FontWeight.w700,
         color: cs.onSurface,
       ),
-      bodyLarge: base.bodyLarge?.copyWith(height: 1.25),
-      bodyMedium: base.bodyMedium?.copyWith(height: 1.25),
-      bodySmall: base.bodySmall?.copyWith(height: 1.25),
-      labelLarge: base.labelLarge?.copyWith(
-        fontWeight: FontWeight.w800,
+      bodyLarge: fontBase.bodyLarge?.copyWith(height: 1.25),
+      bodyMedium: fontBase.bodyMedium?.copyWith(height: 1.25),
+      bodySmall: fontBase.bodySmall?.copyWith(height: 1.25),
+      labelLarge: fontBase.labelLarge?.copyWith(
+        fontWeight: FontWeight.w700,
         letterSpacing: 0.1,
       ),
-      labelMedium: base.labelMedium?.copyWith(fontWeight: FontWeight.w700),
+      labelMedium: fontBase.labelMedium?.copyWith(fontWeight: FontWeight.w600),
     );
   }
 }

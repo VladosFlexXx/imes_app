@@ -128,7 +128,7 @@ Schedule • Grades • Home • Notifications
 ## 📊 Project Status
 
 ```yaml
-Version: 0.6.3 (beta)
+Version: 0.6.6 (beta)
 Platform: Android / iOS (Sideload) / Web (PWA)
 Status: Active Development
 Last Update: November 14, 2026
@@ -147,6 +147,13 @@ Last Update: November 14, 2026
 ---
 
 ## 📝 Release Notes (Changelog)
+
+### 🚀 v0.6.6 (Build 43) — 14.11.2026
+
+- 🔤 **App Font Customization:** Added an in-app font selector in **Settings ➔ Appearance & Theme** featuring 6 curated fonts (System, Golos Text, Inter, Manrope, Rubik, Montserrat) with live interactive typography previews and haptic feedback.
+- 📐 **Responsive Hero Metric Cards:** Fixed awkward mid-word line breaks ("Отды/х", "Выхо/дной") on narrower viewports via responsive auto-scaling single-line text containers.
+- 🎨 **Typography Balance & Refinement:** Softened heavy `w900` headings down to balanced `w800`/`w700` weights, delivering cleaner visual hierarchy, reduced cognitive load, and enhanced readability.
+- 🪄 **Clean Navigation Backdrop:** Introduced an ambient background gradient scrim beneath the floating bottom navigation bar, preventing underlying list items from peeking through bottom bezel margins.
 
 ### 🚀 v0.6.5 (Build 42) — 14.11.2026
 

@@ -214,7 +214,7 @@ class _GreetingHero extends StatelessWidget {
                                 style: Theme.of(context).textTheme.headlineSmall
                                     ?.copyWith(
                                       color: Colors.white,
-                                      fontWeight: FontWeight.w900,
+                                      fontWeight: FontWeight.w800,
                                     ),
                               ),
                             if (profileLine.isNotEmpty) ...[
@@ -303,7 +303,7 @@ class _GreetingHero extends StatelessWidget {
                             style: Theme.of(context).textTheme.headlineSmall
                                 ?.copyWith(
                                   color: Colors.white,
-                                  fontWeight: FontWeight.w900,
+                                  fontWeight: FontWeight.w800,
                                 ),
                           ),
                         const SizedBox(height: 4),
@@ -338,7 +338,7 @@ class _GreetingHero extends StatelessWidget {
                                 style: Theme.of(context).textTheme.titleMedium
                                     ?.copyWith(
                                       color: Colors.white,
-                                      fontWeight: FontWeight.w900,
+                                      fontWeight: FontWeight.w800,
                                     ),
                               ),
                           ],
@@ -379,7 +379,7 @@ class _GreetingHero extends StatelessWidget {
                       _StatBox(
                         title: 'До выходных',
                         value: daysUntilWeekend == 0
-                            ? 'Выходной 🎉'
+                            ? 'Выходной'
                             : '$daysUntilWeekend дн.',
                         skeletonize: skeletonize,
                         accent: accent,
@@ -432,11 +432,15 @@ class _StatBox extends StatelessWidget {
             if (skeletonize)
               const _DashSkLine(width: 46, height: 26)
             else
-              Text(
-                value,
-                style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                  color: Colors.white,
-                  fontWeight: FontWeight.w900,
+              FittedBox(
+                fit: BoxFit.scaleDown,
+                child: Text(
+                  value,
+                  maxLines: 1,
+                  style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+                    color: Colors.white,
+                    fontWeight: FontWeight.w800,
+                  ),
                 ),
               ),
             const SizedBox(height: 4),

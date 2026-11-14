@@ -350,6 +350,28 @@ class _HomeScreenState extends State<HomeScreen>
                 },
               ),
               Positioned(
+                left: 0,
+                right: 0,
+                bottom: 0,
+                height: 96,
+                child: IgnorePointer(
+                  child: DecoratedBox(
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        begin: Alignment.topCenter,
+                        end: Alignment.bottomCenter,
+                        colors: [
+                          theme.scaffoldBackgroundColor.withValues(alpha: 0.0),
+                          theme.scaffoldBackgroundColor.withValues(alpha: 0.85),
+                          theme.scaffoldBackgroundColor,
+                        ],
+                        stops: const [0.0, 0.5, 1.0],
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+              Positioned(
                 left: 28,
                 right: 28,
                 bottom: 14,

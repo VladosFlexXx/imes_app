@@ -32,6 +32,8 @@ import '../schedule/lesson_reminder_service.dart';
 import '../../core/app_icon_service.dart';
 import '../../core/updater/app_update_service.dart';
 import '../../ui/app_haptics.dart';
+import '../../theme_controller.dart';
+import 'package:google_fonts/google_fonts.dart';
 
 part 'settings_parts/push_card.dart';
 
@@ -745,6 +747,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
             final isDark = Theme.of(context).brightness == Brightness.dark;
             final currentMode = themeController.mode;
             final currentScale = themeController.uiScale;
+            final currentFont = themeController.fontFamily;
             final currentIcon = AppIconService.instance.current;
             final currentReduceEffects = themeController.reduceEffects;
             final currentMaterialYou = themeController.materialYou;
@@ -996,7 +999,49 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
                     const SizedBox(height: 24),
 
-                    // 3. МАСШТАБ ИНТЕРФЕЙСА (50% - 150%)
+                    // 3. ШРИФТ ПРИЛОЖЕНИЯ
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Text(
+                          'Шрифт приложения',
+                          style: t.titleSmall?.copyWith(fontWeight: FontWeight.w800),
+                        ),
+                        Text(
+                          currentFont.label,
+                          style: TextStyle(
+                            color: cs.primary,
+                            fontSize: 12,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 10),
+                    SingleChildScrollView(
+                      scrollDirection: Axis.horizontal,
+                      physics: const BouncingScrollPhysics(),
+                      child: Row(
+                        children: [
+                          for (final font in AppFontFamily.values) ...[
+                            _buildFontOptionChip(
+                              context: context,
+                              font: font,
+                              isSelected: currentFont == font,
+                              onTap: () {
+                                AppHaptics.selectionClick();
+                                themeController.setFontFamily(font);
+                              },
+                            ),
+                            const SizedBox(width: 8),
+                          ],
+                        ],
+                      ),
+                    ),
+
+                    const SizedBox(height: 24),
+
+                    // 4. МАСШТАБ ИНТЕРФЕЙСА (50% - 150%)
                     Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
@@ -1218,6 +1263,63 @@ class _SettingsScreenState extends State<SettingsScreen> {
               ),
             ],
           ),
+        ),
+      ),
+    );
+  }
+
+  static Widget _buildFontOptionChip({
+    required BuildContext context,
+    required AppFontFamily font,
+    required bool isSelected,
+    required VoidCallback onTap,
+  }) {
+    final cs = Theme.of(context).colorScheme;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
+    final previewStyle = switch (font) {
+      AppFontFamily.system => const TextStyle(fontWeight: FontWeight.w700, fontSize: 13),
+      AppFontFamily.golosText => GoogleFonts.golosText(fontWeight: FontWeight.w700, fontSize: 13),
+      AppFontFamily.inter => GoogleFonts.inter(fontWeight: FontWeight.w700, fontSize: 13),
+      AppFontFamily.manrope => GoogleFonts.manrope(fontWeight: FontWeight.w700, fontSize: 13),
+      AppFontFamily.rubik => GoogleFonts.rubik(fontWeight: FontWeight.w700, fontSize: 13),
+      AppFontFamily.montserrat => GoogleFonts.montserrat(fontWeight: FontWeight.w700, fontSize: 13),
+    };
+
+    return InkWell(
+      borderRadius: BorderRadius.circular(16),
+      onTap: onTap,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 200),
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+        decoration: BoxDecoration(
+          color: isSelected
+              ? cs.primary.withValues(alpha: 0.16)
+              : (isDark
+                  ? Colors.white.withValues(alpha: 0.05)
+                  : cs.surfaceContainerHighest.withValues(alpha: 0.5)),
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(
+            color: isSelected ? cs.primary : Colors.transparent,
+            width: 2,
+          ),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              isSelected ? Icons.check_circle_rounded : Icons.text_format_rounded,
+              size: 16,
+              color: isSelected ? cs.primary : cs.onSurfaceVariant,
+            ),
+            const SizedBox(width: 8),
+            Text(
+              font.label,
+              style: previewStyle.copyWith(
+                color: isSelected ? cs.primary : cs.onSurface,
+              ),
+            ),
+          ],
         ),
       ),
     );
@@ -1476,8 +1578,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
         ? 'Material You'
         : _accentLabelFromColor(themeController.seedColor);
     final amoledPart = _amoledBlack ? ' · AMOLED' : '';
-    final glassPart = _reduceEffects ? 'Без стекла' : 'Стекло';
-    final status = '${_themeLabel(themeController.mode)} · $accentPart$amoledPart · $glassPart';
+    final glassPart = _reduceEffects ? ' · Без стекла' : '';
+    final fontPart = themeController.fontFamily.label;
+    final status = '${_themeLabel(themeController.mode)} · $accentPart$amoledPart · $fontPart$glassPart';
 
     return _buildAccordionCard(
       icon: Icons.palette_outlined,
@@ -1494,7 +1597,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
               style: t.titleMedium?.copyWith(fontWeight: FontWeight.w800),
             ),
             subtitle: Text(
-              '${_themeLabel(themeController.mode)}, $accentPart, ${(themeController.uiScale * 100).round()}%',
+              '${_themeLabel(themeController.mode)}, $accentPart, $fontPart, ${(themeController.uiScale * 100).round()}%',
             ),
             trailing: tileChevron,
             onTap: () {

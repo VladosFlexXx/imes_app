@@ -5,6 +5,26 @@ import 'platform/theme_platform.dart';
 
 enum AppAccent { blue, orange, purple, red }
 
+enum AppFontFamily {
+  system,
+  golosText,
+  inter,
+  manrope,
+  rubik,
+  montserrat,
+}
+
+extension AppFontFamilyExtension on AppFontFamily {
+  String get label => switch (this) {
+        AppFontFamily.system => 'Системный',
+        AppFontFamily.golosText => 'Golos Text',
+        AppFontFamily.inter => 'Inter',
+        AppFontFamily.manrope => 'Manrope',
+        AppFontFamily.rubik => 'Rubik',
+        AppFontFamily.montserrat => 'Montserrat',
+      };
+}
+
 class ThemeController extends ChangeNotifier {
   static const _key = 'theme_mode'; // light | dark | system
   static const _accentKey = 'theme_accent'; // blue | orange | purple | red
@@ -14,6 +34,10 @@ class ThemeController extends ChangeNotifier {
   static const _reduceAnimationsKey = 'reduce_animations';
   static const _materialYouKey = 'theme_material_you';
   static const _amoledBlackKey = 'theme_amoled_black';
+  static const _fontFamilyKey = 'app_font_family';
+
+  AppFontFamily _fontFamily = AppFontFamily.system;
+  AppFontFamily get fontFamily => _fontFamily;
 
   bool _materialYou = false;
   bool get materialYou => _materialYou;
@@ -75,6 +99,11 @@ class ThemeController extends ChangeNotifier {
     _reduceAnimations = prefs.getBool(_reduceAnimationsKey) ?? false;
     _materialYou = prefs.getBool(_materialYouKey) ?? false;
     _amoledBlack = prefs.getBool(_amoledBlackKey) ?? false;
+    final fontStr = prefs.getString(_fontFamilyKey) ?? 'system';
+    _fontFamily = AppFontFamily.values.firstWhere(
+      (e) => e.name == fontStr,
+      orElse: () => AppFontFamily.system,
+    );
 
     // 🔥 синхронизируем Android night mode сразу при старте
     await _syncPlatform(_mode);
@@ -109,6 +138,15 @@ class ThemeController extends ChangeNotifier {
 
     final prefs = await SharedPreferences.getInstance();
     await prefs.setDouble(_uiScaleKey, _uiScale);
+  }
+
+  Future<void> setFontFamily(AppFontFamily font) async {
+    if (_fontFamily == font) return;
+    _fontFamily = font;
+    notifyListeners();
+
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(_fontFamilyKey, font.name);
   }
 
   Future<void> setAccent(AppAccent accent) async {

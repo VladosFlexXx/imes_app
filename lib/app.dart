@@ -176,12 +176,14 @@ class _VuzAppState extends State<VuzApp> {
           theme: AppTheme.light(
             seed: themeController.seedColor,
             uiScale: themeController.uiScale,
+            font: themeController.fontFamily,
             dynamicColorScheme: useMaterialYou ? lightDynamic : null,
           ),
           darkTheme: AppTheme.dark(
             seed: themeController.seedColor,
             uiScale: themeController.uiScale,
             amoled: themeController.amoledBlack,
+            font: themeController.fontFamily,
             dynamicColorScheme: useMaterialYou ? darkDynamic : null,
           ),
           themeMode: themeController.mode,
