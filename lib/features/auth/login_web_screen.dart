@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:imes_app/app.dart';
 import 'package:imes_app/core/auth/auth_settings.dart';
@@ -96,7 +97,13 @@ class _LoginWebScreenState extends State<LoginWebScreen> {
             password: password,
           );
           await AuthSettings.instance.setCredsEnabled(true);
+          await AuthSettings.instance.setMode(AuthReloginMode.silentWithCredentials);
+        } else {
+          await AuthSettings.instance.setCredsEnabled(false);
+          await AuthSettings.instance.setMode(AuthReloginMode.safeUiLogin);
         }
+
+        TextInput.finishAutofillContext();
 
         SessionManager.instance.reset();
 
@@ -258,71 +265,84 @@ class _LoginWebScreenState extends State<LoginWebScreen> {
                         const SizedBox(height: 16),
                       ],
 
-                      // Поле логина
-                      TextField(
-                        controller: _usernameController,
-                        keyboardType: TextInputType.emailAddress,
-                        textInputAction: TextInputAction.next,
-                        decoration: InputDecoration(
-                          labelText: 'Логин или email ЭИОС',
-                          hintText: 'ivanov.i или ivanov@imes.su',
-                          prefixIcon: const Icon(Icons.person_outline_rounded),
-                          filled: true,
-                          fillColor: isDark
-                              ? Colors.white.withValues(alpha: 0.04)
-                              : const Color(0xFFF7F9FC),
-                          border: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(16),
-                            borderSide: BorderSide(color: cardBorder),
-                          ),
-                          enabledBorder: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(16),
-                            borderSide: BorderSide(color: cardBorder),
-                          ),
-                          focusedBorder: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(16),
-                            borderSide: BorderSide(color: accent, width: 2),
-                          ),
-                        ),
-                      ),
-                      const SizedBox(height: 14),
-
-                      // Поле пароля
-                      TextField(
-                        controller: _passwordController,
-                        obscureText: _obscurePassword,
-                        textInputAction: TextInputAction.done,
-                        onSubmitted: (_) => _doLogin(),
-                        decoration: InputDecoration(
-                          labelText: 'Пароль',
-                          prefixIcon: const Icon(Icons.lock_outline_rounded),
-                          suffixIcon: IconButton(
-                            icon: Icon(
-                              _obscurePassword
-                                  ? Icons.visibility_outlined
-                                  : Icons.visibility_off_outlined,
+                      // Поля логина и пароля с автозаполнением браузера
+                      AutofillGroup(
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            // Поле логина
+                            TextField(
+                              controller: _usernameController,
+                              keyboardType: TextInputType.emailAddress,
+                              textInputAction: TextInputAction.next,
+                              autofillHints: const [
+                                AutofillHints.username,
+                                AutofillHints.email,
+                              ],
+                              decoration: InputDecoration(
+                                labelText: 'Логин или email ЭИОС',
+                                hintText: 'ivanov.i или ivanov@imes.su',
+                                prefixIcon: const Icon(Icons.person_outline_rounded),
+                                filled: true,
+                                fillColor: isDark
+                                    ? Colors.white.withValues(alpha: 0.04)
+                                    : const Color(0xFFF7F9FC),
+                                border: OutlineInputBorder(
+                                  borderRadius: BorderRadius.circular(16),
+                                  borderSide: BorderSide(color: cardBorder),
+                                ),
+                                enabledBorder: OutlineInputBorder(
+                                  borderRadius: BorderRadius.circular(16),
+                                  borderSide: BorderSide(color: cardBorder),
+                                ),
+                                focusedBorder: OutlineInputBorder(
+                                  borderRadius: BorderRadius.circular(16),
+                                  borderSide: BorderSide(color: accent, width: 2),
+                                ),
+                              ),
                             ),
-                            onPressed: () {
-                              AppHaptics.selectionClick();
-                              setState(() => _obscurePassword = !_obscurePassword);
-                            },
-                          ),
-                          filled: true,
-                          fillColor: isDark
-                              ? Colors.white.withValues(alpha: 0.04)
-                              : const Color(0xFFF7F9FC),
-                          border: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(16),
-                            borderSide: BorderSide(color: cardBorder),
-                          ),
-                          enabledBorder: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(16),
-                            borderSide: BorderSide(color: cardBorder),
-                          ),
-                          focusedBorder: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(16),
-                            borderSide: BorderSide(color: accent, width: 2),
-                          ),
+                            const SizedBox(height: 14),
+
+                            // Поле пароля
+                            TextField(
+                              controller: _passwordController,
+                              obscureText: _obscurePassword,
+                              textInputAction: TextInputAction.done,
+                              onSubmitted: (_) => _doLogin(),
+                              autofillHints: const [AutofillHints.password],
+                              decoration: InputDecoration(
+                                labelText: 'Пароль',
+                                prefixIcon: const Icon(Icons.lock_outline_rounded),
+                                suffixIcon: IconButton(
+                                  icon: Icon(
+                                    _obscurePassword
+                                        ? Icons.visibility_outlined
+                                        : Icons.visibility_off_outlined,
+                                  ),
+                                  onPressed: () {
+                                    AppHaptics.selectionClick();
+                                    setState(() => _obscurePassword = !_obscurePassword);
+                                  },
+                                ),
+                                filled: true,
+                                fillColor: isDark
+                                    ? Colors.white.withValues(alpha: 0.04)
+                                    : const Color(0xFFF7F9FC),
+                                border: OutlineInputBorder(
+                                  borderRadius: BorderRadius.circular(16),
+                                  borderSide: BorderSide(color: cardBorder),
+                                ),
+                                enabledBorder: OutlineInputBorder(
+                                  borderRadius: BorderRadius.circular(16),
+                                  borderSide: BorderSide(color: cardBorder),
+                                ),
+                                focusedBorder: OutlineInputBorder(
+                                  borderRadius: BorderRadius.circular(16),
+                                  borderSide: BorderSide(color: accent, width: 2),
+                                ),
+                              ),
+                            ),
+                          ],
                         ),
                       ),
                       const SizedBox(height: 12),

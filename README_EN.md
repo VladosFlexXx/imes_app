@@ -128,10 +128,10 @@ Schedule • Grades • Home • Notifications
 ## 📊 Project Status
 
 ```yaml
-Version: 0.6.6 (beta)
+Version: 0.6.7 (beta)
 Platform: Android / iOS (Sideload) / Web (PWA)
 Status: Active Development
-Last Update: November 14, 2026
+Last Update: November 15, 2026
 ```
 
 <div align="center">
@@ -147,6 +147,12 @@ Last Update: November 14, 2026
 ---
 
 ## 📝 Release Notes (Changelog)
+
+### 🚀 v0.6.7 (Build 44) — 15.11.2026
+
+- 🔑 **Smart Auto-Relogin (Mobile):** In-app WebView intercepts credentials upon form submission or password autofill, prompting to securely save credentials in hardware Keystore upon verified login. When session expires, app silently restores session in the background.
+- 🌐 **Native Browser Autofill & Relogin (Web PWA):** Wrapped web login inputs with `AutofillGroup` and standard autofill hints. Chrome, Safari, and Edge offer saved credentials in 1 click, while «Remember me» activates background proxy re-login.
+- 🛡️ **Privacy & Consent:** Credentials are encrypted locally via Keystore and transmitted solely to official `eos.imes.su` endpoints with explicit student confirmation.
 
 ### 🚀 v0.6.6 (Build 43) — 14.11.2026
 
