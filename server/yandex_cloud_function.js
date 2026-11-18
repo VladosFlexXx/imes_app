@@ -1,4 +1,10 @@
-const EIOS_BASE = "https://eos.imes.su";
+const {
+  EIOS_BASE,
+  isValidEiosUrl,
+  getQuerySecretError,
+  CookieJar,
+  fetchWithRedirects,
+} = require("./core");
 
 const CORS_HEADERS = {
   "Access-Control-Allow-Origin": "https://vladosflexxx.github.io",
@@ -6,83 +12,6 @@ const CORS_HEADERS = {
   "Access-Control-Allow-Headers": "Content-Type, x-cookie-header, x-target-url, Accept",
   "Access-Control-Max-Age": "86400",
 };
-
-class CookieJar {
-  constructor() {
-    this.cookies = new Map();
-  }
-
-  setFromHeaders(headers) {
-    let setCookies = [];
-    if (typeof headers.getSetCookie === "function") {
-      setCookies = headers.getSetCookie();
-    } else {
-      const raw = headers.get("set-cookie");
-      if (raw) setCookies = [raw];
-    }
-    for (const sc of setCookies) {
-      const nameVal = sc.split(";")[0].trim();
-      const eqIdx = nameVal.indexOf("=");
-      if (eqIdx > 0) {
-        const name = nameVal.slice(0, eqIdx).trim();
-        const val = nameVal.slice(eqIdx + 1).trim();
-        this.cookies.set(name, val);
-      }
-    }
-  }
-
-  toHeader() {
-    return Array.from(this.cookies.entries())
-      .map(([k, v]) => k + "=" + v)
-      .join("; ");
-  }
-
-  get(name) {
-    return this.cookies.get(name);
-  }
-}
-
-async function fetchWithRedirects(url, options = {}, jar = new CookieJar(), maxHops = 6) {
-  let currentUrl = url;
-  let currentMethod = options.method || "GET";
-  let currentBody = options.body;
-  const baseHeaders = options.headers || {};
-
-  for (let hop = 0; hop <= maxHops; hop++) {
-    const headers = { ...baseHeaders };
-    const cookieHeader = jar.toHeader();
-    if (cookieHeader) {
-      headers["Cookie"] = cookieHeader;
-    }
-
-    const res = await fetch(currentUrl, {
-      method: currentMethod,
-      headers: headers,
-      body: currentMethod === "POST" ? currentBody : undefined,
-      redirect: "manual",
-    });
-
-    jar.setFromHeaders(res.headers);
-
-    const isRedirect = [301, 302, 303, 307, 308].includes(res.status);
-    if (!isRedirect) {
-      return { response: res, finalUrl: currentUrl };
-    }
-
-    const loc = res.headers.get("location");
-    if (!loc) {
-      return { response: res, finalUrl: currentUrl };
-    }
-
-    currentUrl = new URL(loc, currentUrl).toString();
-    if (res.status === 303 || (res.status === 302 && currentMethod === "POST")) {
-      currentMethod = "GET";
-      currentBody = undefined;
-    }
-  }
-
-  throw new Error("Too many redirects");
-}
 
 module.exports.handler = async function (event, context) {
   const method = (event.httpMethod || "GET").toUpperCase();
@@ -101,6 +30,16 @@ module.exports.handler = async function (event, context) {
     const path = event.path || event.url || "/";
     const headers = event.headers || {};
     const query = event.queryStringParameters || {};
+
+    // 1. Проверка на секреты в query-параметрах
+    const secretError = getQuerySecretError(query);
+    if (secretError) {
+      return {
+        statusCode: 400,
+        headers: { ...dynamicCors, "Content-Type": "application/json" },
+        body: JSON.stringify({ error: secretError }),
+      };
+    }
 
     const isLogin = method === "POST" || path.includes("login") || query.action === "login";
 
@@ -123,14 +62,14 @@ module.exports.handler = async function (event, context) {
         };
       }
 
-      const username = bodyData.username || bodyData.login || query.username;
-      const password = bodyData.password || bodyData.pass || query.password;
+      const username = bodyData.username || bodyData.login;
+      const password = bodyData.password || bodyData.pass;
 
       if (!username || !password) {
         return {
           statusCode: 400,
           headers: { ...dynamicCors, "Content-Type": "application/json" },
-          body: JSON.stringify({ error: "Missing login credentials" }),
+          body: JSON.stringify({ error: "Missing login credentials in request body" }),
         };
       }
 
@@ -212,7 +151,7 @@ module.exports.handler = async function (event, context) {
     }
 
     const targetUrl = headers["x-target-url"] || query.url;
-    const cookieHeader = headers["x-cookie-header"] || query.cookie || "";
+    const cookieHeader = headers["x-cookie-header"] || "";
 
     if (!targetUrl) {
       return {
@@ -222,11 +161,11 @@ module.exports.handler = async function (event, context) {
       };
     }
 
-    if (!targetUrl.startsWith(EIOS_BASE)) {
+    if (!isValidEiosUrl(targetUrl)) {
       return {
         statusCode: 403,
         headers: { ...dynamicCors, "Content-Type": "application/json" },
-        body: JSON.stringify({ error: "Доступ разрешен только к eos.imes.su" }),
+        body: JSON.stringify({ error: "Доступ разрешен только к https://eos.imes.su (порт 443)" }),
       };
     }
 
@@ -238,11 +177,35 @@ module.exports.handler = async function (event, context) {
       proxyHeaders["Cookie"] = cookieHeader;
     }
 
-    const upstreamRes = await fetch(targetUrl, {
-      method: method,
-      headers: proxyHeaders,
-      redirect: "follow",
-    });
+    let currentProxyUrl = targetUrl;
+    let upstreamRes;
+    for (let hop = 0; hop <= 6; hop++) {
+      if (!isValidEiosUrl(currentProxyUrl)) {
+        return {
+          statusCode: 403,
+          headers: { ...dynamicCors, "Content-Type": "application/json" },
+          body: JSON.stringify({ error: "Редирект на сторонний адрес запрещен" }),
+        };
+      }
+
+      upstreamRes = await fetch(currentProxyUrl, {
+        method: method,
+        headers: proxyHeaders,
+        redirect: "manual",
+      });
+
+      const isRedirect = [301, 302, 303, 307, 308].includes(upstreamRes.status);
+      if (!isRedirect) break;
+
+      const loc = upstreamRes.headers.get("location");
+      if (!loc) break;
+
+      const nextUrl = new URL(loc, currentProxyUrl).toString();
+      if (!isValidEiosUrl(nextUrl)) {
+        break;
+      }
+      currentProxyUrl = nextUrl;
+    }
 
     const responseBody = await upstreamRes.text();
     const contentType = upstreamRes.headers.get("content-type") || "text/html; charset=utf-8";

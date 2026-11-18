@@ -28,6 +28,10 @@ import '../recordbook/repository.dart';
 import '../schedule/schedule_repository.dart';
 import '../study_plan/repository.dart';
 import '../notifications/notification_service.dart';
+import '../notifications/inbox_repository.dart';
+import '../homework/homework_repository.dart';
+import '../../core/storage/lesson_notes_storage.dart';
+import '../../core/session/user_session.dart';
 import '../schedule/lesson_reminder_service.dart';
 import '../../core/app_icon_service.dart';
 import '../../core/updater/app_update_service.dart';
@@ -157,6 +161,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
       GradesRepository.instance.clearCache(),
       RecordbookRepository.instance.clearCache(),
       StudyPlanRepository.instance.clearCache(),
+      NotificationInboxRepository.instance.clearCache(),
+      HomeworkRepository.instance.clearCache(),
+      LessonNotesStorage.clearCache(),
+      UserSession.instance.clear(),
     ]);
 
     if (!context.mounted) return;

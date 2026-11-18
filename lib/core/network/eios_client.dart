@@ -175,6 +175,30 @@ class EiosClient {
 
   bool _isRedirectStatus(int code) => code == 301 || code == 302 || code == 303 || code == 307 || code == 308;
 
+  /// ✅ Санитизация URL для безопасного журналирования (исключает cookie, password, token)
+  static String sanitizeUrlForLogging(String rawUrl) {
+    if (rawUrl.isEmpty) return rawUrl;
+    try {
+      final uri = Uri.parse(rawUrl);
+      if (uri.queryParameters.isEmpty) return rawUrl;
+      const sensitiveKeys = {'cookie', 'password', 'pass', 'token', 'auth', 'session', 'secret'};
+      final cleanParams = <String, String>{};
+      var modified = false;
+      uri.queryParameters.forEach((key, value) {
+        if (sensitiveKeys.contains(key.toLowerCase())) {
+          cleanParams[key] = '[REDACTED]';
+          modified = true;
+        } else {
+          cleanParams[key] = value;
+        }
+      });
+      if (!modified) return rawUrl;
+      return uri.replace(queryParameters: cleanParams).toString();
+    } catch (_) {
+      return rawUrl;
+    }
+  }
+
   /// ✅ Отправка запроса + ручное следование редиректам с накоплением Set-Cookie на каждом шаге.
   Future<http.Response> _sendWithRedirects(
     http.Request req,
@@ -185,15 +209,22 @@ class EiosClient {
     http.Request current = req;
 
     for (int hop = 0; hop <= maxHops; hop++) {
-      // подкладываем актуальные cookies перед каждым запросом
-      final cookieHeader = _buildCookieHeaderFromMap(jar);
+      final currentHost = current.url.host.toLowerCase();
+      final isEiosHost = currentHost.isEmpty || currentHost == 'eos.imes.su';
+
+      // подкладываем актуальные cookies перед каждым запросом только на доверенный хост
+      final cookieHeader = isEiosHost ? _buildCookieHeaderFromMap(jar) : '';
       current.headers.remove('Cookie');
-      if (cookieHeader.isNotEmpty) current.headers['Cookie'] = cookieHeader;
+      if (cookieHeader.isNotEmpty) {
+        current.headers['Cookie'] = cookieHeader;
+      }
 
       final res = await _sendNoRedirect(current, timeout: timeout);
 
-      // собираем cookies с каждого ответа
-      _mergeCookiePairsIntoJar(jar, _extractSetCookiePairsFromHeader(res.headers['set-cookie']));
+      // собираем cookies только с доверенного хоста
+      if (isEiosHost) {
+        _mergeCookiePairsIntoJar(jar, _extractSetCookiePairsFromHeader(res.headers['set-cookie']));
+      }
 
       if (!_isRedirectStatus(res.statusCode)) {
         return res;
@@ -205,6 +236,8 @@ class EiosClient {
       }
 
       final nextUri = Uri.parse(loc).isAbsolute ? Uri.parse(loc) : current.url.resolve(loc);
+      final nextHost = nextUri.host.toLowerCase();
+      final isNextEios = nextHost.isEmpty || nextHost == 'eos.imes.su';
 
       // 303 обычно означает: следующий запрос должен быть GET
       final nextMethod = (res.statusCode == 303) ? 'GET' : current.method;
@@ -218,8 +251,13 @@ class EiosClient {
       final nextReq = http.Request(method, nextUri);
       nextReq.headers.addAll(current.headers);
 
-      // Referer полезен для Moodle
-      nextReq.headers['Referer'] = current.url.toString();
+      // Если редирект на сторонний домен, удаляем Cookie и Referer с сессией
+      if (!isNextEios) {
+        nextReq.headers.remove('Cookie');
+        nextReq.headers.remove('Referer');
+      } else {
+        nextReq.headers['Referer'] = current.url.toString();
+      }
 
       current = nextReq;
     }
@@ -442,21 +480,26 @@ class EiosClient {
     }
 
     final parsedUri = Uri.parse(url);
-    final isAllowedHost = parsedUri.host.isEmpty || parsedUri.host.endsWith('imes.su');
+    final host = parsedUri.host.toLowerCase();
+    final isAllowedHost = host.isEmpty || host == 'eos.imes.su';
 
     Future<http.Response> doRequest(String cookieHeader) async {
       if (kIsWeb) {
         Future<http.Response> makeProxyRequest(String proxyUrl) {
           final uri = Uri.parse(proxyUrl).replace(queryParameters: {
             'url': url,
-            if (cookieHeader.isNotEmpty) 'cookie': cookieHeader,
           });
+          final proxyHeaders = <String, String>{
+            'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+            'x-target-url': url,
+          };
+          if (isAllowedHost && cookieHeader.isNotEmpty) {
+            proxyHeaders['x-cookie-header'] = cookieHeader;
+          }
           return _client
               .get(
                 uri,
-                headers: {
-                  'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
-                },
+                headers: proxyHeaders,
               )
               .timeout(timeout);
         }
@@ -497,7 +540,8 @@ class EiosClient {
     }
 
     final startedAt = DateTime.now();
-    AppLogger.instance.i('[HTTP] GET $url timeout=${timeout.inSeconds}s retries=$retries');
+    final safeUrl = sanitizeUrlForLogging(url);
+    AppLogger.instance.i('[HTTP] GET $safeUrl timeout=${timeout.inSeconds}s retries=$retries');
 
     http.Response? res;
     Exception? lastErr;
@@ -512,7 +556,7 @@ class EiosClient {
         lastErr = err;
 
         if (_isAuthExpiredError(e)) {
-          AppLogger.instance.w('[HTTP] auth expired on $url err=$e');
+          AppLogger.instance.w('[HTTP] auth expired on $safeUrl err=$e');
 
           if (!reloginTried) {
             reloginTried = true;
@@ -520,7 +564,7 @@ class EiosClient {
             final ok = await _tryReloginIfEnabled();
             if (ok) {
               cookies = await _getCookieHeader();
-              AppLogger.instance.i('[HTTP] retry after silent relogin: $url');
+              AppLogger.instance.i('[HTTP] retry after silent relogin: $safeUrl');
               try {
                 res = await doRequest(cookies);
                 break;
@@ -538,11 +582,11 @@ class EiosClient {
 
         if (attempt == retries) {
           final elapsedMs = DateTime.now().difference(startedAt).inMilliseconds;
-          AppLogger.instance.e('[HTTP] FAIL $url (${elapsedMs}ms)', lastErr);
+          AppLogger.instance.e('[HTTP] FAIL $safeUrl (${elapsedMs}ms)', lastErr);
           throw lastErr;
         }
 
-        AppLogger.instance.w('[HTTP] ERROR attempt=${attempt + 1}/$retries url=$url err=$e');
+        AppLogger.instance.w('[HTTP] ERROR attempt=${attempt + 1}/$retries url=$safeUrl err=$e');
         await _safeDelay(250 * (attempt + 1));
       }
     }
@@ -550,36 +594,37 @@ class EiosClient {
     final response = res;
     if (response == null) {
       final elapsedMs = DateTime.now().difference(startedAt).inMilliseconds;
-      AppLogger.instance.e('[HTTP] FAIL(no response) $url (${elapsedMs}ms)', lastErr);
+      AppLogger.instance.e('[HTTP] FAIL(no response) $safeUrl (${elapsedMs}ms)', lastErr);
       throw lastErr ?? Exception('Unknown network error');
     }
 
     if (response.statusCode != 200) {
       final elapsedMs = DateTime.now().difference(startedAt).inMilliseconds;
       AppLogger.instance.e(
-        '[HTTP] ${response.statusCode} $url (${elapsedMs}ms) bytes=${response.bodyBytes.length}',
+        '[HTTP] ${response.statusCode} $safeUrl (${elapsedMs}ms) bytes=${response.bodyBytes.length}',
       );
-      throw Exception('Failed to load page: ${response.statusCode} for $url');
+      throw Exception('Failed to load page: ${response.statusCode} for $safeUrl');
     }
 
     final html = response.body;
     final lower = html.toLowerCase();
     final finalUrl = response.request?.url.toString() ?? '';
+    final safeFinalUrl = sanitizeUrlForLogging(finalUrl);
 
     final redirectedToLogin = _isLoginRedirectUrl(finalUrl) || _looksLikeLoginPage(lower);
     if (redirectedToLogin) {
       final elapsedMs = DateTime.now().difference(startedAt).inMilliseconds;
-      AppLogger.instance.w('[HTTP] login page detected url=$url finalUrl=$finalUrl (${elapsedMs}ms)');
+      AppLogger.instance.w('[HTTP] login page detected url=$safeUrl finalUrl=$safeFinalUrl (${elapsedMs}ms)');
       _markSessionExpired('login page detected');
       throw const SessionExpiredException('Moodle returned login page');
     }
 
     final elapsedMs = DateTime.now().difference(startedAt).inMilliseconds;
-    AppLogger.instance.i('[HTTP] 200 $url (${elapsedMs}ms) bytes=${response.bodyBytes.length}');
+    AppLogger.instance.i('[HTTP] 200 $safeUrl (${elapsedMs}ms) bytes=${response.bodyBytes.length}');
 
     if (kDebugMode) {
       // ignore: avoid_print
-      print('[EOIS] GET $url -> ${response.statusCode} (${html.length} chars)');
+      print('[EOIS] GET $safeUrl -> ${response.statusCode} (${html.length} chars)');
     }
 
     return html;

@@ -1,10 +1,13 @@
-name: Deploy Landing to GitHub Pages
+name: Deploy Landing & PWA to GitHub Pages
 
 on:
   push:
     branches: ["main"]
     paths:
       - "landing_preview/**"
+      - "lib/**"
+      - "web/**"
+      - "pubspec.yaml"
       - ".github/workflows/pages.yml"
   workflow_dispatch:
 
@@ -18,7 +21,7 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  deploy:
+  build-and-deploy:
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
@@ -26,6 +29,34 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: "stable"
+          cache: true
+
+      - name: Install dependencies
+        run: flutter pub get
+
+      - name: Build Flutter PWA
+        run: flutter build web --release --base-href /imes_app/app/ --output landing_preview/app
+
+      - name: Verify PWA version
+        run: |
+          node -e '
+            const fs = require("fs");
+            const yaml = fs.readFileSync("pubspec.yaml", "utf8");
+            const match = yaml.match(/^version:\s*([^\s]+)/m);
+            if (!match) process.exit(1);
+            const expectedVersion = match[1].split("+")[0];
+            const vJson = JSON.parse(fs.readFileSync("landing_preview/app/version.json", "utf8"));
+            console.log("Expected version:", expectedVersion, "Built PWA version:", vJson.version);
+            if (vJson.version !== expectedVersion) {
+              console.error("Version mismatch!");
+              process.exit(1);
+            }
+          '
 
       - name: Configure Pages
         uses: actions/configure-pages@v5

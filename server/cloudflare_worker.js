@@ -12,6 +12,43 @@ const CORS_HEADERS = {
   "Access-Control-Max-Age": "86400",
 };
 
+/**
+ * Строгая проверка адреса назначения:
+ * - Схема строго https:
+ * - Хост строго eos.imes.su
+ * - Порт пустой или 443
+ * - Никаких user:pass@
+ */
+function isValidEiosUrl(urlString) {
+  if (!urlString || typeof urlString !== "string") return false;
+  try {
+    const parsed = new URL(urlString);
+    if (parsed.protocol !== "https:") return false;
+    if (parsed.hostname.toLowerCase() !== "eos.imes.su") return false;
+    if (parsed.port !== "" && parsed.port !== "443") return false;
+    if (parsed.username || parsed.password) return false;
+    return true;
+  } catch (_) {
+    return false;
+  }
+}
+
+/**
+ * Проверка на наличие секретов в URL параметрах (query string).
+ */
+function getQuerySecretError(query) {
+  if (!query || typeof query !== "object") return null;
+
+  const keys = Object.keys(query).map((k) => k.toLowerCase());
+  if (keys.includes("password") || keys.includes("pass")) {
+    return "Передача пароля в URL параметрах запрещена. Передавайте пароль в теле POST запроса.";
+  }
+  if (keys.includes("cookie")) {
+    return "Передача cookie в URL параметрах запрещена. Используйте заголовок x-cookie-header.";
+  }
+  return null;
+}
+
 class CookieJar {
   constructor() {
     this.cookies = new Map();
@@ -53,6 +90,10 @@ async function fetchWithRedirects(url, options = {}, jar = new CookieJar(), maxH
   let currentBody = options.body;
   const baseHeaders = options.headers || {};
 
+  if (!isValidEiosUrl(currentUrl)) {
+    throw new Error("Запрещенный адрес назначения: " + currentUrl);
+  }
+
   for (let hop = 0; hop <= maxHops; hop++) {
     const headers = { ...baseHeaders };
     const cookieHeader = jar.toHeader();
@@ -79,7 +120,13 @@ async function fetchWithRedirects(url, options = {}, jar = new CookieJar(), maxH
       return { response: res, finalUrl: currentUrl };
     }
 
-    currentUrl = new URL(loc, currentUrl).toString();
+    const nextUrl = new URL(loc, currentUrl).toString();
+    if (!isValidEiosUrl(nextUrl)) {
+      // Редирект ведет за пределы ЭИОС — останавливаемся без передачи учетных данных
+      return { response: res, finalUrl: currentUrl };
+    }
+
+    currentUrl = nextUrl;
     if (res.status === 303 || (res.status === 302 && currentMethod === "POST")) {
       currentMethod = "GET";
       currentBody = undefined;
@@ -107,6 +154,18 @@ export default {
       const pathname = urlObj.pathname;
       const query = Object.fromEntries(urlObj.searchParams.entries());
 
+      // Проверка на секреты в URL параметрах
+      const secretError = getQuerySecretError(query);
+      if (secretError) {
+        return new Response(
+          JSON.stringify({ error: secretError }),
+          {
+            status: 400,
+            headers: { ...dynamicCors, "Content-Type": "application/json" },
+          }
+        );
+      }
+
       const isLogin =
         method === "POST" ||
         pathname.includes("login") ||
@@ -129,12 +188,12 @@ export default {
           );
         }
 
-        const username = bodyData.username || bodyData.login || query.username;
-        const password = bodyData.password || bodyData.pass || query.password;
+        const username = bodyData.username || bodyData.login;
+        const password = bodyData.password || bodyData.pass;
 
         if (!username || !password) {
           return new Response(
-            JSON.stringify({ error: "Missing login credentials" }),
+            JSON.stringify({ error: "Missing login credentials in request body" }),
             {
               status: 400,
               headers: { ...dynamicCors, "Content-Type": "application/json" },
@@ -174,21 +233,23 @@ export default {
           Origin: EIOS_BASE,
         };
 
-        const { response: postRes, finalUrl: postFinalUrl } = await fetchWithRedirects(
-          `${EIOS_BASE}/login/index.php`,
-          {
-            method: "POST",
-            headers: postHeaders,
-            body: formParams.toString(),
-          },
-          jar
-        );
+        const { response: postRes, finalUrl: postFinalUrl } =
+          await fetchWithRedirects(
+            `${EIOS_BASE}/login/index.php`,
+            {
+              method: "POST",
+              headers: postHeaders,
+              body: formParams.toString(),
+            },
+            jar
+          );
 
-        const { response: myRes, finalUrl: myFinalUrl } = await fetchWithRedirects(
-          `${EIOS_BASE}/my/`,
-          { method: "GET", headers: commonHeaders },
-          jar
-        );
+        const { response: myRes, finalUrl: myFinalUrl } =
+          await fetchWithRedirects(
+            `${EIOS_BASE}/my/`,
+            { method: "GET", headers: commonHeaders },
+            jar
+          );
 
         const myHtml = await myRes.text();
         const lower = myHtml.toLowerCase();
@@ -196,7 +257,8 @@ export default {
           myFinalUrl.includes("/login") ||
           lower.includes("loginfailed") ||
           lower.includes("неверный логин") ||
-          (lower.includes("вход в систему") && !lower.includes("личный кабинет"));
+          (lower.includes("вход в систему") &&
+            !lower.includes("личный кабинет"));
 
         if (isLoginPage) {
           return new Response(
@@ -230,7 +292,7 @@ export default {
       }
 
       const targetUrl = request.headers.get("x-target-url") || query.url;
-      const cookieHeader = request.headers.get("x-cookie-header") || query.cookie || "";
+      const cookieHeader = request.headers.get("x-cookie-header") || "";
 
       if (!targetUrl) {
         return new Response(
@@ -246,9 +308,9 @@ export default {
         );
       }
 
-      if (!targetUrl.startsWith(EIOS_BASE)) {
+      if (!isValidEiosUrl(targetUrl)) {
         return new Response(
-          JSON.stringify({ error: "Доступ разрешен только к eos.imes.su" }),
+          JSON.stringify({ error: "Доступ разрешен только к https://eos.imes.su (порт 443)" }),
           {
             status: 403,
             headers: { ...dynamicCors, "Content-Type": "application/json" },
@@ -265,11 +327,37 @@ export default {
         proxyHeaders["Cookie"] = cookieHeader;
       }
 
-      const upstreamRes = await fetch(targetUrl, {
-        method: method,
-        headers: proxyHeaders,
-        redirect: "follow",
-      });
+      let currentProxyUrl = targetUrl;
+      let upstreamRes;
+      for (let hop = 0; hop <= 6; hop++) {
+        if (!isValidEiosUrl(currentProxyUrl)) {
+          return new Response(
+            JSON.stringify({ error: "Редирект на сторонний адрес запрещен" }),
+            {
+              status: 403,
+              headers: { ...dynamicCors, "Content-Type": "application/json" },
+            }
+          );
+        }
+
+        upstreamRes = await fetch(currentProxyUrl, {
+          method: method,
+          headers: proxyHeaders,
+          redirect: "manual",
+        });
+
+        const isRedirect = [301, 302, 303, 307, 308].includes(upstreamRes.status);
+        if (!isRedirect) break;
+
+        const loc = upstreamRes.headers.get("location");
+        if (!loc) break;
+
+        const nextUrl = new URL(loc, currentProxyUrl).toString();
+        if (!isValidEiosUrl(nextUrl)) {
+          break;
+        }
+        currentProxyUrl = nextUrl;
+      }
 
       const responseBody = await upstreamRes.arrayBuffer();
       const contentType =

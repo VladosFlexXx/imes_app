@@ -8,6 +8,7 @@ import 'package:imes_app/core/auth/auth_settings.dart';
 import 'package:imes_app/core/auth/session_manager.dart';
 import 'package:imes_app/core/demo/demo_mode.dart';
 import 'package:imes_app/core/network/eios_client.dart';
+import 'package:imes_app/core/session/user_session.dart';
 import 'package:imes_app/features/grades/repository.dart';
 import 'package:imes_app/features/home/home_screen.dart';
 import 'package:imes_app/features/notifications/inbox_repository.dart';
@@ -41,7 +42,8 @@ class _LoginWebScreenState extends State<LoginWebScreen> {
 
   Future<void> _loadSavedCreds() async {
     final s = AuthSettings.instance;
-    final creds = await s.getCredentials();
+    await s.load();
+    final creds = s.credsEnabled ? await s.getCredentials() : null;
     await EiosClient.instance.initProxyProvider();
     if (mounted) {
       setState(() {
@@ -91,6 +93,8 @@ class _LoginWebScreenState extends State<LoginWebScreen> {
       if (ok) {
         AppHaptics.lightImpact();
 
+        await UserSession.instance.setAccountId(username);
+
         if (_rememberMe) {
           await AuthSettings.instance.setCredentials(
             username: username,
@@ -99,6 +103,7 @@ class _LoginWebScreenState extends State<LoginWebScreen> {
           await AuthSettings.instance.setCredsEnabled(true);
           await AuthSettings.instance.setMode(AuthReloginMode.silentWithCredentials);
         } else {
+          await AuthSettings.instance.clearCredentials();
           await AuthSettings.instance.setCredsEnabled(false);
           await AuthSettings.instance.setMode(AuthReloginMode.safeUiLogin);
         }

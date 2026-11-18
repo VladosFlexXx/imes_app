@@ -50,15 +50,24 @@ class _AuthAvatarState extends State<AuthAvatar> {
     }
 
     try {
-      final cookie = (await _storage.read(key: 'cookie_header')) ?? '';
+      final uri = Uri.tryParse(url);
+      final isEiosHost = uri != null &&
+          uri.isScheme('https') &&
+          uri.host.toLowerCase() == 'eos.imes.su';
+
+      final cookie = isEiosHost ? ((await _storage.read(key: 'cookie_header')) ?? '') : '';
+      final headers = <String, String>{
+        'User-Agent': 'Mozilla/5.0',
+        'Accept': 'image/avif,image/webp,image/apng,image/*,*/*;q=0.8',
+      };
+      if (isEiosHost) {
+        if (cookie.isNotEmpty) headers['Cookie'] = cookie;
+        headers['Referer'] = 'https://eos.imes.su/';
+      }
+
       final res = await http.get(
         Uri.parse(url),
-        headers: {
-          if (cookie.isNotEmpty) 'Cookie': cookie,
-          'User-Agent': 'Mozilla/5.0',
-          'Accept': 'image/avif,image/webp,image/apng,image/*,*/*;q=0.8',
-          'Referer': 'https://eos.imes.su/',
-        },
+        headers: headers,
       );
       if (res.statusCode >= 200 &&
           res.statusCode < 300 &&

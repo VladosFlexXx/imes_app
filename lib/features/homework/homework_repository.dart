@@ -2,6 +2,8 @@ import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import '../../core/session/user_session.dart';
+
 class HomeworkItem {
   final String id;
   final String subject;
@@ -70,9 +72,17 @@ class HomeworkRepository extends ChangeNotifier {
   HomeworkRepository._();
   static final HomeworkRepository instance = HomeworkRepository._();
 
-  static const _kStorageKey = 'student_homework_list_v1';
+  static const _legacyStorageKey = 'student_homework_list_v1';
   final List<HomeworkItem> _items = [];
   bool _loaded = false;
+
+  String _resolveStorageKey() {
+    final account = UserSession.instance.accountId;
+    if (account.isNotEmpty) {
+      return 'student_homework_$account';
+    }
+    return _legacyStorageKey;
+  }
 
   List<HomeworkItem> get items => List.unmodifiable(_items);
 
@@ -84,14 +94,15 @@ class HomeworkRepository extends ChangeNotifier {
     return active;
   }
 
-  Future<void> init() async {
-    if (_loaded) return;
+  Future<void> init({bool reload = false}) async {
+    if (_loaded && !reload) return;
     try {
       final prefs = await SharedPreferences.getInstance();
-      final raw = prefs.getString(_kStorageKey);
+      final key = _resolveStorageKey();
+      final raw = prefs.getString(key);
+      _items.clear();
       if (raw != null && raw.isNotEmpty) {
         final decoded = jsonDecode(raw) as List<dynamic>;
-        _items.clear();
         for (final entry in decoded) {
           if (entry is Map<String, dynamic>) {
             _items.add(HomeworkItem.fromJson(entry));
@@ -107,8 +118,22 @@ class HomeworkRepository extends ChangeNotifier {
     try {
       final prefs = await SharedPreferences.getInstance();
       final raw = jsonEncode(_items.map((i) => i.toJson()).toList());
-      await prefs.setString(_kStorageKey, raw);
+      await prefs.setString(_resolveStorageKey(), raw);
     } catch (_) {}
+  }
+
+  /// Полная очистка списка ДЗ для изоляции пользователей
+  Future<void> clearCache({bool purgeFromStorage = true}) async {
+    _items.clear();
+    _loaded = false;
+    notifyListeners();
+    if (purgeFromStorage) {
+      try {
+        final prefs = await SharedPreferences.getInstance();
+        await prefs.remove(_resolveStorageKey());
+        await prefs.remove(_legacyStorageKey);
+      } catch (_) {}
+    }
   }
 
   Future<void> add({

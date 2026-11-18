@@ -6,6 +6,7 @@ import '../../core/cache/cached_repository.dart';
 import '../../core/data_source/app_data_source.dart';
 import '../../core/demo/demo_data.dart';
 import '../../core/demo/demo_mode.dart';
+import '../../core/session/user_session.dart';
 import 'data/api_profile_remote_source.dart';
 import 'data/profile_remote_source.dart';
 import 'data/web_profile_remote_source.dart';
@@ -48,13 +49,18 @@ class ProfileRepository extends CachedRepository<UserProfile?> {
       if (raw == null || raw.trim().isEmpty) return null;
 
       final j = jsonDecode(raw) as Map<String, dynamic>;
-      return UserProfile(
+      final profile = UserProfile(
         fullName: (j['fullName'] ?? 'Студент').toString(),
         avatarUrl: (j['avatarUrl'] as String?)?.toString(),
         fields: ((j['fields'] as Map?) ?? const {}).map(
           (k, v) => MapEntry(k.toString(), v.toString()),
         ),
       );
+      final account = (profile.email?.isNotEmpty == true) ? profile.email! : profile.fullName;
+      if (account.isNotEmpty && UserSession.instance.accountId.isEmpty) {
+        await UserSession.instance.setAccountId(account);
+      }
+      return profile;
     } catch (_) {
       return null;
     }
@@ -74,6 +80,11 @@ class ProfileRepository extends CachedRepository<UserProfile?> {
 
     await prefs.setString(_kProfileCacheKey, raw);
     await prefs.setString(_kProfileUpdatedKey, updatedAt.toIso8601String());
+
+    final account = (data.email?.isNotEmpty == true) ? data.email! : data.fullName;
+    if (account.isNotEmpty && UserSession.instance.accountId.isEmpty) {
+      await UserSession.instance.setAccountId(account);
+    }
   }
 
   @override

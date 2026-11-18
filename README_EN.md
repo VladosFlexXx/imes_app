@@ -128,10 +128,10 @@ Schedule • Grades • Home • Notifications
 ## 📊 Project Status
 
 ```yaml
-Version: 0.6.7 (beta)
+Version: 0.6.8 (beta)
 Platform: Android / iOS (Sideload) / Web (PWA)
 Status: Active Development
-Last Update: November 15, 2026
+Last Update: November 18, 2026
 ```
 
 <div align="center">
@@ -147,6 +147,15 @@ Last Update: November 15, 2026
 ---
 
 ## 📝 Release Notes (Changelog)
+
+### 🚀 v0.6.8 (Build 45) — 18.11.2026
+
+- 🛡️ **Session Security (Code Audit):** Completely eliminated EIOS session cookies from web proxy URL query parameters; cookies are now strictly passed via `x-cookie-header`.
+- 🔒 **Strict Proxy Gateway Validation:** All backend proxies (Standalone Node.js, Yandex Cloud Functions, Cloudflare Worker) enforce strict HTTPS target host validation (`eos.imes.su:443`) and reject query string credentials with 400.
+- 🖼️ **Avatar & Redirect Domain Isolation:** Session cookies and Referer are only attached to official `eos.imes.su` endpoints; external avatars are loaded anonymously.
+- 👥 **Multi-User Isolation on Shared Devices:** Homework, notifications, and lesson notes are account-scoped and completely purged upon sign-out. Stale async network responses after logout are discarded (`sessionGeneration`).
+- 🌐 **Automated CI PWA Deployment:** GitHub Pages workflow now builds Flutter Web PWA from repository sources with version consistency checks.
+- 🐳 **Dockerfile Update:** Upgraded standalone server Docker container base image to modern LTS `node:22-alpine`.
 
 ### 🚀 v0.6.7 (Build 44) — 15.11.2026
 

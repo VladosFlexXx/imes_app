@@ -1,6 +1,12 @@
 const http = require("node:http");
+const {
+  EIOS_BASE,
+  isValidEiosUrl,
+  getQuerySecretError,
+  CookieJar,
+  fetchWithRedirects,
+} = require("./core");
 
-const EIOS_BASE = "https://eos.imes.su";
 const PORT = process.env.PORT || 3000;
 const HOST = process.env.HOST || "0.0.0.0";
 
@@ -10,83 +16,6 @@ const CORS_HEADERS = {
   "Access-Control-Allow-Headers": "Content-Type, x-cookie-header, x-target-url, Accept, Authorization",
   "Access-Control-Max-Age": "86400",
 };
-
-class CookieJar {
-  constructor() {
-    this.cookies = new Map();
-  }
-
-  setFromHeaders(headers) {
-    let setCookies = [];
-    if (typeof headers.getSetCookie === "function") {
-      setCookies = headers.getSetCookie();
-    } else {
-      const raw = headers.get("set-cookie");
-      if (raw) setCookies = [raw];
-    }
-    for (const sc of setCookies) {
-      const nameVal = sc.split(";")[0].trim();
-      const eqIdx = nameVal.indexOf("=");
-      if (eqIdx > 0) {
-        const name = nameVal.slice(0, eqIdx).trim();
-        const val = nameVal.slice(eqIdx + 1).trim();
-        this.cookies.set(name, val);
-      }
-    }
-  }
-
-  toHeader() {
-    return Array.from(this.cookies.entries())
-      .map(([k, v]) => `${k}=${v}`)
-      .join("; ");
-  }
-
-  get(name) {
-    return this.cookies.get(name);
-  }
-}
-
-async function fetchWithRedirects(url, options = {}, jar = new CookieJar(), maxHops = 6) {
-  let currentUrl = url;
-  let currentMethod = options.method || "GET";
-  let currentBody = options.body;
-  const baseHeaders = options.headers || {};
-
-  for (let hop = 0; hop <= maxHops; hop++) {
-    const headers = { ...baseHeaders };
-    const cookieHeader = jar.toHeader();
-    if (cookieHeader) {
-      headers["Cookie"] = cookieHeader;
-    }
-
-    const res = await fetch(currentUrl, {
-      method: currentMethod,
-      headers: headers,
-      body: currentMethod === "POST" ? currentBody : undefined,
-      redirect: "manual",
-    });
-
-    jar.setFromHeaders(res.headers);
-
-    const isRedirect = [301, 302, 303, 307, 308].includes(res.status);
-    if (!isRedirect) {
-      return { response: res, finalUrl: currentUrl };
-    }
-
-    const loc = res.headers.get("location");
-    if (!loc) {
-      return { response: res, finalUrl: currentUrl };
-    }
-
-    currentUrl = new URL(loc, currentUrl).toString();
-    if (res.status === 303 || (res.status === 302 && currentMethod === "POST")) {
-      currentMethod = "GET";
-      currentBody = undefined;
-    }
-  }
-
-  throw new Error("Too many redirects");
-}
 
 function sendResponse(res, statusCode, headers, body) {
   res.writeHead(statusCode, headers);
@@ -115,6 +44,18 @@ const server = http.createServer(async (req, res) => {
   const parsedUrl = new URL(req.url, `http://${req.headers.host || "localhost"}`);
   const pathname = parsedUrl.pathname;
   const query = Object.fromEntries(parsedUrl.searchParams.entries());
+
+  // Проверка секретов в URL параметрах
+  const secretError = getQuerySecretError(query);
+  if (secretError) {
+    sendResponse(
+      res,
+      400,
+      { ...dynamicCors, "Content-Type": "application/json" },
+      JSON.stringify({ error: secretError })
+    );
+    return;
+  }
 
   // Buffer incoming body
   let rawBody = "";
@@ -169,15 +110,15 @@ const server = http.createServer(async (req, res) => {
         }
       }
 
-      const username = bodyData.username || bodyData.login || query.username;
-      const password = bodyData.password || bodyData.pass || query.password;
+      const username = bodyData.username || bodyData.login;
+      const password = bodyData.password || bodyData.pass;
 
       if (!username || !password) {
         sendResponse(
           res,
           400,
           { ...dynamicCors, "Content-Type": "application/json" },
-          JSON.stringify({ error: "Missing login credentials (username, password)" })
+          JSON.stringify({ error: "Missing login credentials in request body" })
         );
         return;
       }
@@ -231,11 +172,10 @@ const server = http.createServer(async (req, res) => {
 
       const myHtml = await myRes.text();
       const lower = myHtml.toLowerCase();
-      const isLoginPage =
-        myFinalUrl.includes("/login") ||
-        lower.includes("loginfailed") ||
-        lower.includes("неверный логин") ||
-        (lower.includes("вход в систему") && !lower.includes("личный кабинет"));
+      const isLoginPage = myFinalUrl.includes("/login") || 
+                          lower.includes("loginfailed") || 
+                          lower.includes("неверный логин") || 
+                          (lower.includes("вход в систему") && !lower.includes("личный кабинет"));
 
       if (isLoginPage) {
         sendResponse(
@@ -266,7 +206,7 @@ const server = http.createServer(async (req, res) => {
 
     // 3. Proxy endpoint
     const targetUrl = req.headers["x-target-url"] || query.url;
-    const cookieHeader = req.headers["x-cookie-header"] || query.cookie || "";
+    const cookieHeader = req.headers["x-cookie-header"] || "";
 
     if (!targetUrl) {
       sendResponse(
@@ -276,19 +216,19 @@ const server = http.createServer(async (req, res) => {
         JSON.stringify({
           status: "ok",
           service: "MyIMES Proxy & Backup Server",
-          usage: "Pass x-target-url header or ?url= parameter pointing to eos.imes.su",
+          usage: "Pass x-target-url header pointing to https://eos.imes.su",
           time: new Date().toISOString(),
         })
       );
       return;
     }
 
-    if (!targetUrl.startsWith(EIOS_BASE)) {
+    if (!isValidEiosUrl(targetUrl)) {
       sendResponse(
         res,
         403,
         { ...dynamicCors, "Content-Type": "application/json" },
-        JSON.stringify({ error: "Доступ разрешен только к eos.imes.su" })
+        JSON.stringify({ error: "Доступ разрешен только к https://eos.imes.su (порт 443)" })
       );
       return;
     }
@@ -301,12 +241,38 @@ const server = http.createServer(async (req, res) => {
       proxyHeaders["Cookie"] = cookieHeader;
     }
 
-    const upstreamRes = await fetch(targetUrl, {
-      method: method,
-      headers: proxyHeaders,
-      body: method === "POST" && rawBody ? rawBody : undefined,
-      redirect: "follow",
-    });
+    let currentProxyUrl = targetUrl;
+    let upstreamRes;
+    for (let hop = 0; hop <= 6; hop++) {
+      if (!isValidEiosUrl(currentProxyUrl)) {
+        sendResponse(
+          res,
+          403,
+          { ...dynamicCors, "Content-Type": "application/json" },
+          JSON.stringify({ error: "Редирект на сторонний адрес запрещен" })
+        );
+        return;
+      }
+
+      upstreamRes = await fetch(currentProxyUrl, {
+        method: method,
+        headers: proxyHeaders,
+        body: method === "POST" && rawBody ? rawBody : undefined,
+        redirect: "manual",
+      });
+
+      const isRedirect = [301, 302, 303, 307, 308].includes(upstreamRes.status);
+      if (!isRedirect) break;
+
+      const loc = upstreamRes.headers.get("location");
+      if (!loc) break;
+
+      const nextUrl = new URL(loc, currentProxyUrl).toString();
+      if (!isValidEiosUrl(nextUrl)) {
+        break;
+      }
+      currentProxyUrl = nextUrl;
+    }
 
     const responseBody = await upstreamRes.text();
     const contentType = upstreamRes.headers.get("content-type") || "text/html; charset=utf-8";
@@ -338,10 +304,6 @@ const server = http.createServer(async (req, res) => {
 
 server.listen(PORT, HOST, () => {
   console.log(`🚀 MyIMES Standalone Proxy Server running at http://${HOST}:${PORT}/`);
-  console.log(`   Connected to EIOS upstream: ${EIOS_BASE}`);
 });
 
-process.on("SIGTERM", () => {
-  console.log("Shutting down gracefully...");
-  server.close(() => process.exit(0));
-});
+module.exports = server;

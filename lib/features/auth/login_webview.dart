@@ -8,6 +8,7 @@ import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:imes_app/core/auth/auth_settings.dart';
 import 'package:imes_app/core/demo/demo_mode.dart';
 import 'package:imes_app/core/network/eios_client.dart';
+import 'package:imes_app/core/session/user_session.dart';
 import 'package:imes_app/ui/app_haptics.dart';
 import 'package:imes_app/ui/app_theme.dart';
 import 'package:imes_app/ui/shimmer_skeleton.dart';
@@ -38,6 +39,7 @@ class _LoginWebViewScreenState extends State<LoginWebViewScreen> {
 
   static const String _captureScript = """
     (function() {
+      if (window.location.origin !== 'https://eos.imes.su') return;
       function tryCapture() {
         try {
           var u = document.querySelector('input[name="username"]') || 
@@ -219,6 +221,10 @@ class _LoginWebViewScreenState extends State<LoginWebViewScreen> {
             _capturedPassword!,
           );
         }
+      }
+
+      if (_capturedUsername != null && _capturedUsername!.isNotEmpty) {
+        await UserSession.instance.setAccountId(_capturedUsername!);
       }
 
       await _goToApp();
@@ -442,14 +448,17 @@ class _LoginWebViewScreenState extends State<LoginWebViewScreen> {
           _controller = c;
           c.addJavaScriptHandler(
             handlerName: 'onCredentialsCaptured',
-            callback: (args) {
+            callback: (args) async {
+              final currentUrl = await c.getUrl();
+              if (currentUrl?.scheme != 'https' || currentUrl?.host != 'eos.imes.su') {
+                return;
+              }
               if (args.length >= 2) {
                 final u = args[0]?.toString() ?? '';
                 final p = args[1]?.toString() ?? '';
                 if (u.trim().isNotEmpty && p.isNotEmpty) {
                   _capturedUsername = u.trim();
                   _capturedPassword = p;
-                  debugPrint('CREDENTIALS CAPTURED: user=$_capturedUsername');
                 }
               }
             },
@@ -457,16 +466,21 @@ class _LoginWebViewScreenState extends State<LoginWebViewScreen> {
         },
         onProgressChanged: (_, p) => setState(() => _progress = p / 100),
         onLoadStop: (controller, url) async {
-          try {
-            await controller.evaluateJavascript(source: _captureScript);
-          } catch (_) {}
+          if (url?.scheme == 'https' && url?.host == 'eos.imes.su') {
+            try {
+              await controller.evaluateJavascript(source: _captureScript);
+            } catch (_) {}
+          }
           await _maybeDetectLoggedIn(url?.toString());
         },
         shouldOverrideUrlLoading: (controller, action) async {
-          try {
-            await controller.evaluateJavascript(source: _captureScript);
-          } catch (_) {}
-          final u = action.request.url?.toString();
+          final reqUrl = action.request.url;
+          if (reqUrl?.scheme == 'https' && reqUrl?.host == 'eos.imes.su') {
+            try {
+              await controller.evaluateJavascript(source: _captureScript);
+            } catch (_) {}
+          }
+          final u = reqUrl?.toString();
           // каждый переход — шанс понять, что залогинились
           unawaited(_maybeDetectLoggedIn(u));
           return NavigationActionPolicy.ALLOW;

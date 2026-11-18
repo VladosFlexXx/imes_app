@@ -5,6 +5,7 @@ import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import '../../core/session/user_session.dart';
 import 'web_notifications_source.dart';
 
 class NotificationInboxItem {
@@ -83,7 +84,7 @@ class NotificationInboxRepository extends ChangeNotifier {
   static final NotificationInboxRepository instance =
       NotificationInboxRepository._();
 
-  static const String _prefsKey = 'notifications_inbox_v1';
+  static const String _legacyPrefsKey = 'notifications_inbox_v1';
   static const int _maxItems = 120;
   final WebNotificationsSource _webSource = WebNotificationsSource();
 
@@ -91,16 +92,26 @@ class NotificationInboxRepository extends ChangeNotifier {
   final List<NotificationInboxItem> _items = [];
   bool _initialized = false;
 
+  String _resolvePrefsKey() {
+    final account = UserSession.instance.accountId;
+    if (account.isNotEmpty) {
+      return 'notifications_inbox_$account';
+    }
+    return _legacyPrefsKey;
+  }
+
   UnmodifiableListView<NotificationInboxItem> get items =>
       UnmodifiableListView(_items);
 
-  Future<void> init() async {
-    if (_initialized) return;
+  Future<void> init({bool reload = false}) async {
+    if (_initialized && !reload) return;
     _initialized = true;
 
     final prefs = await SharedPreferences.getInstance();
-    final raw = prefs.getString(_prefsKey);
+    final key = _resolvePrefsKey();
+    final raw = prefs.getString(key);
     if (raw == null || raw.trim().isEmpty) {
+      _items.clear();
       _syncCounters();
       return;
     }
@@ -123,6 +134,20 @@ class NotificationInboxRepository extends ChangeNotifier {
     }
 
     _syncCounters();
+  }
+
+  /// Полная очистка данных уведомлений для изоляции сессий
+  Future<void> clearCache({bool purgeFromStorage = true}) async {
+    _items.clear();
+    _initialized = false;
+    _syncCounters();
+    if (purgeFromStorage) {
+      try {
+        final prefs = await SharedPreferences.getInstance();
+        await prefs.remove(_resolvePrefsKey());
+        await prefs.remove(_legacyPrefsKey);
+      } catch (_) {}
+    }
   }
 
   Future<void> ingestRemoteMessage(
@@ -318,7 +343,7 @@ class NotificationInboxRepository extends ChangeNotifier {
   Future<void> _persist() async {
     final prefs = await SharedPreferences.getInstance();
     final raw = jsonEncode(_items.map((e) => e.toJson()).toList());
-    await prefs.setString(_prefsKey, raw);
+    await prefs.setString(_resolvePrefsKey(), raw);
   }
 
   void _syncCounters() {

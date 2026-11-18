@@ -1,8 +1,9 @@
-FROM node:20-alpine
+FROM node:22-alpine
 
 WORKDIR /app
 
 COPY package.json ./
+COPY core.js ./
 COPY standalone_server.js ./
 
 ENV PORT=3000

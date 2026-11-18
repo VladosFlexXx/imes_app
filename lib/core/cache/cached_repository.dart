@@ -23,6 +23,7 @@ abstract class CachedRepository<T> extends ChangeNotifier {
   bool _loading = false;
   Object? _lastError;
   bool _cacheLoaded = false;
+  int _sessionGeneration = 0;
   Future<void>? _initFuture;
   Future<void>? _refreshFuture;
 
@@ -31,6 +32,7 @@ abstract class CachedRepository<T> extends ChangeNotifier {
   bool get loading => _loading;
   Object? get lastError => _lastError;
   Duration get ttl => _ttl;
+  int get sessionGeneration => _sessionGeneration;
 
   String get debugName => runtimeType.toString();
 
@@ -41,6 +43,7 @@ abstract class CachedRepository<T> extends ChangeNotifier {
 
   @protected
   Future<void> resetState() async {
+    _sessionGeneration++;
     _data = _initialData;
     _updatedAt = null;
     _lastError = null;
@@ -110,6 +113,7 @@ abstract class CachedRepository<T> extends ChangeNotifier {
   }
 
   Future<void> _refreshImpl({required bool force}) async {
+    final currentGen = _sessionGeneration;
     _loading = true;
     _lastError = null;
     notifyListeners();
@@ -119,6 +123,10 @@ abstract class CachedRepository<T> extends ChangeNotifier {
 
     try {
       final fresh = await fetchRemote();
+      if (currentGen != _sessionGeneration) {
+        AppLogger.instance.w('[$debugName] refresh discarded: session changed during request');
+        return;
+      }
       _data = fresh;
       _updatedAt = DateTime.now();
       await writeCache(_data, _updatedAt!);
@@ -128,12 +136,15 @@ abstract class CachedRepository<T> extends ChangeNotifier {
         '[$debugName] refresh ok (${elapsedMs}ms) updatedAt=${_updatedAt?.toIso8601String()}',
       );
     } catch (e, st) {
+      if (currentGen != _sessionGeneration) return;
       final elapsedMs = DateTime.now().difference(startedAt).inMilliseconds;
       _lastError = e;
       AppLogger.instance.e('[$debugName] refresh error (${elapsedMs}ms)', e, st);
     } finally {
-      _loading = false;
-      notifyListeners();
+      if (currentGen == _sessionGeneration) {
+        _loading = false;
+        notifyListeners();
+      }
     }
   }
 
